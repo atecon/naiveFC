@@ -1,2 +1,183 @@
-clear
+/*
+   clear
+
+   open "/home/at/git/simple_forecasts/beer.gdt" --quiet
+*/
 set verbose off
+
+scalar h = 11
+#smpl ; -h
+
+function string meanf_colnam(matrix ci)
+    # construct column names
+    string c = "point"
+    loop i=1..cols(ci) -q
+        c += sprintf(" q%d", ci[i]*100)
+    endloop
+    return c
+end function
+
+
+function string rownam(scalar h)
+    # construct row names
+    string r = "h=1"
+    loop i=2..h -q
+        r += sprintf(" h=%d", i)
+    endloop
+    return r
+end function
+
+function matrix meanf (const series y "Series",
+                       int h[1::10] "Horizon",
+                       scalar level[64:99:90] "Confidence level",
+                       bool fan[0],
+                       bool bootstrap[0], int npaths[99::5000])
+    # forecasts of all future values are equal to the mean of the historical data
+    # Returns forecasts and prediction intervals for an iid model applied to y
+    /* R func:
+       meanf(y, h = 10, level = c(80, 95), fan = FALSE, lambda = NULL,
+       biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
+    */
+    if !fan
+        scalar lo = (100-level)/2
+        matrix ci = { lo, 100-lo }./100
+    else
+        matrix ci = seq(2,99,3)/100
+    endif
+    matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ quantile({y},ci)' )
+    colnames(ymean, meanf_colnam(ci))
+    rownames(ymean, rownam(h))
+    return ymean
+end function
+
+function matrix rwf (const series y "Series",
+                     int h[1::10] "Horizon",
+                     bool drift[0] "0=Random-Walk wo drift, 1=w drift",
+                     scalar level[64:99:90] "Confidence level",
+                     bool fan[0],
+                     bool bootstrap[0], int npaths[99::5000])
+    # naïve forecast is optimal when data follow a random walk
+    # these are also called random walk forecasts
+    /* R func:
+       https://www.rdocumentation.org/packages/forecast/versions/8.4/topics/rwf
+       rwf(y, h = 10, drift = FALSE, level = c(80, 95), fan = FALSE,
+       lambda = NULL, biasadj = FALSE, bootstrap = FALSE, npaths = 5000,
+       x = y)
+    */
+
+    if !fan
+        scalar lo = (100-level)/2
+        matrix ci = { lo, 100-lo }./100
+    else
+        matrix ci = seq(2,99,3)/100
+    endif
+    val = {y[$t2]}		# last actual realization
+    mat = ones(h,1) ~ cum(ones(h,cols(ci)))	# TODO
+    # TODO: construct CI
+
+    matrix fc = mat .* ( val ~ NA ~ NA )
+    colnames(fc, colnam(ci))
+    rownames(fc, rownam(h))
+    return fc
+end function
+
+function void fcplot(const series y, matrix meanf,
+                     string title[null],
+                     string ylab[null],
+                     string xlab[null])
+
+    # Plot point forecast and quantiles
+    string title = !exists(title) ? "" : title
+    string ylab = !exists(ylab) ? "" : ylab
+    string xlab = !exists(xlab) ? "" : xlab
+
+    set warnings off
+    matrix mplot = {y}
+    loop i=1..cols(meanf) -q
+        mplot ~= NA
+    endloop
+    mplot |= (NA ~ meanf)
+    colnames(mplot, "Actuals PointFC Low High")
+    set warnings on
+
+    ylo = min(y)-0.05*min(y)
+    yup = max(y)+0.05*max(y)
+    plot mplot
+        options with-lines time-series single-yaxis
+        literal set linetype 1 lc rgb "grey"
+        literal set linetype 2 lc rgb "red" lw 2
+        literal set linetype 3 lc rgb "black" lw 1.5
+        literal set linetype 4 lc rgb "black" lw 1.5
+        literal set key bottom below
+        printf "set yrange[%g:%g]", ylo, yup
+        printf "set ylabel \"%s\"", ylab
+        printf "set xlabel \"%s\"", xlab
+        printf "set title \"%s\"", title
+    end plot --output=display
+end function
+
+function matrix snaive (const series y "Series",
+                        int h[1::10] "Horizon",
+                        scalar level[64:99:90] "Confidence level",
+                        bool fan[0],
+                        bool bootstrap[0], int npaths[99::5000])
+    # returns forecasts and prediction intervals from an ARIMA(0,0,0)(0,1,0)
+    # model where m is the seasonal period.
+    /* R func:
+       https://www.rdocumentation.org/packages/cv.ts/versions/0.0.0.90105/topics/snaiveForecast
+       snaive(y, h = 2 * frequency(x), level = c(80, 95), fan = FALSE,
+       lambda = NULL, biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
+    */
+    /*
+       if !fan
+       scalar lo = (100-level)/2
+       matrix ci = { lo, 100-lo }./100
+       else
+       matrix ci = seq(2,99,3)/100
+       endif
+    */
+    # forecast simply equals last obs for each specific periodicity (month, quarter)
+    matrix val = zeros($pd,1)
+    my = {y}
+    loop i=1..$pd -q
+        val[i] = my[$t2-$pd+$i]
+    endloop
+    # stack snaive forecasts
+    if h>rows(val)
+        loop i=1..ceil(h/rows(val)) -q
+            val|=val
+        endloop
+        val = val[1:h]
+    else
+        val = val[1:h]
+    endif
+    mat = ones(h,3)			# TODO: construct CI
+    matrix fc = mat .* ( val ~ NA ~ NA )
+    colnames(fc, "Point NA NA")
+    rownames(fc, rownam(h))
+    return fc
+end function
+
+#SNAIVE
+snaiv = snaive(x,h)
+snaiv
+stop
+#xmean = meanf(x, h)
+#fcplot(x, xmean, "TITLE", "nice ylabel", "nice xlabel")
+
+# RW wo drift
+rw = rwf(x, h)
+rw
+fcplot(x, rw)
+
+
+
+
+
+
+
+
+
+
+
+

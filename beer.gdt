@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE gretldata SYSTEM "gretldata.dtd">
+
+<gretldata version="1.4" name="beer" frequency="4" startobs="1992:1" endobs="2007:4" type="time-series">
+<description>Data imported from CSV file 'beer.csv', 2018-10-21 13:03
+</description>
+<variables count="1">
+<variable name="x"
+/>
+</variables>
+<observations count="64" labels="false">
+<obs>443 </obs>
+<obs>410 </obs>
+<obs>420 </obs>
+<obs>532 </obs>
+<obs>433 </obs>
+<obs>421 </obs>
+<obs>410 </obs>
+<obs>512 </obs>
+<obs>449 </obs>
+<obs>381 </obs>
+<obs>423 </obs>
+<obs>531 </obs>
+<obs>426 </obs>
+<obs>408 </obs>
+<obs>416 </obs>
+<obs>520 </obs>
+<obs>409 </obs>
+<obs>398 </obs>
+<obs>398 </obs>
+<obs>507 </obs>
+<obs>432 </obs>
+<obs>398 </obs>
+<obs>406 </obs>
+<obs>526 </obs>
+<obs>428 </obs>
+<obs>397 </obs>
+<obs>403 </obs>
+<obs>517 </obs>
+<obs>435 </obs>
+<obs>383 </obs>
+<obs>424 </obs>
+<obs>521 </obs>
+<obs>421 </obs>
+<obs>402 </obs>
+<obs>414 </obs>
+<obs>500 </obs>
+<obs>451 </obs>
+<obs>380 </obs>
+<obs>416 </obs>
+<obs>492 </obs>
+<obs>428 </obs>
+<obs>408 </obs>
+<obs>406 </obs>
+<obs>506 </obs>
+<obs>435 </obs>
+<obs>380 </obs>
+<obs>421 </obs>
+<obs>490 </obs>
+<obs>435 </obs>
+<obs>390 </obs>
+<obs>412 </obs>
+<obs>454 </obs>
+<obs>416 </obs>
+<obs>403 </obs>
+<obs>408 </obs>
+<obs>482 </obs>
+<obs>438 </obs>
+<obs>386 </obs>
+<obs>405 </obs>
+<obs>491 </obs>
+<obs>427 </obs>
+<obs>383 </obs>
+<obs>394 </obs>
+<obs>473 </obs>
+</observations>
+</gretldata>
