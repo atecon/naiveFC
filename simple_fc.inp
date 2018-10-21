@@ -4,7 +4,7 @@
    open "/home/at/git/simple_forecasts/beer.gdt" --quiet
 */
 set verbose off
-
+include SB.gfn
 scalar h = 11
 #smpl ; -h
 
@@ -31,7 +31,8 @@ function matrix meanf (const series y "Series",
                        int h[1::10] "Horizon",
                        scalar level[64:99:90] "Confidence level",
                        bool fan[0],
-                       bool bootstrap[0], int npaths[99::5000])
+                       int nboot[0::99],
+                       int blength[2::] "Block lenght bootstrap")
     # forecasts of all future values are equal to the mean of the historical data
     # Returns forecasts and prediction intervals for an iid model applied to y
     /* R func:
@@ -44,10 +45,23 @@ function matrix meanf (const series y "Series",
     else
         matrix ci = seq(2,99,3)/100
     endif
-    matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ quantile({y},ci)' )
+    if nboot==0
+        matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ quantile({y},ci)' )
+    else
+        matrix yb = vec( re_sample({y}, nboot, blength) )
+        matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
+    endif
     colnames(ymean, meanf_colnam(ci))
     rownames(ymean, rownam(h))
     return ymean
+end function
+
+function matrix re_sample ( const matrix y, int nboot, int blength)
+    matrix bb=zeros(nobs(y),nboot)
+    loop boot=1..nboot --quiet
+        bb[,boot]=SB(y,blength)
+    endloop
+    return bb
 end function
 
 function matrix rwf (const series y "Series",
@@ -73,7 +87,6 @@ function matrix rwf (const series y "Series",
     endif
     val = {y[$t2]}		# last actual realization
     mat = ones(h,1) ~ cum(ones(h,cols(ci)))	# TODO
-    # TODO: construct CI
 
     matrix fc = mat .* ( val ~ NA ~ NA )
     colnames(fc, colnam(ci))
@@ -120,7 +133,8 @@ function matrix snaive (const series y "Series",
                         int h[1::10] "Horizon",
                         scalar level[64:99:90] "Confidence level",
                         bool fan[0],
-                        bool bootstrap[0], int npaths[99::5000])
+                        int nboot[0::99],
+                        int blength[2::] "Block lenght bootstrap")
     # returns forecasts and prediction intervals from an ARIMA(0,0,0)(0,1,0)
     # model where m is the seasonal period.
     /* R func:
@@ -128,17 +142,37 @@ function matrix snaive (const series y "Series",
        snaive(y, h = 2 * frequency(x), level = c(80, 95), fan = FALSE,
        lambda = NULL, biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
     */
-    /*
-       if !fan
-       scalar lo = (100-level)/2
-       matrix ci = { lo, 100-lo }./100
-       else
-       matrix ci = seq(2,99,3)/100
-       endif
-    */
-    # forecast simply equals last obs for each specific periodicity (month, quarter)
+    if !fan
+        scalar lo = (100-level)/2
+        matrix ci = { lo, 100-lo }./100
+    else
+        matrix ci = seq(2,99,3)/100
+    endif
+
+    if nboot==0
+        # forecast simply equals last obs for each specific periodicity (month, quarter)
+        fc = snaive_stack({y}, h)
+        matrix fc = ones(h,3) .* ( val ~ NA ~ NA )
+        colnames(fc, "Point NA NA")
+    else
+        # forecast simply equals last obs for each specific periodicity (month, quarter)
+        # FIXME: This destroys the seasonality structure
+        matrix yb = re_sample({y}, nboot, blength)
+        fc_b = zeros(h, nboot)
+        loop i=1..nboot -q
+            fc_b[,i] = snaive_stack(yb[,i], h)
+        endloop
+        #fc_mean:	 mean across each horizon
+        #fc_ci:		quantiles across each horizon
+        matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
+    endif
+    colnames(fc, meanf_colnam(ci))
+    rownames(fc, rownam(h))
+    return fc
+end function
+
+function matrix snaive_stack(const matrix my, int h)
     matrix val = zeros($pd,1)
-    my = {y}
     loop i=1..$pd -q
         val[i] = my[$t2-$pd+$i]
     endloop
@@ -151,19 +185,22 @@ function matrix snaive (const series y "Series",
     else
         val = val[1:h]
     endif
-    mat = ones(h,3)			# TODO: construct CI
-    matrix fc = mat .* ( val ~ NA ~ NA )
-    colnames(fc, "Point NA NA")
-    rownames(fc, rownam(h))
-    return fc
+    return val
 end function
 
-#SNAIVE
-snaiv = snaive(x,h)
+
+
+# SNAIVE: bootstrap doesn't work yet!
+snaiv = snaive(x,h, , ,999, $pd)
 snaiv
+fcplot(x, snaiv, "TITLE", "nice ylabel", "nice xlabel")
 stop
-#xmean = meanf(x, h)
-#fcplot(x, xmean, "TITLE", "nice ylabel", "nice xlabel")
+
+# MEANFC
+xmean = meanf(x, h, , ,999,$pd)
+xmean
+fcplot(x, xmean, "TITLE", "nice ylabel", "nice xlabel")
+stop
 
 # RW wo drift
 rw = rwf(x, h)
