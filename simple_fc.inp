@@ -169,21 +169,40 @@ function matrix snaive (const series y "Series",
 end function
 
 function matrix get_last_obsminor (const series y, int h)
-    # obtain last k (quarterly=4, monthly=12, etc. obs)    
+    # obtain last k (quarterly=4, monthly=12, etc. obs)
     smpl ($t2-$pd+1) $t2	# last $pd values
-    matrix ylast = {y}
-    
-    # stack snaive forecasts
-    if h>rows(ylast)
-        loop i=1..ceil(h/rows(ylast)) -q
-            ylast|=ylast
-        endloop
-        ylast = ylast[1:h]
-    else
-        ylast = ylast[1:h]
-    endif
-    return ylast
+    return stack_fc({y}, h)
 end function
+
+
+function matrix stack_fc (matrix fc "Forecast(s)",
+  int h "Forecast horizon")    
+    matrix fc = vec(fc)
+      # stack snaive forecasts
+    if h>rows(fc)
+        loop i=1..ceil(h/rows(fc)) -q
+            fc |= fc
+        endloop
+        fc = fc[1:h]
+    else
+        fc = fc[1:h]
+    endif
+    return fc
+end function
+
+function matrix get_mean_obsminor (const series y, int h)
+    # obtain last k (quarterly=4, monthly=12, etc. obs)
+    
+    series omin = $obsminor
+    matrix smean = zeros(uniq(omin),1)
+    
+    loop i=1..maxc(val_omin) -q	# filter by $obsminor
+        smpl omin==$i --restrict --replace
+        smean[i] = mean(y)
+    endloop
+    
+    return ylast
+end functions
 
 function matrix smean (const series y "Series",
                         int h[1::10] "Horizon",
@@ -233,6 +252,13 @@ open "/home/at/git/simple_forecasts/beer.gdt" --quiet
 */
 include SB.gfn
 scalar h = 11
+
+# SMEANNAIVE:
+smean = smean(x, h)
+smean
+fcplot(x, smean, "TITLE", "nice ylabel", "nice xlabel")
+stop
+
 
 # SNAIVE:
 snaiv = snaive(x, h)
