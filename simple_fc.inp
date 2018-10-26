@@ -144,11 +144,13 @@ function matrix snaive (const series y "Series",
 
     if fan==0
         # forecast simply equals last obs for each specific periodicity (month, quarter)        
-        fc = snaive_stack(y, h)
+        fc = get_last_obsminor(y, h)
         matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
         colnames(fc, "Point NA NA")
         
     else
+        funcerr "Confidence intervals are not available yet."
+        /* NEEDS 
         # forecast simply equals last obs for each specific periodicity (month, quarter)
         # FIXME: This destroys the seasonality structure
         matrix yb = re_sample({y}, nboot, blength)
@@ -159,14 +161,15 @@ function matrix snaive (const series y "Series",
         #fc_mean:	 mean across each horizon
         #fc_ci:		quantiles across each horizon
         matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
+        */
     endif
     colnames(fc, meanf_colnam(ci))
     rownames(fc, rownam(h))
     return fc
 end function
 
-function matrix snaive_stack (const series y, int h)
-    
+function matrix get_last_obsminor (const series y, int h)
+    # obtain last k (quarterly=4, monthly=12, etc. obs)    
     smpl ($t2-$pd+1) $t2	# last $pd values
     matrix ylast = {y}
     
@@ -182,6 +185,43 @@ function matrix snaive_stack (const series y, int h)
     return ylast
 end function
 
+function matrix smean (const series y "Series",
+                        int h[1::10] "Horizon",
+                        scalar level[64:99:90] "Confidence level",
+                        bool fan[0],
+                        int nboot[0::99],
+                       int blength[2::4] "Block lenght bootstrap")
+                       
+    # forecasts of all future values are equal to the mean of season of the historical data
+    # model where m is the seasonal period.
+              
+    matrix ci = genci(level, fan)
+
+    if fan==0
+        # forecast simply equals the mean for each specific $obsminor periodicity (month, quarter etc.)
+        fc = get_mean_obsminor(y, h)
+        matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
+        colnames(fc, "Point NA NA")
+        
+    else
+        funcerr "Confidence intervals are not available yet."
+        /* NEEDS 
+        # forecast simply equals last obs for each specific periodicity (month, quarter)
+        # FIXME: This destroys the seasonality structure
+        matrix yb = re_sample({y}, nboot, blength)
+        fc_b = zeros(h, nboot)
+        loop i=1..nboot -q
+            fc_b[,i] = snaive_stack(yb[,i], h)
+        endloop
+        #fc_mean:	 mean across each horizon
+        #fc_ci:		quantiles across each horizon
+        matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
+        */
+    endif
+    colnames(fc, meanf_colnam(ci))
+    rownames(fc, rownam(h))
+    return fc
+end function
 
 
 
