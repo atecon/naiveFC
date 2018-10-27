@@ -24,16 +24,16 @@ function matrix get_last_obsminor (const series y, int h)
 end function
 
 /*
-function matrix re_sample (const matrix y, int nboot, int blength)
-    # NOTE: requires SB.gfn package
-    # not considered yet
-    
-    matrix bb=zeros(nobs(y),nboot)
-    loop boot=1..nboot --quiet
-        bb[,boot]=SB(y,blength)
-    endloop
-    return bb
-end function
+   function matrix re_sample (const matrix y, int nboot, int blength)
+   # NOTE: requires SB.gfn package
+   # not considered yet
+
+   matrix bb=zeros(nobs(y),nboot)
+   loop boot=1..nboot --quiet
+   bb[,boot]=SB(y,blength)
+   endloop
+   return bb
+   end function
 */
 
 function matrix genci (scalar level[1:99:90] "confidence sign. level",
@@ -44,15 +44,15 @@ function matrix genci (scalar level[1:99:90] "confidence sign. level",
         matrix ci = { lo, 100-lo }./100
     else
         matrix ci = seq(2,99,3)/100
-    endif                       
+    endif
     return ci
 end function
 
 function matrix stack_fc (matrix fc "Forecast(s)",
-  int h "Forecast horizon")
-    # construct h-step ahdead forecasts    
+      int h "Forecast horizon")
+    # construct h-step ahdead forecasts
     matrix fc = vec(fc)
-      # stack forecasts
+    # stack forecasts
     if h>rows(fc)
         loop i=1..ceil(h/rows(fc)) -q
             fc |= fc
@@ -65,23 +65,23 @@ function matrix stack_fc (matrix fc "Forecast(s)",
 end function
 
 function matrix get_mean_obsminor (const series y, int h)
-    # obtain last k (quarterly=4, monthly=12, etc. obs)    
+    # obtain last k (quarterly=4, monthly=12, etc. obs)
     series omin = $obsminor
     scalar n = max(uniq(omin))
     matrix ymeans = zeros(n, 1)
-    
+
     loop i=1..n -q	# filter by $obsminor
         smpl omin==$i --restrict --replace
         ymeans[i] = mean(y)
-    endloop    
+    endloop
     return stack_fc(ymeans, h)
 end function
 
 
 function void fcplot (const series y, matrix fc,
-                     string title[null],
-                     string ylab[null],
-                     string xlab[null])
+                      string title[null],
+                      string ylab[null],
+                      string xlab[null])
 
     # Plot point forecast and quantiles
     string title = !exists(title) ? "" : title
@@ -116,7 +116,7 @@ end function
 function void seas_check (const series y "Actuals")
     if $pd==1
         funcerr "The method you requested is not available for annual data."
-    endif    
+    endif
 end function
 
 
@@ -136,7 +136,7 @@ function matrix meanf (const series y "Actuals",
 
     if nboot==0
         matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
-        
+
     else
         matrix yb = vec( re_sample({y}, nboot, blength) )
         matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
@@ -153,8 +153,8 @@ function matrix rwf (const series y "Actuals",
                      scalar level[64:99:90] "Confidence level",
                      bool fan[0],
                      int nboot[0::0],
-                     int blength[2::4] "Block lenght bootstrap")                     
-                     
+                     int blength[2::4] "Block lenght bootstrap")
+
     # naïve forecast is optimal when data follow a random walk
     # these are also called random walk forecasts
     /* R func:
@@ -168,7 +168,7 @@ function matrix rwf (const series y "Actuals",
 
     mat = ones(h,1) 					#TODO: construct intervals later
     matrix fc = mat .* ( y[$t2] ~ NA ~ NA )
-    
+
     if drift
         # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
         scalar avg = (y[$t2]-y[$t1])/(nobs(y)-1)	# average growth rate (drift)
@@ -187,38 +187,38 @@ function matrix snaive (const series y "Series",
                         bool fan[0],
                         int nboot[0::0],
                         int blength[2::4] "Block lenght bootstrap")
-                                                
+
     # returns forecasts and prediction intervals from an ARIMA(0,0,0)(0,1,0)
     # model where m is the seasonal period.
     /* R func:
        https://www.rdocumentation.org/packages/cv.ts/versions/0.0.0.90105/topics/snaiveForecast
        snaive(y, h = 2 * frequency(x), level = c(80, 95), fan = FALSE,
        lambda = NULL, biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
-       */
+    */
 
-       seas_check(y)
-              
-       matrix ci = genci(level,fan)
+    seas_check(y)
+
+    matrix ci = genci(level,fan)
 
     if fan==0
-        # forecast simply equals last obs for each specific periodicity (month, quarter)        
+        # forecast simply equals last obs for each specific periodicity (month, quarter)
         fc = get_last_obsminor(y, h)
         matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
         colnames(fc, "Point NA NA")
-        
+
     else
         funcerr "Confidence intervals are not available yet."
-        /* NEEDS 
-        # forecast simply equals last obs for each specific periodicity (month, quarter)
-        # FIXME: This destroys the seasonality structure
-        matrix yb = re_sample({y}, nboot, blength)
-        fc_b = zeros(h, nboot)
-        loop i=1..nboot -q
-            fc_b[,i] = snaive_stack(yb[,i], h)
-        endloop
-        #fc_mean:	 mean across each horizon
-        #fc_ci:		quantiles across each horizon
-        matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
+        /* NEEDS
+           # forecast simply equals last obs for each specific periodicity (month, quarter)
+           # FIXME: This destroys the seasonality structure
+           matrix yb = re_sample({y}, nboot, blength)
+           fc_b = zeros(h, nboot)
+           loop i=1..nboot -q
+           fc_b[,i] = snaive_stack(yb[,i], h)
+           endloop
+           #fc_mean:	 mean across each horizon
+           #fc_ci:		quantiles across each horizon
+           matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
         */
     endif
     colnames(fc, gen_colnames(ci))
@@ -233,12 +233,12 @@ function matrix smeanf (const series y "Series",
                         bool fan[0],
                         int nboot[0::0],
                         int blength[2::4] "Block lenght bootstrap")
-                       
+
     # forecasts of all future values are equal to the mean of season of the historical data
     # model where m is the seasonal period.
 
     seas_check(y)
-              
+
     matrix ci = genci(level, fan)
 
     if fan==0
@@ -246,20 +246,20 @@ function matrix smeanf (const series y "Series",
         fc = get_mean_obsminor(y, h)
 
         matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
-        colnames(fc, "Point NA NA")        
+        colnames(fc, "Point NA NA")
     else
         funcerr "Confidence intervals are not available yet."
         /* Not implemented yet
-        # forecast simply equals last obs for each specific periodicity (month, quarter)
-        # FIXME: This destroys the seasonality structure
-        matrix yb = re_sample({y}, nboot, blength)
-        fc_b = zeros(h, nboot)
-        loop i=1..nboot -q
-            fc_b[,i] = snaive_stack(yb[,i], h)
-        endloop
-        #fc_mean:	 mean across each horizon
-        #fc_ci:		quantiles across each horizon
-        matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
+           # forecast simply equals last obs for each specific periodicity (month, quarter)
+           # FIXME: This destroys the seasonality structure
+           matrix yb = re_sample({y}, nboot, blength)
+           fc_b = zeros(h, nboot)
+           loop i=1..nboot -q
+           fc_b[,i] = snaive_stack(yb[,i], h)
+           endloop
+           #fc_mean:	 mean across each horizon
+           #fc_ci:		quantiles across each horizon
+           matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
         */
     endif
     colnames(fc, gen_colnames(ci))
@@ -269,21 +269,34 @@ end function
 
 
 function matrix ensemble_fc (const series y "Series",
-                        int h[1::10] "Horizon",
-                        scalar level[64:99:90] "Confidence level",
-                        bool fan[0],
-                        int nboot[0::0],
-                        int blength[2::4] "Block lenght bootstrap")
+                             int h[1::10] "Horizon",
+                             scalar level[64:99:90] "Confidence level",
+                             bool fan[0],
+                             int nboot[0::0],
+                             int blength[2::4] "Block lenght bootstrap")
 
-    # Computes the mean/median and cross-sectional (across forecast methods)
+    # Computes the mean and cross-sectional (across forecast methods)
     # standard deviation at each horizon using all simple forecast methods
     # available.
-    
 
+    # Base models
+    strings M = defarray("meanf(y,h)", "rwf(y,h)", "rwf(y,h,1)")
+    if $pd>1	# for seasonal data only
+        M += "smeanf(y,h)"
+        M += "snaive(y,h)"
+    endif
+
+    matrix fc = zeros(h,nelem(M))
+    loop i=1..nelem(M) -q
+        string s = sprintf("%s", M[i])
+        fc[,i] = @s[,1]	# only point-fc
+    endloop
+
+    fc = meanr(fc) ~ sdc(fc')'
+    colnames(fc, "Mean SD")
+    rownames(fc, rownam(h))
+    return fc
 end function
-
-
-
 
 
 

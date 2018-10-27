@@ -34,4 +34,7 @@ rwd = rwf(x, h, 1)
 rwd
 fcplot(x, rw, "Random-Walk + Drift Forecast")
 
-
+# Mean forecast (ensemble)
+avgfc = ensemble_fc(x, h)
+avgfc
+fcplot(x, avgfc[,1], "Ensemble Forecast")
