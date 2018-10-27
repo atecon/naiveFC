@@ -1,0 +1,11 @@
+author = Artur Tarassow
+email = atecon@cryptolab.net
+version = 0.1
+date = 2018-10-27
+description = Simple forecasting methods
+data-requirement = needs-time-series-data
+tags = C53
+public = fcplot meanf smeanf rwf snaive ensemble_fc
+help = naiveFC.pdf
+sample-script = naiveFC_sample.inp
+min-version = 2018a

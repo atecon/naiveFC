@@ -1,14 +1,8 @@
-
-include "/home/at/git/simple_forecasts/naiveFC.inp" --force
-
-#----------
-# EXAMPLES
-#----------
 set verbose off
+include naiveFC.gfn --force
 
-#open "/home/at/git/simple_forecasts/beer.gdt" --quiet
 open AWM.gdt --quiet
-series x = YGA		# output gap
+series x = YGA		# output gap; for simplity named "x"
 scalar h = 11		# set forecast horizon
 
 # MEANFC

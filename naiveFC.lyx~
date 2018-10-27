@@ -77,7 +77,7 @@
 \begin_body
 
 \begin_layout Title
-The naiveFC() function package for Gretl
+The naiveFC function package for Gretl
 \end_layout
 
 \begin_layout Author
@@ -180,12 +180,19 @@ target "https://otexts.org/fpp2/simple-methods.html"
 \end_inset
 
 ).
- The functions implemented in naiveFC() are inspired by Hyndman's well-known
- forecast package for R.
+ The functions implemented in 
+\family typewriter
+naiveFC
+\family default
+ are inspired by Hyndman's well-known forecast package for R.
 \end_layout
 
 \begin_layout Standard
-This function package comprises the following features:
+The 
+\family typewriter
+naiveFC
+\family default
+ function package comprises currently the following features:
 \end_layout
 
 \begin_layout Itemize
@@ -208,14 +215,19 @@ Easy computation of an ensemble forecast by simply taking the mean forecast
 Plotting of the h-step ahead forecasts.
 \end_layout
 
+\begin_layout Standard
+NOTE: Currently, no prediction intervals or elaborated bootstrap methods
+ are implemented.
+ These may be introduced at some later stage though.
+\end_layout
+
 \begin_layout Section
 Install and load the package
 \end_layout
 
 \begin_layout Standard
-Since the simpleFC package is user-contributed it is publicly available
- on the gretl server.
- The package must be downloaded once, and loaded into memory each time gretl
+The naiveFC package is publicly available on the Gretl server.
+ The package must be downloaded once, and loaded into memory each time Gretl
  is started.
  
 \end_layout
@@ -262,7 +274,7 @@ set verbose off
 
 \begin_layout Plain Layout
 
-pkg install simpleFC
+pkg install naiveFC
 \end_layout
 
 \begin_layout Plain Layout
@@ -272,7 +284,7 @@ pkg install simpleFC
 
 \begin_layout Plain Layout
 
-include simpleFC.gfn
+include naiveFC.gfn
 \end_layout
 
 \begin_layout Plain Layout
@@ -282,7 +294,7 @@ include simpleFC.gfn
 
 \begin_layout Plain Layout
 
-help simpleFC
+help naiveFC
 \end_layout
 
 \end_inset
@@ -296,77 +308,38 @@ help simpleFC
 \end_layout
 
 \begin_layout Section
-Examples
-\end_layout
-
-\begin_layout Subsection
-Determine the optimal lag length
+Example
 \end_layout
 
 \begin_layout Standard
-A first step of the modeling stage comprises the determination of the optimal
- lag length of the approximate ARDL specification.
- The function 
-\family typewriter
-lagselect()
-\family default
- makes use of gretl's 
-\family typewriter
-var
-\family default
- command to determine the lag length using some standard information criteria.
- For the determination of the lag length, only variable 
-\begin_inset Formula $y_{t}$
+For illustration we use the AWM-macroeconomic data set comprising various
+ series observed at a quarterly frequency over 28 years.
+ The data set ends in 1998Q4.
+ The objective is to forecast the output gap (series named 
+\begin_inset Quotes eld
 \end_inset
 
- enters as an endogenous while all other variables are taken as exogenous.
- A simple example follows using the AWM-macroeconomic dataset comprising
- various series observed at a quarterly frequency over 28 years.
- The objective is to estimate a consumption equation where real log consumption
- expenditures, 
-\begin_inset Formula $c_{t},$
+YGA
+\begin_inset Quotes erd
 \end_inset
 
- is supposed to be a linear but dynamic function of its own lags as well
- as the log of real income, 
-\begin_inset Formula $inc_{t}$
+).
+ Note, the last valid observation for 
+\begin_inset Quotes eld
 \end_inset
 
-, and log of real wealth, 
-\begin_inset Formula $w_{t}$
+YGA
+\begin_inset Quotes erd
 \end_inset
 
-.
+ is for 1998Q2.
+ Hence, the 1-step ahead forecast will be computed for period 1998Q3!
 \end_layout
 
 \begin_layout Standard
-For illustrative purposes we set the maximum lag length to 
-\begin_inset Formula $p=q=4$
-\end_inset
-
-.
- Note that at the moment, the 
-\family typewriter
-ADMBP
-\family default
- package does not allow for gappy lag structures and the same lag length
- applies to all variables — which is also the standard case in VAR modeling.
- In the example we use the AIC information criteria to determine the optimal
- lag length.
- However, the user has the choice of using the BIC or the HQ criteria alternativ
-ely.
-\end_layout
-
-\begin_layout Standard
-Before we can call the public function 
-\family typewriter
-lagselect()
-\family default
-, we need to set up the main function 
-\family typewriter
-setARDL()
-\family default
- whose structure we will introduce in the following sub-chapter.
+The sample script opens the data set, computes and plots some forecasts.
+ Lastly, an ensemble forecast is computed which is an average of five simple
+ forecast methods (for details see below).
 \end_layout
 
 \begin_layout Standard
@@ -478,13 +451,76 @@ avgfc = ensemble_fc(x, h)
 
 \begin_layout Plain Layout
 
-print avgfc				# 1st col: point forecast, 2nd col: std.
+print avgfc		# 1st col: point forecast, 2nd col: std.
  deviation
 \end_layout
 
 \begin_layout Plain Layout
 
 fcplot(x, avgfc[,1], "Ensemble Forecast")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The estimated 
+\begin_inset Formula $h$
+\end_inset
+
+-step ahead ensemble forecasts for the first three horizons are:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+         Mean           SD
+\end_layout
+
+\begin_layout Plain Layout
+
+h=1      0.99175    0.0025707
+\end_layout
+
+\begin_layout Plain Layout
+
+h=2      0.99204    0.0022136
+\end_layout
+
+\begin_layout Plain Layout
+
+h=3      0.99273    0.0014922
 \end_layout
 
 \end_inset
@@ -586,7 +622,10 @@ NOT supported yet!
 bool fan[0]
 \family default
 : If 1, level is set to seq(51,99,3).
- This is suitable for fan plots (default no)
+ This is suitable for fan plots (default no).
+ 
+\color red
+NOT supported yet!
 \end_layout
 
 \begin_layout Enumerate
@@ -594,7 +633,11 @@ bool fan[0]
 \family typewriter
 int nboot[0::0]
 \family default
-: If >0 , use a bootstrap method to compute prediction intervals.
+: If >0 , use a bootstrap method with 
+\begin_inset Formula $nboot$
+\end_inset
+
+ iterations to compute prediction intervals.
  
 \color red
 NOT supported yet!
@@ -631,6 +674,12 @@ smeanf
 Forecasts of all future values are equal to the average of the historical
  data for each specific seasonality (e.g.
  daily, monthly, or quarterly).
+ For example, with monthly data, the forecast for all future February values
+ is equal to the last observed February value.
+ With quarterly data, the forecast of all future Q2 values is equal to the
+ last observed Q2 value (where Q2 means the second quarter).
+ Similar rules apply for other months and quarters, and for other seasonal
+ periods.
 \end_layout
 
 \begin_layout Standard
@@ -672,70 +721,7 @@ matrix
 \end_layout
 
 \begin_layout Standard
-The function arguments are similar to the ones as for meanf():
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-series y
-\family default
-: series of actual historical outcomes
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int 
-\family default
-h[1::10]: Max.
- forecast horizon to compute (default 10)
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-scalar level[64:90:90]
-\family default
-: Set the confidence level for prediction intervals (default 90).
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-bool fan[0]
-\family default
-: If 1, level is set to seq(51,99,3).
- This is suitable for fan plots (default no)
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int nboot[0::0]
-\family default
-: If >0 , use a bootstrap method to compute prediction intervals.
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int blength[2::4]
-\family default
-: If 
-\family typewriter
-nboot
-\family default
->0, set the block-length of the stationary block-bootstrap (default 4).
- 
-\color red
-NOT supported yet!
+The function arguments are the same as for meanf().
 \end_layout
 
 \begin_layout Standard
@@ -853,7 +839,10 @@ NOT supported yet!
 bool fan[0]
 \family default
 : If 1, level is set to seq(51,99,3).
- This is suitable for fan plots (default no)
+ This is suitable for fan plots (default no).
+ 
+\color red
+NOT supported yet!
 \end_layout
 
 \begin_layout Enumerate
@@ -895,8 +884,8 @@ snaive
 \end_layout
 
 \begin_layout Standard
-A similar method compared to naïve forecasts using rwf() is useful for highly
- seasonal data.
+A similar method compared to naïve forecasts using rwf() is useful for seasonal
+ data.
  Each forecast is equal to the last observed value from the same season
  of the year (e.g., the same month of the previous year).
  
@@ -1121,7 +1110,7 @@ string ylab
 \family typewriter
 string xlab
 \family default
-: provide a string for the x-label.
+[null]: provide a string for the x-label.
 \end_layout
 
 \begin_layout Enumerate
@@ -1129,11 +1118,7 @@ string xlab
 \family typewriter
 string filename
 \family default
-[null]: provide a string for the x-label.
-\end_layout
-
-\begin_layout Standard
-This function plots the dynamic multipliers immediately on the screen.
+[null]: provide a string for the x-label (default 'display').
 \end_layout
 
 \end_body
