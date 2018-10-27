@@ -77,6 +77,7 @@ function matrix get_mean_obsminor (const series y, int h)
         smpl omin==$i --restrict --replace
         ymeans[i] = mean(y)
     endloop
+    smpl full
     return stack_fc(ymeans, h)
 end function
 

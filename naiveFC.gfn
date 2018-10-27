@@ -368,6 +368,7 @@ loop i=1..n -q	# filter by $obsminor
   smpl omin==$i --restrict --replace
   ymeans[i] = mean(y)
 endloop
+smpl full
 return stack_fc(ymeans, h)
 </code>
 </gretl-function>
@@ -389,6 +390,7 @@ endif
 <sample-script>
 set verbose off
 include naiveFC.gfn --force
+#include /home/at/git/naiveFC/naiveFC.inp --force
 
 open AWM.gdt --quiet
 series x = YGA		# output gap; for simplity named &quot;x&quot;
