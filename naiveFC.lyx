@@ -1,0 +1,1136 @@
+#LyX 2.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 508
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package babel
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize 11
+\spacing other 1.15
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 2.5cm
+\topmargin 2.5cm
+\rightmargin 2.5cm
+\bottommargin 2.5cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\listings_params "basicstyle={\footnotesize\ttfamily}"
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+The naiveFC() function package for Gretl
+\end_layout
+
+\begin_layout Author
+\begin_inset CommandInset href
+LatexCommand href
+name "Artur Tarassow"
+target "https://sites.google.com/site/arturtarassow/"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Date
+Version 0.1
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Changelog
+\end_layout
+
+\begin_layout Itemize
+Version 0.1 (Oct, 2018)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+initial public version
+\end_layout
+
+\end_deeper
+\end_inset
+
+
+\begin_inset Newpage newpage
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset toc
+LatexCommand tableofcontents
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Standard
+The 
+\family typewriter
+naiveFC
+\family default
+ package is a collection of gretl scripts for computing forecasts using
+ very simple forecasting methods.
+ These may yield surprisingly good (in terms of forecast accuracy) results,
+ and may serve as benchmarks for more sophisticated methods.
+ For details on the methods read Rob J Hyndman and George Athanasopoulos'
+ book 
+\begin_inset Quotes eld
+\end_inset
+
+Forecasting: Principles and Practice
+\begin_inset Quotes erd
+\end_inset
+
+ and especially chapter 3.1.
+ there (URL: 
+\begin_inset CommandInset href
+LatexCommand href
+name "https://otexts.org/fpp2/simple-methods.html"
+target "https://otexts.org/fpp2/simple-methods.html"
+
+\end_inset
+
+).
+ The functions implemented in naiveFC() are inspired by Hyndman's well-known
+ forecast package for R.
+\end_layout
+
+\begin_layout Standard
+This function package comprises the following features:
+\end_layout
+
+\begin_layout Itemize
+Point estimates for five simple forecasting methods, namely the 'Average'
+ (mean), 'Seasonal Average' (seasonal mean), 'Naive' (Random-Walk), the
+ 'Seasonal Naive' and the 
+\begin_inset Quotes eld
+\end_inset
+
+Naive plus drift', are implemented.
+\end_layout
+
+\begin_layout Itemize
+Easy computation of an ensemble forecast by simply taking the mean forecast
+ across all available simple forecast methods (depending on whether the
+ underlying time-series has seasonality, or not).
+\end_layout
+
+\begin_layout Itemize
+Plotting of the h-step ahead forecasts.
+\end_layout
+
+\begin_layout Section
+Install and load the package
+\end_layout
+
+\begin_layout Standard
+Since the simpleFC package is user-contributed it is publicly available
+ on the gretl server.
+ The package must be downloaded once, and loaded into memory each time gretl
+ is started.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+# turn extra output off
+\end_layout
+
+\begin_layout Plain Layout
+
+set verbose off
+\end_layout
+
+\begin_layout Plain Layout
+
+# Download package (only once need)
+\end_layout
+
+\begin_layout Plain Layout
+
+pkg install simpleFC
+\end_layout
+
+\begin_layout Plain Layout
+
+# Load the package into memory
+\end_layout
+
+\begin_layout Plain Layout
+
+include simpleFC.gfn
+\end_layout
+
+\begin_layout Plain Layout
+
+# Get the help file
+\end_layout
+
+\begin_layout Plain Layout
+
+help simpleFC
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Example
+\end_layout
+
+\begin_layout Standard
+A first step of the modeling stage comprises the determination of the optimal
+ lag length of the approximate ARDL specification.
+ The function 
+\family typewriter
+lagselect()
+\family default
+ makes use of gretl's 
+\family typewriter
+var
+\family default
+ command to determine the lag length using some standard information criteria.
+ For the determination of the lag length, only variable 
+\begin_inset Formula $y_{t}$
+\end_inset
+
+ enters as an endogenous while all other variables are taken as exogenous.
+ A simple example follows using the AWM-macroeconomic dataset comprising
+ various series observed at a quarterly frequency over 28 years.
+ The objective is to estimate a consumption equation where real log consumption
+ expenditures, 
+\begin_inset Formula $c_{t},$
+\end_inset
+
+ is supposed to be a linear but dynamic function of its own lags as well
+ as the log of real income, 
+\begin_inset Formula $inc_{t}$
+\end_inset
+
+, and log of real wealth, 
+\begin_inset Formula $w_{t}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+For illustrative purposes we set the maximum lag length to 
+\begin_inset Formula $p=q=4$
+\end_inset
+
+.
+ Note that at the moment, the 
+\family typewriter
+ADMBP
+\family default
+ package does not allow for gappy lag structures and the same lag length
+ applies to all variables — which is also the standard case in VAR modeling.
+ In the example we use the AIC information criteria to determine the optimal
+ lag length.
+ However, the user has the choice of using the BIC or the HQ criteria alternativ
+ely.
+\end_layout
+
+\begin_layout Standard
+Before we can call the public function 
+\family typewriter
+lagselect()
+\family default
+, we need to set up the main function 
+\family typewriter
+setARDL()
+\family default
+ whose structure we will introduce in the following sub-chapter.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+open AWM.gdt --quiet
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+series x = YGA		# output gap
+\end_layout
+
+\begin_layout Plain Layout
+
+scalar h = 11		# set max.
+ forecast horizon
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+# SMEANF
+\end_layout
+
+\begin_layout Plain Layout
+
+smean = smeanf(x, h) 
+\end_layout
+
+\begin_layout Plain Layout
+
+print smean
+\end_layout
+
+\begin_layout Plain Layout
+
+fcplot(x, smean, "Seasonal Mean Forecast")
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+# RW with drift
+\end_layout
+
+\begin_layout Plain Layout
+
+rwd = rwf(x, h, 1)
+\end_layout
+
+\begin_layout Plain Layout
+
+print rwd
+\end_layout
+
+\begin_layout Plain Layout
+
+fcplot(x, rwd, "Random-Walk + Drift Forecast")
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+# Ensemble Forecast
+\end_layout
+
+\begin_layout Plain Layout
+
+avgfc = ensemble_fc(x, h)
+\end_layout
+
+\begin_layout Plain Layout
+
+print avgfc				# 1st col: point forecast, 2nd col: std.
+ deviation
+\end_layout
+
+\begin_layout Plain Layout
+
+fcplot(x, avgfc[,1], "Ensemble Forecast")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+List of public functions
+\end_layout
+
+\begin_layout Subsection
+meanf
+\end_layout
+
+\begin_layout Standard
+Forecasts of all future values are equal to the average (or “mean”) of the
+ historical data.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+meanf(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
+ level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
+::4] "Block length bootstrap")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+matrix
+\end_layout
+
+\begin_layout Standard
+The function arguments are:
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+series y
+\family default
+: series of actual historical outcomes
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int 
+\family default
+h[1::10]: Max.
+ forecast horizon to compute (default 10)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+scalar level[64:90:90]
+\family default
+: Set the confidence level for prediction intervals (default 90).
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+bool fan[0]
+\family default
+: If 1, level is set to seq(51,99,3).
+ This is suitable for fan plots (default no)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int nboot[0::0]
+\family default
+: If >0 , use a bootstrap method to compute prediction intervals.
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int blength[2::4]
+\family default
+: If 
+\family typewriter
+nboot
+\family default
+>0, set the block-length of the stationary block-bootstrap (default 4).
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Standard
+An 
+\begin_inset Formula $h\times1$
+\end_inset
+
+ matrix holding the h-step ahead point forecasts will be returned.
+\end_layout
+
+\begin_layout Subsection
+smeanf
+\end_layout
+
+\begin_layout Standard
+Forecasts of all future values are equal to the average of the historical
+ data for each specific seasonality (e.g.
+ daily, monthly, or quarterly).
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+smeanf(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
+ level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
+::4] "Block length bootstrap")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+matrix
+\end_layout
+
+\begin_layout Standard
+The function arguments are similar to the ones as for meanf():
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+series y
+\family default
+: series of actual historical outcomes
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int 
+\family default
+h[1::10]: Max.
+ forecast horizon to compute (default 10)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+scalar level[64:90:90]
+\family default
+: Set the confidence level for prediction intervals (default 90).
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+bool fan[0]
+\family default
+: If 1, level is set to seq(51,99,3).
+ This is suitable for fan plots (default no)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int nboot[0::0]
+\family default
+: If >0 , use a bootstrap method to compute prediction intervals.
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int blength[2::4]
+\family default
+: If 
+\family typewriter
+nboot
+\family default
+>0, set the block-length of the stationary block-bootstrap (default 4).
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Standard
+An 
+\begin_inset Formula $h\times1$
+\end_inset
+
+ matrix holding the h-step ahead point forecasts will be returned.
+\end_layout
+
+\begin_layout Subsection
+rwf
+\end_layout
+
+\begin_layout Standard
+For naïve forecasts, we simply set all forecasts to be the value of the
+ last observation.
+ A variation on the naïve method is to allow the forecasts to increase or
+ decrease over time, where the amount of change over time (called the drift)
+ is set to be the average change seen in the historical data.
+ Thus the forecast for time 
+\begin_inset Formula $T+h$
+\end_inset
+
+ is given by:
+\begin_inset Formula 
+\[
+\hat{y}_{T+h|T}=y_{T}+h\left(\frac{y_{T}-y_{1}}{T-1}\right)
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+rwf(const series y "Actuals", int h[1::10] "Forecast horizon", bool drift[0]
+ "0=Random-Walk wo drift, 1=w drift", scalar level[64:99:90] "Confidence
+ level", bool fan[0], int nboot[0::0], int blength[2::4] "Block length bootstrap
+")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+matrix
+\end_layout
+
+\begin_layout Standard
+The function arguments are the same as for meanf(), despite the 3rd option:
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+series y
+\family default
+: series of actual historical outcomes
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int 
+\family default
+h[1::10]: Max.
+ forecast horizon to compute (default 10)
+\end_layout
+
+\begin_layout Enumerate
+bool drift[0]: If '1', fits a random walk with drift term (default '0':
+ no drift)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+scalar level[64:90:90]
+\family default
+: Set the confidence level for prediction intervals (default 90).
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+bool fan[0]
+\family default
+: If 1, level is set to seq(51,99,3).
+ This is suitable for fan plots (default no)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int nboot[0::0]
+\family default
+: If >0 , use a bootstrap method to compute prediction intervals.
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int blength[2::4]
+\family default
+: If 
+\family typewriter
+nboot
+\family default
+>0, set the block-length of the stationary block-bootstrap (default 4).
+ 
+\color red
+NOT supported yet!
+\end_layout
+
+\begin_layout Standard
+An 
+\begin_inset Formula $h\times1$
+\end_inset
+
+ matrix holding the h-step ahead point forecasts will be returned.
+\end_layout
+
+\begin_layout Subsection
+snaive
+\end_layout
+
+\begin_layout Standard
+A similar method compared to naïve forecasts using rwf() is useful for highly
+ seasonal data.
+ Each forecast is equal to the last observed value from the same season
+ of the year (e.g., the same month of the previous year).
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+snaive(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
+ level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
+::4] "Block length bootstrap")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+matrix
+\end_layout
+
+\begin_layout Standard
+The function arguments are the same as for meanf().
+\end_layout
+
+\begin_layout Standard
+An 
+\begin_inset Formula $h\times1$
+\end_inset
+
+ matrix holding the h-step ahead point forecasts will be returned.
+\end_layout
+
+\begin_layout Subsection
+ensemble_fc
+\end_layout
+
+\begin_layout Standard
+This function computes the mean and cross-sectional (across forecast methods)
+ standard deviation of the respective point forecasts at each forecast horizon
+ using all simple forecasting methods available.
+ For annual data only the 
+\series bold
+(i)
+\series default
+ mean-forecast (meanf), the 
+\series bold
+(ii)
+\series default
+ Random-Walk without drift (rwf) and 
+\series bold
+(iii)
+\series default
+ Random-Walk with drift (rwf) will be computed.
+ For data with seasonality (e.g., monthly, quarterly) we also add the 
+\series bold
+(iv)
+\series default
+ the seasonal-mean (smean) and the 
+\series bold
+(v)
+\series default
+ seasonal-naive forecast (snaive) to the ensemble.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+ensemble_fc(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
+ level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
+::4] "Block length bootstrap")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+matrix
+\end_layout
+
+\begin_layout Standard
+The function arguments are the same as for meanf().
+\end_layout
+
+\begin_layout Standard
+An 
+\begin_inset Formula $h\times2$
+\end_inset
+
+ matrix holding the h-step ahead point forecasts in the 1st column and the
+ cross-sectional standard-deviation across all (3/5) forecasts will be returned.
+\end_layout
+
+\begin_layout Subsection
+fcplot
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+fcplot(const series y, matrix fc, string title[null], string ylab[null],
+ string xlab[null], string filename[null] "'display' OR 'Path+filename'")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+void
+\end_layout
+
+\begin_layout Standard
+The function arguments are:
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+series y: 
+\family default
+series of actual historical outcomes
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+matrix fc
+\family default
+: 
+\begin_inset Formula $h\times1$
+\end_inset
+
+ matrix holding the h-step ahead forecasts
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string title
+\family default
+[null]: provide a string for the title.
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string ylab
+\family default
+[null]: provide a string for the y-label.
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string xlab
+\family default
+: provide a string for the x-label.
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string filename
+\family default
+[null]: provide a string for the x-label.
+\end_layout
+
+\begin_layout Standard
+This function plots the dynamic multipliers immediately on the screen.
+\end_layout
+
+\end_body
+\end_document

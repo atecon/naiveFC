@@ -6,8 +6,9 @@ include "/home/at/git/simple_forecasts/naiveFC.inp" --force
 #----------
 set verbose off
 
-open "/home/at/git/simple_forecasts/beer.gdt" --quiet
-
+#open "/home/at/git/simple_forecasts/beer.gdt" --quiet
+open AWM.gdt --quiet
+series x = YGA		# output gap
 scalar h = 11		# set forecast horizon
 
 # MEANFC
