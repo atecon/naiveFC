@@ -83,12 +83,14 @@ end function
 function void fcplot (const series y, matrix fc,
                       string title[null],
                       string ylab[null],
-                      string xlab[null])
+                      string xlab[null],
+                      string filename[null] "'display' OR 'Path+filename'")
 
     # Plot point forecast and quantiles
     string title = !exists(title) ? "" : title
     string ylab = !exists(ylab) ? "" : ylab
     string xlab = !exists(xlab) ? "" : xlab
+    string out = !exists(filename) ? "display" : filename
 
     set warnings off
     matrix mplot = {y}
@@ -116,7 +118,7 @@ function void fcplot (const series y, matrix fc,
         printf "set ylabel \"%s\"", ylab
         printf "set xlabel \"%s\"", xlab
         printf "set title \"%s\"", title
-    end plot --output=display
+    end plot --output=@out
 end function
 
 function void seas_check (const series y "Actuals")
@@ -135,7 +137,7 @@ function matrix meanf (const series y "Actuals",
                        scalar level[64:99:90] "Confidence level",
                        bool fan[0],
                        int nboot[0::0],
-                       int blength[2::4] "Block lenght bootstrap")
+                       int blength[2::4] "Block length bootstrap")
     # forecasts of all future values are equal to the mean of the historical data
     # Returns forecasts and prediction intervals for an iid model applied to y
     /* R func:
@@ -171,7 +173,7 @@ function matrix rwf (const series y "Actuals",
                      scalar level[64:99:90] "Confidence level",
                      bool fan[0],
                      int nboot[0::0],
-                     int blength[2::4] "Block lenght bootstrap")
+                     int blength[2::4] "Block length bootstrap")
 
     # naïve forecast is optimal when data follow a random walk
     # these are also called random walk forecasts
@@ -208,7 +210,7 @@ function matrix snaive (const series y "Series",
                         scalar level[64:99:90] "Confidence level",
                         bool fan[0],
                         int nboot[0::0],
-                        int blength[2::4] "Block lenght bootstrap")
+                        int blength[2::4] "Block length bootstrap")
 
     # returns forecasts and prediction intervals from an ARIMA(0,0,0)(0,1,0)
     # model where m is the seasonal period.
@@ -258,7 +260,7 @@ function matrix smeanf (const series y "Series",
                         scalar level[64:99:90] "Confidence level",
                         bool fan[0],
                         int nboot[0::0],
-                        int blength[2::4] "Block lenght bootstrap")
+                        int blength[2::4] "Block length bootstrap")
 
     # forecasts of all future values are equal to the mean of season of the historical data
     # model where m is the seasonal period.
@@ -303,7 +305,7 @@ function matrix ensemble_fc (const series y "Series",
                              scalar level[64:99:90] "Confidence level",
                              bool fan[0],
                              int nboot[0::0],
-                             int blength[2::4] "Block lenght bootstrap")
+                             int blength[2::4] "Block length bootstrap")
 
     # Computes the mean and cross-sectional (across forecast methods)
     # standard deviation at each horizon using all simple forecast methods
