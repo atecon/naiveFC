@@ -1,7 +1,4 @@
-set verbose off
-
-
-function string gen_colnames(matrix ci)
+function string gen_colnames (matrix ci)
     # construct column names
     string c = "point"
     loop i=1..cols(ci) -q
@@ -10,14 +7,7 @@ function string gen_colnames(matrix ci)
     return c
 end function
 
-function matrix get_last_obsminor (const series y, int h)
-    # obtain last k (quarterly=4, monthly=12, etc. obs)
-    smpl ($t2-$pd+1) $t2	# last $pd values
-    return stack_fc({y}, h)
-end function
-
-
-function string rownam(scalar h)
+function string rownam (scalar h)
     # construct row names
     string r = "h=1"
     loop i=2..h -q
@@ -26,13 +16,25 @@ function string rownam(scalar h)
     return r
 end function
 
-function matrix re_sample ( const matrix y, int nboot, int blength)
+
+function matrix get_last_obsminor (const series y, int h)
+    # obtain last k (quarterly=4, monthly=12, etc. obs)
+    smpl ($t2-$pd+1) $t2	# last $pd values
+    return stack_fc({y}, h)
+end function
+
+/*
+function matrix re_sample (const matrix y, int nboot, int blength)
+    # NOTE: required SB.gfn package
+    # not considered yet
+    
     matrix bb=zeros(nobs(y),nboot)
     loop boot=1..nboot --quiet
         bb[,boot]=SB(y,blength)
     endloop
     return bb
 end function
+*/
 
 function matrix genci (scalar level[1:99:90] "confidence sign. level",
                        bool fan[0])
@@ -46,9 +48,9 @@ function matrix genci (scalar level[1:99:90] "confidence sign. level",
 end function
 
 function matrix stack_fc (matrix fc "Forecast(s)",
-  int h "Forecast horizon")    
+  int h "Forecast horizon")
     matrix fc = vec(fc)
-      # stack snaive forecasts
+      # stack forecasts
     if h>rows(fc)
         loop i=1..ceil(h/rows(fc)) -q
             fc |= fc
@@ -64,10 +66,10 @@ function matrix get_mean_obsminor (const series y, int h)
     # obtain last k (quarterly=4, monthly=12, etc. obs)
     
     series omin = $obsminor
-    scalar vals = max(uniq(omin))
-    matrix ymeans = zeros(vals, 1)
+    scalar n = max(uniq(omin))
+    matrix ymeans = zeros(n, 1)
     
-    loop i=1..vals -q	# filter by $obsminor
+    loop i=1..n -q	# filter by $obsminor
         smpl omin==$i --restrict --replace
         ymeans[i] = mean(y)
     endloop
@@ -76,7 +78,7 @@ function matrix get_mean_obsminor (const series y, int h)
 end function
 
 
-function void fcplot(const series y, matrix meanf,
+function void fcplot(const series y, matrix fc,
                      string title[null],
                      string ylab[null],
                      string xlab[null])
@@ -88,10 +90,10 @@ function void fcplot(const series y, matrix meanf,
 
     set warnings off
     matrix mplot = {y}
-    loop i=1..cols(meanf) -q
+    loop i=1..cols(fc) -q
         mplot ~= NA
     endloop
-    mplot |= (NA ~ meanf)
+    mplot |= (NA ~ fc)
     colnames(mplot, "Actuals PointFC Low High")
     set warnings on
 
@@ -144,6 +146,7 @@ function matrix rwf (const series y "Series",
                      scalar level[64:99:90] "Confidence level",
                      bool fan[0],
                      bool bootstrap[0], int npaths[99::5000])
+                     
     # naïve forecast is optimal when data follow a random walk
     # these are also called random walk forecasts
     /* R func:
@@ -250,54 +253,6 @@ function matrix smeanf (const series y "Series",
     rownames(fc, rownam(h))
     return fc
 end function
-
-
-# EXAMPLE
-
-open "/home/at/git/simple_forecasts/beer.gdt" --quiet
-
-#include SB.gfn
-scalar h = 11		# set forecast horizon
-
-# MEANFC
-xmean = meanf(x, h)
-xmean
-fcplot(x, xmean, "Mean Forecast", "nice ylabel", "nice xlabel")
-
-# MEANFC + bootstrap
-xmean = meanf(x, h, , ,999,$pd)
-xmean
-fcplot(x, xmean, "Mean Forecast + Boot.", "nice ylabel", "nice xlabel")
-
-# SMEANF:
-smean = smeanf(x, h)
-smean
-fcplot(x, smean, "Seasonal Mean Forecast", "nice ylabel", "nice xlabel")
-
-# SNAIVE:
-snaiv = snaive(x, h)
-snaiv
-fcplot(x, snaiv, "Naive Seasonal Forecast", "nice ylabel", "nice xlabel")
-#stop
-
-# SNAIVE: bootstrap doesn't work yet!
-/*
-snaiv = snaive(x, h, , ,999, $pd)
-snaiv
-fcplot(x, snaiv, "Naive Seasonal Forecast", "nice ylabel", "nice xlabel")
-#stop
-*/
-
-# RW wo drift
-rw = rwf(x, h)
-rw
-fcplot(x, rw, "Random-Walk Forecast")
-
-# RW with drift
-rw = rwf(x, h, 1)
-rw
-fcplot(x, rw, "Random-Walk + Drift Forecast")
-
 
 
 
