@@ -12,6 +12,7 @@ scalar h = 11		# set forecast horizon
 
 # MEANFC
 xmean = meanf(x, h)
+xmean
 fcplot(x, xmean, "Mean Forecast", "nice ylabel", "nice xlabel")
 
 # SMEANF:
@@ -32,7 +33,7 @@ fcplot(x, rw, "Random-Walk Forecast")
 # RW with drift
 rwd = rwf(x, h, 1)
 rwd
-fcplot(x, rw, "Random-Walk + Drift Forecast")
+fcplot(x, rwd, "Random-Walk + Drift Forecast")
 
 # Mean forecast (ensemble)
 avgfc = ensemble_fc(x, h)
