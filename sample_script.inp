@@ -12,13 +12,7 @@ scalar h = 11		# set forecast horizon
 
 # MEANFC
 xmean = meanf(x, h)
-xmean
 fcplot(x, xmean, "Mean Forecast", "nice ylabel", "nice xlabel")
-
-# MEANFC + bootstrap
-xmean = meanf(x, h, , ,999,$pd)
-xmean
-fcplot(x, xmean, "Mean Forecast + Boot.")
 
 # SMEANF:
 smean = smeanf(x, h)
@@ -36,8 +30,8 @@ rw
 fcplot(x, rw, "Random-Walk Forecast")
 
 # RW with drift
-rw = rwf(x, h, 1)
-rw
+rwd = rwf(x, h, 1)
+rwd
 fcplot(x, rw, "Random-Walk + Drift Forecast")
 
 
