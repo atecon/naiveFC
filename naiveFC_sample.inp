@@ -1,5 +1,5 @@
 set verbose off
-#include naiveFC.gfn --force
+include naiveFC.gfn --force
 
 open AWM.gdt --quiet
 series x = YGA		# output gap; for simplity named "x"

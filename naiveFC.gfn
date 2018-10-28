@@ -240,7 +240,7 @@ rownames(fc, rownam(h))
 return fc
 </code>
 </gretl-function>
-<gretl-function name="ensemble_fc" type="matrix">
+<gretl-function name="avgfc" type="matrix">
  <params count="6">
   <param name="y" type="series" const="true">
 <description>Series</description>
@@ -257,7 +257,7 @@ return fc
 <description>Block length bootstrap</description>
   </param>
  </params>
-<code># Computes the mean and cross-sectional (across forecast methods)
+<code># Computes the mean (average) and cross-sectional (across forecast methods)
 # standard deviation at each horizon using all simple forecast methods
 # available.
 if nboot&gt;0
@@ -276,9 +276,9 @@ loop i=1..nelem(M) -q
 endloop
 fc = meanr(fc) ~ sdc(fc')' ~ fc
 if $pd == 1
-  colnames(fc, &quot;ens.-mean ens.-sd meanf rwf rwf+drift&quot;)
+  colnames(fc, &quot;average-fc sd meanf rwf rwf+drift&quot;)
 else
-  colnames(fc, &quot;ens.-mean ens.-sd meanf rwf rwf+drift smean snaive&quot;)
+  colnames(fc, &quot;average-fc sd meanf rwf rwf+drift smean snaive&quot;)
 endif
 rownames(fc, rownam(h))
 return fc
@@ -426,10 +426,10 @@ rwd = rwf(x, h, 1)
 rwd
 fcplot(x, rwd, &quot;Random-Walk + Drift Forecast&quot;)
 
-# Mean forecast (ensemble)
-avgfc = ensemble_fc(x, h)
-avgfc
-fcplot(x, avgfc[,1], &quot;Ensemble Forecast&quot;)
+# Average of Forecasts
+avg_fc = avgfc(x, h)
+avg_fc		# 1st col: point forecast, 2nd col: std. deviation
+fcplot(x, avg_fc[,1], &quot;Avg. of Forecasts&quot;)
 </sample-script>
 </gretl-function-package>
 </gretl-functions>
