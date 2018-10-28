@@ -6,6 +6,8 @@
 <date>2018-10-27</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
+<label>naiveFC</label>
+<menu-attachment>MAINWIN/Model</menu-attachment>
 <help>
 pdfdoc:naiveFC.pdf
 </help>
@@ -272,8 +274,12 @@ loop i=1..nelem(M) -q
   string s = sprintf(&quot;%s&quot;, M[i])
   fc[,i] = @s[,1]	# only point-fc
 endloop
-fc = meanr(fc) ~ sdc(fc')'
-colnames(fc, &quot;Mean SD&quot;)
+fc = meanr(fc) ~ sdc(fc')' ~ fc
+if $pd == 1
+  colnames(fc, &quot;ens.-mean ens.-sd meanf rwf rwf+drift&quot;)
+else
+  colnames(fc, &quot;ens.-mean ens.-sd meanf rwf rwf+drift smean snaive&quot;)
+endif
 rownames(fc, rownam(h))
 return fc
 </code>
@@ -390,7 +396,6 @@ endif
 <sample-script>
 set verbose off
 include naiveFC.gfn --force
-#include /home/at/git/naiveFC/naiveFC.inp --force
 
 open AWM.gdt --quiet
 series x = YGA		# output gap; for simplity named &quot;x&quot;
