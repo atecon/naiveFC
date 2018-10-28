@@ -199,9 +199,9 @@ Naive plus drift', are implemented.
 \end_layout
 
 \begin_layout Itemize
-Easy computation of an ensemble forecast by simply taking the mean forecast
- across all available simple forecast methods (depending on whether the
- underlying time-series has seasonality, or not).
+Easy computation of an average of forecasts by taking the mean point forecasts
+ of all available simple forecast methods (depending on whether the underlying
+ time-series has seasonality, or not).
 \end_layout
 
 \begin_layout Itemize
@@ -210,7 +210,7 @@ Plotting of the h-step ahead forecasts.
 
 \begin_layout Standard
 NOTE: Currently, no prediction intervals or elaborated bootstrap methods
- are implemented.
+ for computing the whole forecast density are implemented.
  These may be introduced at some later stage though.
 \end_layout
 
@@ -331,8 +331,8 @@ YGA
 
 \begin_layout Standard
 The sample script opens the data set, computes and plots some forecasts.
- Lastly, an ensemble forecast is computed which is an average of five simple
- forecast methods (for details see below).
+ Lastly, an average of forecasts is computed which is an average of the
+ (currently) five forecast methods implemented (for details see below).
 \end_layout
 
 \begin_layout Standard
@@ -434,23 +434,24 @@ fcplot(x, rwd, "Random-Walk + Drift Forecast")
 
 \begin_layout Plain Layout
 
-# Ensemble Forecast
+# Average of Forecasts
 \end_layout
 
 \begin_layout Plain Layout
 
-avgfc = ensemble_fc(x, h)
+avg_fc = avgfc(x, h)
 \end_layout
 
 \begin_layout Plain Layout
 
-print avgfc		# 1st col: point forecast, 2nd col: std.
+print avg_fc		# 1st col: point forecast, 2nd col: std.
  deviation
 \end_layout
 
 \begin_layout Plain Layout
 
-fcplot(x, avgfc[,1], "Ensemble Forecast")
+fcplot(x, avg_fc[,1], "Avg.
+ of Forecasts")
 \end_layout
 
 \end_inset
@@ -468,7 +469,9 @@ The estimated
 \begin_inset Formula $h$
 \end_inset
 
--step ahead ensemble forecasts for the first three horizons are:
+-step ahead average of forecasts (named 'average-fc') and the cross-sectional
+ standard deviation ('sd') as well as the point forecasts of the separate
+ methods are reported in the output below for the first three horizons:
 \end_layout
 
 \begin_layout Standard
@@ -498,22 +501,26 @@ status open
 
 \begin_layout Plain Layout
 
-         Mean           SD
+        average-fc    sd           meanf        rwf          rwf+drift 
+   smean        snaive
 \end_layout
 
 \begin_layout Plain Layout
 
-h=1      0.99175    0.0025707
+h=1      0.99175    0.0025707      0.99446      0.99160      0.99154      0.99397
+      0.98720
 \end_layout
 
 \begin_layout Plain Layout
 
-h=2      0.99204    0.0022136
+h=2      0.99204    0.0022136      0.99446      0.99160      0.99149      0.99426
+      0.98840
 \end_layout
 
 \begin_layout Plain Layout
 
-h=3      0.99273    0.0014922
+h=3      0.99273    0.0014922      0.99446      0.99160      0.99143      0.99465
+      0.99150  
 \end_layout
 
 \end_inset
@@ -935,7 +942,7 @@ An
 \end_layout
 
 \begin_layout Subsection
-ensemble_fc
+avgfc
 \end_layout
 
 \begin_layout Standard
@@ -950,24 +957,44 @@ This function computes the mean and cross-sectional (across forecast methods)
 \series bold
 (i)
 \series default
- mean-forecast (meanf), the 
+ mean-forecast (
+\emph on
+meanf
+\emph default
+), the 
 \series bold
 (ii)
 \series default
- Random-Walk without drift (rwf) and 
+ Random-Walk without drift (
+\emph on
+rwf
+\emph default
+) and 
 \series bold
 (iii)
 \series default
- Random-Walk with drift (rwf) will be computed.
+ Random-Walk with drift (
+\emph on
+rwf
+\emph default
+) will be computed.
  For data with seasonality (e.g., monthly, quarterly) we also add the 
 \series bold
 (iv)
 \series default
- the seasonal-mean (smean) and the 
+ the seasonal-mean (
+\emph on
+smean
+\emph default
+) and the 
 \series bold
 (v)
 \series default
- seasonal-naive forecast (snaive) to the ensemble.
+ seasonal-naive forecast (
+\emph on
+snaive
+\emph default
+) to collection of forecasts.
 \end_layout
 
 \begin_layout Standard
@@ -992,7 +1019,7 @@ status open
 \begin_layout Plain Layout
 
 \family typewriter
-ensemble_fc(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
+avgfc(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
  level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
 ::4] "Block length bootstrap")
 \end_layout

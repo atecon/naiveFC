@@ -301,14 +301,14 @@ function matrix snaive (const series y "Series",
     return fc
 end function
 
-function matrix ensemble_fc (const series y "Series",
+function matrix avgfc (const series y "Series",
                              int h[1::10] "Horizon",
                              scalar level[64:99:90] "Confidence level",
                              bool fan[0],
                              int nboot[0::0],
                              int blength[2::4] "Block length bootstrap")
 
-    # Computes the mean and cross-sectional (across forecast methods)
+    # Computes the mean (average) and cross-sectional (across forecast methods)
     # standard deviation at each horizon using all simple forecast methods
     # available.
 
@@ -331,9 +331,9 @@ function matrix ensemble_fc (const series y "Series",
 
     fc = meanr(fc) ~ sdc(fc')' ~ fc
     if $pd == 1
-        colnames(fc, "ens.-mean ens.-sd meanf rwf rwf+drift")
+        colnames(fc, "average-fc sd meanf rwf rwf+drift")
     else
-        colnames(fc, "ens.-mean ens.-sd meanf rwf rwf+drift smean snaive")
+        colnames(fc, "average-fc sd meanf rwf rwf+drift smean snaive")
     endif    
     rownames(fc, rownam(h))
     return fc

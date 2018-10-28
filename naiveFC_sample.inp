@@ -1,5 +1,5 @@
 set verbose off
-include naiveFC.gfn --force
+#include naiveFC.gfn --force
 
 open AWM.gdt --quiet
 series x = YGA		# output gap; for simplity named "x"
@@ -30,7 +30,7 @@ rwd = rwf(x, h, 1)
 rwd
 fcplot(x, rwd, "Random-Walk + Drift Forecast")
 
-# Mean forecast (ensemble)
-avgfc = ensemble_fc(x, h)
-avgfc
-fcplot(x, avgfc[,1], "Ensemble Forecast")
+# Average of Forecasts
+avg_fc = avgfc(x, h)
+avg_fc		# 1st col: point forecast, 2nd col: std. deviation
+fcplot(x, avg_fc[,1], "Avg. of Forecasts")
