@@ -941,7 +941,11 @@ ensemble_fc
 \begin_layout Standard
 This function computes the mean and cross-sectional (across forecast methods)
  standard deviation of the respective point forecasts at each forecast horizon
- using all simple forecasting methods available.
+ using all 
+\begin_inset Formula $k$
+\end_inset
+
+ simple forecasting methods available.
  For annual data only the 
 \series bold
 (i)
@@ -1010,11 +1014,15 @@ The function arguments are the same as for meanf().
 
 \begin_layout Standard
 An 
-\begin_inset Formula $h\times2$
+\begin_inset Formula $h\times(2+k)$
 \end_inset
 
  matrix holding the h-step ahead point forecasts in the 1st column and the
- cross-sectional standard-deviation across all (3/5) forecasts will be returned.
+ cross-sectional standard-deviation across all (
+\begin_inset Formula $k$
+\end_inset
+
+) forecasts will be returned.
 \end_layout
 
 \begin_layout Subsection

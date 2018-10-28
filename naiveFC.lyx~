@@ -133,13 +133,6 @@ initial public version
 \end_inset
 
 
-\begin_inset Newpage newpage
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
 \begin_inset CommandInset toc
 LatexCommand tableofcontents
 
@@ -948,7 +941,11 @@ ensemble_fc
 \begin_layout Standard
 This function computes the mean and cross-sectional (across forecast methods)
  standard deviation of the respective point forecasts at each forecast horizon
- using all simple forecasting methods available.
+ using all 
+\begin_inset Formula $k$
+\end_inset
+
+ simple forecasting methods available.
  For annual data only the 
 \series bold
 (i)
@@ -1017,7 +1014,7 @@ The function arguments are the same as for meanf().
 
 \begin_layout Standard
 An 
-\begin_inset Formula $h\times2$
+\begin_inset Formula $h\times(2+k)$
 \end_inset
 
  matrix holding the h-step ahead point forecasts in the 1st column and the
@@ -1118,7 +1115,8 @@ string xlab
 \family typewriter
 string filename
 \family default
-[null]: provide a string for the x-label (default 'display').
+[null]: provide a string for the x-label (default 'display' which plots
+ the forecast directly on the screen).
 \end_layout
 
 \end_body

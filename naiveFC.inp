@@ -329,8 +329,12 @@ function matrix ensemble_fc (const series y "Series",
         fc[,i] = @s[,1]	# only point-fc
     endloop
 
-    fc = meanr(fc) ~ sdc(fc')'
-    colnames(fc, "Mean SD")
+    fc = meanr(fc) ~ sdc(fc')' ~ fc
+    if $pd == 1
+        colnames(fc, "ens.-mean ens.-sd meanf rwf rwf+drift")
+    else
+        colnames(fc, "ens.-mean ens.-sd meanf rwf rwf+drift smean snaive")
+    endif    
     rownames(fc, rownam(h))
     return fc
 end function
