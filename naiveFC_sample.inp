@@ -1,5 +1,6 @@
 set verbose off
-include naiveFC.gfn --force
+clear
+#include naiveFC.gfn --force
 
 open AWM.gdt --quiet
 series x = YGA		# output gap; for simplity named "x"
@@ -29,6 +30,12 @@ fcplot(x, rw, "Random-Walk Forecast")
 rwd = rwf(x, h, 1)
 rwd
 fcplot(x, rwd, "Random-Walk + Drift Forecast")
+
+# AR(1)
+ar_1 = ar1f(x, h)
+ar_1
+fcplot(x, ar_1, "AR(1) Forecast")
+
 
 # Average of Forecasts
 avg_fc = avgfc(x, h)

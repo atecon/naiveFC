@@ -88,8 +88,6 @@ function void fcplot (const series y, matrix fc,
                       string xlab[null],
                       string filename[null] "'display' OR 'Path+filename'")
 
-    include extra.gfn	# call sepstr2arr()
-
     # Plot point forecast and quantiles
     string title = !exists(title) ? "" : title
     string ylab = !exists(ylab) ? "" : ylab
@@ -102,10 +100,10 @@ function void fcplot (const series y, matrix fc,
         mplot ~= NA
     endloop
     mplot |= (NA ~ fc)
-    if cols(fc)>1        
-        cnameset(mplot, sepstr2arr("Actuals Point-FC Low High", " "))
+    if cols(fc)>1
+        cnameset(mplot, strsplit("Actuals Point-FC Low High", " "))
     else
-        cnameset(mplot, sepstr2arr("Actuals Point-FC", " "))
+        cnameset(mplot, strsplit("Actuals Point-FC", " "))
     endif
     set warnings on
 
@@ -303,6 +301,39 @@ function matrix snaive (const series y "Series",
     return fc
 end function
 
+function matrix ar1f (const series y "Series",
+                        int h[1::10] "Horizon",
+                        scalar level[64:99:90] "Confidence level",
+                        bool fan[0],
+                        int nboot[0::0],
+                      int blength[2::4] "Block length bootstrap")
+                      
+    if nboot>0
+        print_noboot()
+    endif
+    matrix ci = genci(level,fan)
+    
+    smpl y --no-missing
+    ols y 0 y(-1) --quiet				# estimation via OLS
+    matrix fc = recfc(y, $coeff, h)		# iterative forecast
+     
+    cnameset(fc, gen_colnames(ci))
+    rnameset(fc, rownam(h))
+    return fc
+end function
+
+
+function matrix recfc(const series y, matrix bhat, int h)
+    matrix fc = zeros(h,1)
+    fc[1] = bhat[1] + bhat[2]*y[$t2]
+    loop i=2..h -q
+        fc[i] = bhat[1] + bhat[2]*fc[i-1]
+    endloop
+    return fc
+end function 
+
+
+
 function matrix avgfc (const series y "Series",
                              int h[1::10] "Horizon",
                              scalar level[64:99:90] "Confidence level",
@@ -319,7 +350,7 @@ function matrix avgfc (const series y "Series",
     endif
 
     # Base models
-    strings M = defarray("meanf(y,h)", "rwf(y,h)", "rwf(y,h,1)")
+    strings M = defarray("meanf(y,h)", "rwf(y,h)", "rwf(y,h,1)", "ar1f(y,h)")
     if $pd>1	# for seasonal data only
         M += "smeanf(y,h)"
         M += "snaive(y,h)"
@@ -330,12 +361,11 @@ function matrix avgfc (const series y "Series",
         string s = sprintf("%s", M[i])
         fc[,i] = @s[,1]	# only point-fc
     endloop
-
-    fc = meanr(fc) ~ sdc(fc')' ~ fc
+    fc = meanr(fc) ~ sdc(fc', rows(fc')-1)' ~ fc
     if $pd == 1
-        cnameset(fc, sepstr2arr("average-fc sd meanf rwf rwf+drift", " "))
+        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1)", " "))
     else
-        cnameset(fc, sepstr2arr("average-fc sd meanf rwf rwf+drift smean snaive", " "))
+        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1) smean snaive", " "))
     endif    
     rnameset(fc, rownam(h))
     return fc
