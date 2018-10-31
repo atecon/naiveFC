@@ -1,13 +1,15 @@
 author = Artur Tarassow
 email = atecon@cryptolab.net
-version = 0.1
-date = 2018-10-27
+version = 0.11
+date = 2018-10-31
 description = Simple forecasting methods
 data-requirement = needs-time-series-data
 tags = C53
-public = fcplot meanf smeanf rwf snaive avgfc
-label = naiveFC
+min-version = 2018a
+public = fcplot meanf smeanf rwf ar1f snaive avgfc
+gui-main = avgfc
+label = average-forecast
 menu-attachment = MAINWIN/Model
 help = naiveFC.pdf
 sample-script = naiveFC_sample.inp
-min-version = 2018a
+

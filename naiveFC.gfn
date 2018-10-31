@@ -2,11 +2,11 @@
 <gretl-functions>
 <gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2018a" lives-in-subdir="true">
 <author email="atecon@cryptolab.net">Artur Tarassow</author>
-<version>0.1</version>
-<date>2018-10-27</date>
+<version>0.11</version>
+<date>2018-10-31</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
-<label>naiveFC</label>
+<label>average-forecast</label>
 <menu-attachment>MAINWIN/Model</menu-attachment>
 <help>
 pdfdoc:naiveFC.pdf
@@ -34,9 +34,9 @@ loop i=1..cols(fc) -q
 endloop
 mplot |= (NA ~ fc)
 if cols(fc)&gt;1
-  colnames(mplot, &quot;Actuals PointFC Low High&quot;)
+  cnameset(mplot, strsplit(&quot;Actuals Point-FC Low High&quot;, &quot; &quot;))
 else
-  colnames(mplot, &quot;Actuals Point-FC&quot;)
+  cnameset(mplot, strsplit(&quot;Actuals Point-FC&quot;, &quot; &quot;))
 endif
 set warnings on
 ylo = min(y)-0.05*min(y)
@@ -90,8 +90,8 @@ else
   matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
   */
 endif
-colnames(ymean, gen_colnames(ci))
-rownames(ymean, rownam(h))
+cnameset(ymean, gen_colnames(ci))
+rnameset(ymean, rownam(h))
 return ymean
 </code>
 </gretl-function>
@@ -139,8 +139,8 @@ else
   matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
   */
 endif
-colnames(fc, gen_colnames(ci))
-rownames(fc, rownam(h))
+cnameset(fc, gen_colnames(ci))
+rnameset(fc, rownam(h))
 return fc
 </code>
 </gretl-function>
@@ -182,8 +182,37 @@ if drift
   scalar avg = (y[$t2]-y[$t1])/(nobs(y)-1)	# average growth rate (drift)
   fc[,1] = fc[,1] .+ cum(ones(h,1))*avg	# TODO: consider intervals later
 endif
-colnames(fc, gen_colnames(ci))
-rownames(fc, rownam(h))
+cnameset(fc, gen_colnames(ci))
+rnameset(fc, rownam(h))
+return fc
+</code>
+</gretl-function>
+<gretl-function name="ar1f" type="matrix">
+ <params count="6">
+  <param name="y" type="series" const="true">
+<description>Series</description>
+  </param>
+  <param name="h" type="int" min="1" default="10">
+<description>Horizon</description>
+  </param>
+  <param name="level" type="scalar" min="64" max="99" default="90">
+<description>Confidence level</description>
+  </param>
+  <param name="fan" type="bool" default="0"/>
+  <param name="nboot" type="int" min="0" default="0"/>
+  <param name="blength" type="int" min="2" default="4">
+<description>Block length bootstrap</description>
+  </param>
+ </params>
+<code>if nboot&gt;0
+  print_noboot()
+endif
+matrix ci = genci(level,fan)
+smpl y --no-missing
+ols y 0 y(-1) --quiet				# estimation via OLS
+matrix fc = recfc(y, $coeff, h)		# iterative forecast
+cnameset(fc, gen_colnames(ci))
+rnameset(fc, rownam(h))
 return fc
 </code>
 </gretl-function>
@@ -235,12 +264,12 @@ else
   matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
   */
 endif
-colnames(fc, gen_colnames(ci))
-rownames(fc, rownam(h))
+cnameset(fc, gen_colnames(ci))
+rnameset(fc, rownam(h))
 return fc
 </code>
 </gretl-function>
-<gretl-function name="avgfc" type="matrix">
+<gretl-function name="avgfc" type="matrix" pkg-role="gui-main">
  <params count="6">
   <param name="y" type="series" const="true">
 <description>Series</description>
@@ -264,7 +293,7 @@ if nboot&gt;0
   print_noboot()
 endif
 # Base models
-strings M = defarray(&quot;meanf(y,h)&quot;, &quot;rwf(y,h)&quot;, &quot;rwf(y,h,1)&quot;)
+strings M = defarray(&quot;meanf(y,h)&quot;, &quot;rwf(y,h)&quot;, &quot;rwf(y,h,1)&quot;, &quot;ar1f(y,h)&quot;)
 if $pd&gt;1	# for seasonal data only
   M += &quot;smeanf(y,h)&quot;
   M += &quot;snaive(y,h)&quot;
@@ -274,22 +303,22 @@ loop i=1..nelem(M) -q
   string s = sprintf(&quot;%s&quot;, M[i])
   fc[,i] = @s[,1]	# only point-fc
 endloop
-fc = meanr(fc) ~ sdc(fc')' ~ fc
+fc = meanr(fc) ~ sdc(fc', rows(fc')-1)' ~ fc
 if $pd == 1
-  colnames(fc, &quot;average-fc sd meanf rwf rwf+drift&quot;)
+  cnameset(fc, strsplit(&quot;average-fc sd meanf rwf rwf+drift AR(1)&quot;, &quot; &quot;))
 else
-  colnames(fc, &quot;average-fc sd meanf rwf rwf+drift smean snaive&quot;)
+  cnameset(fc, strsplit(&quot;average-fc sd meanf rwf rwf+drift AR(1) smean snaive&quot;, &quot; &quot;))
 endif
-rownames(fc, rownam(h))
+rnameset(fc, rownam(h))
 return fc
 </code>
 </gretl-function>
-<gretl-function name="gen_colnames" type="string" private="1">
+<gretl-function name="gen_colnames" type="strings" private="1">
  <params count="1">
   <param name="ci" type="matrix"/>
  </params>
 <code># construct column names
-string c = &quot;point&quot;
+strings c = defarray(&quot;point&quot;)
 /* confidence intervals are not supported yet
 loop i=1..cols(ci) -q
   c += sprintf(&quot; q%d&quot;, ci[i]*100)
@@ -298,14 +327,14 @@ endloop
 return c
 </code>
 </gretl-function>
-<gretl-function name="rownam" type="string" private="1">
+<gretl-function name="rownam" type="strings" private="1">
  <params count="1">
   <param name="h" type="scalar"/>
  </params>
 <code># construct row names (horizons)
-string r = &quot;h=1&quot;
-loop i=2..h -q
-  r += sprintf(&quot; h=%d&quot;, i)
+strings r = array(h)
+loop i=1..h -q
+  r[i] = sprintf(&quot; h=%d&quot;, i)
 endloop
 return r
 </code>
@@ -393,8 +422,23 @@ endif
 <code>funcerr &quot;Bootstrap confidence intervals are not supported, yet&quot;
 </code>
 </gretl-function>
+<gretl-function name="recfc" type="matrix" private="1">
+ <params count="3">
+  <param name="y" type="series" const="true"/>
+  <param name="bhat" type="matrix"/>
+  <param name="h" type="int"/>
+ </params>
+<code>matrix fc = zeros(h,1)
+fc[1] = bhat[1] + bhat[2]*y[$t2]
+loop i=2..h -q
+  fc[i] = bhat[1] + bhat[2]*fc[i-1]
+endloop
+return fc
+</code>
+</gretl-function>
 <sample-script>
 set verbose off
+clear
 include naiveFC.gfn --force
 
 open AWM.gdt --quiet
@@ -425,6 +469,12 @@ fcplot(x, rw, &quot;Random-Walk Forecast&quot;)
 rwd = rwf(x, h, 1)
 rwd
 fcplot(x, rwd, &quot;Random-Walk + Drift Forecast&quot;)
+
+# AR(1)
+ar_1 = ar1f(x, h)
+ar_1
+fcplot(x, ar_1, &quot;AR(1) Forecast&quot;)
+
 
 # Average of Forecasts
 avg_fc = avgfc(x, h)
