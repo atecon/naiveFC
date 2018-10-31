@@ -1,5 +1,5 @@
-#LyX 2.3 created this file. For more info see http://www.lyx.org/
-\lyxformat 544
+#LyX 2.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 508
 \begin_document
 \begin_header
 \save_transient_properties true
@@ -21,8 +21,6 @@
 \font_osf false
 \font_sf_scale 100 100
 \font_tt_scale 100 100
-\use_microtype false
-\use_dash_ligatures true
 \graphics default
 \default_output_format default
 \output_sync 0
@@ -52,7 +50,6 @@
 \suppress_date false
 \justification true
 \use_refstyle 1
-\use_minted 0
 \index Index
 \shortcut idx
 \color #008000
@@ -65,10 +62,7 @@
 \tocdepth 3
 \paragraph_separation indent
 \paragraph_indentation default
-\is_math_indent 0
-\math_numbering_side default
-\quotes_style english
-\dynamic_quotes 0
+\quotes_language english
 \papercolumns 1
 \papersides 1
 \paperpagestyle default
@@ -91,7 +85,6 @@ The naiveFC function package for Gretl
 LatexCommand href
 name "Artur Tarassow"
 target "https://sites.google.com/site/arturtarassow/"
-literal "false"
 
 \end_inset
 
@@ -99,7 +92,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.11
+Version 0.1
 \end_layout
 
 \begin_layout Standard
@@ -128,34 +121,12 @@ Changelog
 \end_layout
 
 \begin_layout Itemize
-Version 0.11 (Oct, 2018)
-\end_layout
-
-\begin_deeper
-\begin_layout Itemize
-initial public version
-\end_layout
-
-\begin_layout Itemize
-add AR(1)-based forecasts
-\end_layout
-
-\begin_layout Itemize
-minor changes and corrections
-\end_layout
-
-\begin_layout Itemize
-set minimum gretl version to 2018a
-\end_layout
-
-\end_deeper
-\begin_layout Itemize
 Version 0.1 (Oct, 2018)
 \end_layout
 
 \begin_deeper
 \begin_layout Itemize
-initial non-public version
+initial public version
 \end_layout
 
 \end_deeper
@@ -198,7 +169,6 @@ Forecasting: Principles and Practice
 LatexCommand href
 name "https://otexts.org/fpp2/simple-methods.html"
 target "https://otexts.org/fpp2/simple-methods.html"
-literal "false"
 
 \end_inset
 
@@ -219,13 +189,13 @@ naiveFC
 \end_layout
 
 \begin_layout Itemize
-Point estimates for six simple forecasting methods, namely the 'Average'
+Point estimates for five simple forecasting methods, namely the 'Average'
  (mean), 'Seasonal Average' (seasonal mean), 'Naive' (Random-Walk), the
- 'Seasonal Naive', the 
+ 'Seasonal Naive' and the 
 \begin_inset Quotes eld
 \end_inset
 
-Naive plus drift' and the AR(1) model, are implemented.
+Naive plus drift', are implemented.
 \end_layout
 
 \begin_layout Itemize
@@ -531,26 +501,26 @@ status open
 
 \begin_layout Plain Layout
 
-        average-fc     sd           meanf        rwf         rwf+drift 
-   AR(1)		smean        snaive
+        average-fc    sd           meanf        rwf          rwf+drift 
+   smean        snaive
 \end_layout
 
 \begin_layout Plain Layout
 
-h=1      0.99176    0.0025708      0.99446      0.99160      0.99154      0.99181
-      0.99397      0.98720
+h=1      0.99175    0.0025707      0.99446      0.99160      0.99154      0.99397
+      0.98720
 \end_layout
 
 \begin_layout Plain Layout
 
-h=2      0.99203    0.0022136      0.99446      0.99160      0.99149      0.99201
-      0.99426      0.98840
+h=2      0.99204    0.0022136      0.99446      0.99160      0.99149      0.99426
+      0.98840
 \end_layout
 
 \begin_layout Plain Layout
 
-h=3      0.99264    0.0015085      0.99446      0.99160      0.99143      0.99219
-      0.99465      0.99150      
+h=3      0.99273    0.0014922      0.99446      0.99160      0.99143      0.99465
+      0.99150  
 \end_layout
 
 \end_inset
@@ -737,85 +707,6 @@ status open
 smeanf(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
  level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
 ::4] "Block length bootstrap")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-matrix
-\end_layout
-
-\begin_layout Standard
-The function arguments are the same as for meanf().
-\end_layout
-
-\begin_layout Standard
-An 
-\begin_inset Formula $h\times1$
-\end_inset
-
- matrix holding the h-step ahead point forecasts will be returned.
-\end_layout
-
-\begin_layout Subsection
-ar1f
-\end_layout
-
-\begin_layout Standard
-This function simply estimates an AR(1) model incl.
- an intercept using standard OLS.
- The out-of-sample forecasts are recursively (also known as 
-\emph on
-iterated forecast
-\emph default
-) constructed.
- The 1-step ahead forecast is based on realized values from the previous
- period.
- The 
-\begin_inset Formula $h$
-\end_inset
-
--step ahead (for 
-\begin_inset Formula $h>1$
-\end_inset
-
-) forecast is based on the forecast value from horizon 
-\begin_inset Formula $h-1$
-\end_inset
-
-, respectively.
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-ar1f(const series y "Actuals", int h[1::10] "Forecast horizon", scalar level[64:
-99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2::4]
- "Block length bootstrap")
 \end_layout
 
 \end_inset
@@ -1051,6 +942,117 @@ An
 \end_layout
 
 \begin_layout Subsection
+avgfc
+\end_layout
+
+\begin_layout Standard
+This function computes the mean and cross-sectional (across forecast methods)
+ standard deviation of the respective point forecasts at each forecast horizon
+ using all 
+\begin_inset Formula $k$
+\end_inset
+
+ simple forecasting methods available.
+ For annual data only the 
+\series bold
+(i)
+\series default
+ mean-forecast (
+\emph on
+meanf
+\emph default
+), the 
+\series bold
+(ii)
+\series default
+ Random-Walk without drift (
+\emph on
+rwf
+\emph default
+) and 
+\series bold
+(iii)
+\series default
+ Random-Walk with drift (
+\emph on
+rwf
+\emph default
+) will be computed.
+ For data with seasonality (e.g., monthly, quarterly) we also add the 
+\series bold
+(iv)
+\series default
+ the seasonal-mean (
+\emph on
+smean
+\emph default
+) and the 
+\series bold
+(v)
+\series default
+ seasonal-naive forecast (
+\emph on
+snaive
+\emph default
+) to collection of forecasts.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+avgfc(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
+ level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
+::4] "Block length bootstrap")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+matrix
+\end_layout
+
+\begin_layout Standard
+The function arguments are the same as for meanf().
+\end_layout
+
+\begin_layout Standard
+An 
+\begin_inset Formula $h\times(2+k)$
+\end_inset
+
+ matrix holding the h-step ahead point forecasts in the 1st column and the
+ cross-sectional standard-deviation across all (
+\begin_inset Formula $k$
+\end_inset
+
+) forecasts will be returned.
+\end_layout
+
+\begin_layout Subsection
 fcplot
 \end_layout
 
@@ -1146,121 +1148,6 @@ string filename
 \family default
 [null]: provide a string for the x-label (default 'display' which plots
  the forecast directly on the screen).
-\end_layout
-
-\begin_layout Subsection
-avgfc
-\end_layout
-
-\begin_layout Standard
-This function computes the mean and cross-sectional (across forecast methods)
- standard deviation of the respective point forecasts at each forecast horizon
- using all 
-\begin_inset Formula $k$
-\end_inset
-
- simple forecasting methods available.
- For annual data only the 
-\series bold
-(i)
-\series default
- mean-forecast (
-\emph on
-meanf
-\emph default
-), the 
-\series bold
-(ii)
-\series default
- Random-Walk without drift (
-\emph on
-rwf
-\emph default
-), 
-\series bold
-(iii)
-\series default
- Random-Walk with drift (
-\emph on
-rwf
-\emph default
-) and (
-\series bold
-iv
-\series default
-) the AR(1)-forecast will be computed.
- For data with seasonality (e.g., monthly, quarterly) we also add the 
-\series bold
-(v)
-\series default
- the seasonal-mean (
-\emph on
-smean
-\emph default
-) and the 
-\series bold
-(vi)
-\series default
- seasonal-naive forecast (
-\emph on
-snaive
-\emph default
-) to collection of forecasts.
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-avgfc(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
- level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
-::4] "Block length bootstrap")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-matrix
-\end_layout
-
-\begin_layout Standard
-The function arguments are the same as for meanf().
-\end_layout
-
-\begin_layout Standard
-An 
-\begin_inset Formula $h\times(2+k)$
-\end_inset
-
- matrix holding the h-step ahead point forecasts in the 1st column and the
- cross-sectional standard-deviation across all (
-\begin_inset Formula $k$
-\end_inset
-
-) forecasts will be returned.
 \end_layout
 
 \end_body
