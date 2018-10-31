@@ -1,6 +1,6 @@
-function string gen_colnames (matrix ci)
+function strings gen_colnames (matrix ci)
     # construct column names
-    string c = "point"
+    strings c = defarray("point")
     /* confidence intervals are not supported yet
        loop i=1..cols(ci) -q
        c += sprintf(" q%d", ci[i]*100)
@@ -9,11 +9,11 @@ function string gen_colnames (matrix ci)
     return c
 end function
 
-function string rownam (scalar h)
+function strings rownam (scalar h)
     # construct row names (horizons)
-    string r = "h=1"
-    loop i=2..h -q
-        r += sprintf(" h=%d", i)
+    strings r = array(h)
+    loop i=1..h -q
+        r[i] = sprintf(" h=%d", i)
     endloop
     return r
 end function
@@ -88,6 +88,8 @@ function void fcplot (const series y, matrix fc,
                       string xlab[null],
                       string filename[null] "'display' OR 'Path+filename'")
 
+    include extra.gfn	# call sepstr2arr()
+
     # Plot point forecast and quantiles
     string title = !exists(title) ? "" : title
     string ylab = !exists(ylab) ? "" : ylab
@@ -100,10 +102,10 @@ function void fcplot (const series y, matrix fc,
         mplot ~= NA
     endloop
     mplot |= (NA ~ fc)
-    if cols(fc)>1
-        colnames(mplot, "Actuals PointFC Low High")
+    if cols(fc)>1        
+        cnameset(mplot, sepstr2arr("Actuals Point-FC Low High", " "))
     else
-        colnames(mplot, "Actuals Point-FC")
+        cnameset(mplot, sepstr2arr("Actuals Point-FC", " "))
     endif
     set warnings on
 
@@ -162,9 +164,9 @@ function matrix meanf (const series y "Actuals",
        matrix yb = vec( re_sample({y}, nboot, blength) )
        matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
         */
-    endif
-    colnames(ymean, gen_colnames(ci))
-    rownames(ymean, rownam(h))
+    endif    
+    cnameset(ymean, gen_colnames(ci))
+    rnameset(ymean, rownam(h))
     return ymean
 end function
 
@@ -207,8 +209,8 @@ function matrix smeanf (const series y "Series",
            matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
         */
     endif
-    colnames(fc, gen_colnames(ci))
-    rownames(fc, rownam(h))
+    cnameset(fc, gen_colnames(ci))
+    rnameset(fc, rownam(h))
     return fc
 end function
 
@@ -246,8 +248,8 @@ function matrix rwf (const series y "Actuals",
         fc[,1] = fc[,1] .+ cum(ones(h,1))*avg	# TODO: consider intervals later
     endif
 
-    colnames(fc, gen_colnames(ci))
-    rownames(fc, rownam(h))
+    cnameset(fc, gen_colnames(ci))
+    rnameset(fc, rownam(h))
     return fc
 end function
 
@@ -296,8 +298,8 @@ function matrix snaive (const series y "Series",
            matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
         */
     endif
-    colnames(fc, gen_colnames(ci))
-    rownames(fc, rownam(h))
+    cnameset(fc, gen_colnames(ci))
+    rnameset(fc, rownam(h))
     return fc
 end function
 
@@ -331,10 +333,10 @@ function matrix avgfc (const series y "Series",
 
     fc = meanr(fc) ~ sdc(fc')' ~ fc
     if $pd == 1
-        colnames(fc, "average-fc sd meanf rwf rwf+drift")
+        cnameset(fc, sepstr2arr("average-fc sd meanf rwf rwf+drift", " "))
     else
-        colnames(fc, "average-fc sd meanf rwf rwf+drift smean snaive")
+        cnameset(fc, sepstr2arr("average-fc sd meanf rwf rwf+drift smean snaive", " "))
     endif    
-    rownames(fc, rownam(h))
+    rnameset(fc, rownam(h))
     return fc
 end function
