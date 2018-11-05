@@ -332,7 +332,12 @@ function matrix recfc(const series y, matrix bhat, int h)
     return fc
 end function 
 
-
+function matrix avgfc_gui (const series y "Series",
+                           int h[1::10] "Horizon")
+    matrix FC = avgfc(y,h)
+    printf "%12.4f\n", FC    
+    return FC    
+end function
 
 function matrix avgfc (const series y "Series",
                              int h[1::10] "Horizon",

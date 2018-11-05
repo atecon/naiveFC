@@ -6,55 +6,11 @@
 <date>2018-10-31</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
-<label>average-forecast</label>
-<menu-attachment>MAINWIN/Model</menu-attachment>
+<label>naive forecast(s)</label>
+<menu-attachment>MAINWIN/Model/&quot;Time series&quot;</menu-attachment>
 <help>
 pdfdoc:naiveFC.pdf
 </help>
-<gretl-function name="fcplot" type="void">
- <params count="6">
-  <param name="y" type="series" const="true"/>
-  <param name="fc" type="matrix"/>
-  <param name="title" type="string" optional="true"/>
-  <param name="ylab" type="string" optional="true"/>
-  <param name="xlab" type="string" optional="true"/>
-  <param name="filename" type="string" optional="true">
-<description>'display' OR 'Path+filename'</description>
-  </param>
- </params>
-<code># Plot point forecast and quantiles
-string title = !exists(title) ? &quot;&quot; : title
-string ylab = !exists(ylab) ? &quot;&quot; : ylab
-string xlab = !exists(xlab) ? &quot;&quot; : xlab
-string out = !exists(filename) ? &quot;display&quot; : filename
-set warnings off
-matrix mplot = {y}
-loop i=1..cols(fc) -q
-  mplot ~= NA
-endloop
-mplot |= (NA ~ fc)
-if cols(fc)&gt;1
-  cnameset(mplot, strsplit(&quot;Actuals Point-FC Low High&quot;, &quot; &quot;))
-else
-  cnameset(mplot, strsplit(&quot;Actuals Point-FC&quot;, &quot; &quot;))
-endif
-set warnings on
-ylo = min(y)-0.05*min(y)
-yup = max(y)+0.05*max(y)
-plot mplot
-  options with-lines time-series single-yaxis
-  literal set linetype 1 lc rgb &quot;grey&quot;
-  literal set linetype 2 lc rgb &quot;red&quot; lw 2
-  literal set linetype 3 lc rgb &quot;black&quot; lw 1.5
-  literal set linetype 4 lc rgb &quot;black&quot; lw 1.5
-  literal set key bottom below
-  printf &quot;set yrange[%g:%g]&quot;, ylo, yup
-  printf &quot;set ylabel \&quot;%s\&quot;&quot;, ylab
-  printf &quot;set xlabel \&quot;%s\&quot;&quot;, xlab
-  printf &quot;set title \&quot;%s\&quot;&quot;, title
-end plot --output=@out
-</code>
-</gretl-function>
 <gretl-function name="meanf" type="matrix">
  <params count="6">
   <param name="y" type="series" const="true">
@@ -95,55 +51,6 @@ rnameset(ymean, rownam(h))
 return ymean
 </code>
 </gretl-function>
-<gretl-function name="smeanf" type="matrix">
- <params count="6">
-  <param name="y" type="series" const="true">
-<description>Series</description>
-  </param>
-  <param name="h" type="int" min="1" default="10">
-<description>Horizon</description>
-  </param>
-  <param name="level" type="scalar" min="64" max="99" default="90">
-<description>Confidence level</description>
-  </param>
-  <param name="fan" type="bool" default="0"/>
-  <param name="nboot" type="int" min="0" default="0"/>
-  <param name="blength" type="int" min="2" default="4">
-<description>Block length bootstrap</description>
-  </param>
- </params>
-<code># forecasts of all future values are equal to the mean of season of the historical data
-# model where m is the seasonal period.
-if nboot&gt;0
-  print_noboot()
-endif
-seas_check(y)
-matrix ci = genci(level, fan)
-if fan==0
-  # forecast simply equals the mean for each specific $obsminor periodicity (month, quarter etc.)
-  fc = get_mean_obsminor(y, h)
-  #matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
-  matrix fc = ones(h,1) .* fc
-else
-  funcerr &quot;Fan forecasts are not available, yet.&quot;
-  /* Not implemented yet
-  # forecast simply equals last obs for each specific periodicity (month, quarter)
-  # FIXME: This destroys the seasonality structure
-  matrix yb = re_sample({y}, nboot, blength)
-  fc_b = zeros(h, nboot)
-  loop i=1..nboot -q
-    fc_b[,i] = snaive_stack(yb[,i], h)
-  endloop
-  #fc_mean:	 mean across each horizon
-  #fc_ci:		quantiles across each horizon
-  matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
-  */
-endif
-cnameset(fc, gen_colnames(ci))
-rnameset(fc, rownam(h))
-return fc
-</code>
-</gretl-function>
 <gretl-function name="rwf" type="matrix">
  <params count="7">
   <param name="y" type="series" const="true">
@@ -182,35 +89,6 @@ if drift
   scalar avg = (y[$t2]-y[$t1])/(nobs(y)-1)	# average growth rate (drift)
   fc[,1] = fc[,1] .+ cum(ones(h,1))*avg	# TODO: consider intervals later
 endif
-cnameset(fc, gen_colnames(ci))
-rnameset(fc, rownam(h))
-return fc
-</code>
-</gretl-function>
-<gretl-function name="ar1f" type="matrix">
- <params count="6">
-  <param name="y" type="series" const="true">
-<description>Series</description>
-  </param>
-  <param name="h" type="int" min="1" default="10">
-<description>Horizon</description>
-  </param>
-  <param name="level" type="scalar" min="64" max="99" default="90">
-<description>Confidence level</description>
-  </param>
-  <param name="fan" type="bool" default="0"/>
-  <param name="nboot" type="int" min="0" default="0"/>
-  <param name="blength" type="int" min="2" default="4">
-<description>Block length bootstrap</description>
-  </param>
- </params>
-<code>if nboot&gt;0
-  print_noboot()
-endif
-matrix ci = genci(level,fan)
-smpl y --no-missing
-ols y 0 y(-1) --quiet				# estimation via OLS
-matrix fc = recfc(y, $coeff, h)		# iterative forecast
 cnameset(fc, gen_colnames(ci))
 rnameset(fc, rownam(h))
 return fc
@@ -269,7 +147,143 @@ rnameset(fc, rownam(h))
 return fc
 </code>
 </gretl-function>
-<gretl-function name="avgfc" type="matrix" pkg-role="gui-main">
+<gretl-function name="avgfc_gui" type="matrix" pkg-role="gui-main">
+ <params count="2">
+  <param name="y" type="series" const="true">
+<description>Series</description>
+  </param>
+  <param name="h" type="int" min="1" default="10">
+<description>Horizon</description>
+  </param>
+ </params>
+<code>matrix FC = avgfc(y,h)
+printf &quot;%12.4f\n&quot;, FC
+return FC
+</code>
+</gretl-function>
+<gretl-function name="fcplot" type="void">
+ <params count="6">
+  <param name="y" type="series" const="true"/>
+  <param name="fc" type="matrix"/>
+  <param name="title" type="string" optional="true"/>
+  <param name="ylab" type="string" optional="true"/>
+  <param name="xlab" type="string" optional="true"/>
+  <param name="filename" type="string" optional="true">
+<description>'display' OR 'Path+filename'</description>
+  </param>
+ </params>
+<code># Plot point forecast and quantiles
+string title = !exists(title) ? &quot;&quot; : title
+string ylab = !exists(ylab) ? &quot;&quot; : ylab
+string xlab = !exists(xlab) ? &quot;&quot; : xlab
+string out = !exists(filename) ? &quot;display&quot; : filename
+set warnings off
+matrix mplot = {y}
+loop i=1..cols(fc) -q
+  mplot ~= NA
+endloop
+mplot |= (NA ~ fc)
+if cols(fc)&gt;1
+  cnameset(mplot, strsplit(&quot;Actuals Point-FC Low High&quot;, &quot; &quot;))
+else
+  cnameset(mplot, strsplit(&quot;Actuals Point-FC&quot;, &quot; &quot;))
+endif
+set warnings on
+ylo = min(y)-0.05*min(y)
+yup = max(y)+0.05*max(y)
+plot mplot
+  options with-lines time-series single-yaxis
+  literal set linetype 1 lc rgb &quot;grey&quot;
+  literal set linetype 2 lc rgb &quot;red&quot; lw 2
+  literal set linetype 3 lc rgb &quot;black&quot; lw 1.5
+  literal set linetype 4 lc rgb &quot;black&quot; lw 1.5
+  literal set key bottom below
+  printf &quot;set yrange[%g:%g]&quot;, ylo, yup
+  printf &quot;set ylabel \&quot;%s\&quot;&quot;, ylab
+  printf &quot;set xlabel \&quot;%s\&quot;&quot;, xlab
+  printf &quot;set title \&quot;%s\&quot;&quot;, title
+end plot --output=@out
+</code>
+</gretl-function>
+<gretl-function name="smeanf" type="matrix">
+ <params count="6">
+  <param name="y" type="series" const="true">
+<description>Series</description>
+  </param>
+  <param name="h" type="int" min="1" default="10">
+<description>Horizon</description>
+  </param>
+  <param name="level" type="scalar" min="64" max="99" default="90">
+<description>Confidence level</description>
+  </param>
+  <param name="fan" type="bool" default="0"/>
+  <param name="nboot" type="int" min="0" default="0"/>
+  <param name="blength" type="int" min="2" default="4">
+<description>Block length bootstrap</description>
+  </param>
+ </params>
+<code># forecasts of all future values are equal to the mean of season of the historical data
+# model where m is the seasonal period.
+if nboot&gt;0
+  print_noboot()
+endif
+seas_check(y)
+matrix ci = genci(level, fan)
+if fan==0
+  # forecast simply equals the mean for each specific $obsminor periodicity (month, quarter etc.)
+  fc = get_mean_obsminor(y, h)
+  #matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
+  matrix fc = ones(h,1) .* fc
+else
+  funcerr &quot;Fan forecasts are not available, yet.&quot;
+  /* Not implemented yet
+  # forecast simply equals last obs for each specific periodicity (month, quarter)
+  # FIXME: This destroys the seasonality structure
+  matrix yb = re_sample({y}, nboot, blength)
+  fc_b = zeros(h, nboot)
+  loop i=1..nboot -q
+    fc_b[,i] = snaive_stack(yb[,i], h)
+  endloop
+  #fc_mean:	 mean across each horizon
+  #fc_ci:		quantiles across each horizon
+  matrix fc = ones(h,cols(ci)+1) .* ( meanr(fc_b) ~ quantile(fc_b',ci)' )
+  */
+endif
+cnameset(fc, gen_colnames(ci))
+rnameset(fc, rownam(h))
+return fc
+</code>
+</gretl-function>
+<gretl-function name="ar1f" type="matrix">
+ <params count="6">
+  <param name="y" type="series" const="true">
+<description>Series</description>
+  </param>
+  <param name="h" type="int" min="1" default="10">
+<description>Horizon</description>
+  </param>
+  <param name="level" type="scalar" min="64" max="99" default="90">
+<description>Confidence level</description>
+  </param>
+  <param name="fan" type="bool" default="0"/>
+  <param name="nboot" type="int" min="0" default="0"/>
+  <param name="blength" type="int" min="2" default="4">
+<description>Block length bootstrap</description>
+  </param>
+ </params>
+<code>if nboot&gt;0
+  print_noboot()
+endif
+matrix ci = genci(level,fan)
+smpl y --no-missing
+ols y 0 y(-1) --quiet				# estimation via OLS
+matrix fc = recfc(y, $coeff, h)		# iterative forecast
+cnameset(fc, gen_colnames(ci))
+rnameset(fc, rownam(h))
+return fc
+</code>
+</gretl-function>
+<gretl-function name="avgfc" type="matrix">
  <params count="6">
   <param name="y" type="series" const="true">
 <description>Series</description>
