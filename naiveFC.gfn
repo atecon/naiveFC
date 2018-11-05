@@ -7,7 +7,7 @@
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
 <label>naive forecast(s)</label>
-<menu-attachment>MAINWIN/Model/&quot;Time series&quot;</menu-attachment>
+<menu-attachment>MAINWIN/Model/TSModels</menu-attachment>
 <help>
 pdfdoc:naiveFC.pdf
 </help>
@@ -147,7 +147,7 @@ rnameset(fc, rownam(h))
 return fc
 </code>
 </gretl-function>
-<gretl-function name="avgfc_gui" type="matrix" pkg-role="gui-main">
+<gretl-function name="avgfc_gui" type="matrix" menu-only="1" pkg-role="gui-main">
  <params count="2">
   <param name="y" type="series" const="true">
 <description>Series</description>
