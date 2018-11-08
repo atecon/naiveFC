@@ -162,7 +162,7 @@ function matrix meanf (const series y "Actuals",
        matrix yb = vec( re_sample({y}, nboot, blength) )
        matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
         */
-    endif    
+    endif
     cnameset(ymean, gen_colnames(ci))
     rnameset(ymean, rownam(h))
     return ymean
@@ -302,21 +302,21 @@ function matrix snaive (const series y "Series",
 end function
 
 function matrix ar1f (const series y "Series",
-                        int h[1::10] "Horizon",
-                        scalar level[64:99:90] "Confidence level",
-                        bool fan[0],
-                        int nboot[0::0],
+                      int h[1::10] "Horizon",
+                      scalar level[64:99:90] "Confidence level",
+                      bool fan[0],
+                      int nboot[0::0],
                       int blength[2::4] "Block length bootstrap")
-                      
+
     if nboot>0
         print_noboot()
     endif
     matrix ci = genci(level,fan)
-    
+
     smpl y --no-missing
     ols y 0 y(-1) --quiet				# estimation via OLS
     matrix fc = recfc(y, $coeff, h)		# iterative forecast
-     
+
     cnameset(fc, gen_colnames(ci))
     rnameset(fc, rownam(h))
     return fc
@@ -330,21 +330,21 @@ function matrix recfc(const series y, matrix bhat, int h)
         fc[i] = bhat[1] + bhat[2]*fc[i-1]
     endloop
     return fc
-end function 
+end function
 
 function matrix avgfc_gui (const series y "Series",
                            int h[1::10] "Horizon")
     matrix FC = avgfc(y,h)
-    printf "%12.4f\n", FC    
-    return FC    
+    printf "%12.4f\n", FC
+    return FC
 end function
 
 function matrix avgfc (const series y "Series",
-                             int h[1::10] "Horizon",
-                             scalar level[64:99:90] "Confidence level",
-                             bool fan[0],
-                             int nboot[0::0],
-                             int blength[2::4] "Block length bootstrap")
+                       int h[1::10] "Horizon",
+                       scalar level[64:99:90] "Confidence level",
+                       bool fan[0],
+                       int nboot[0::0],
+                       int blength[2::4] "Block length bootstrap")
 
     # Computes the mean (average) and cross-sectional (across forecast methods)
     # standard deviation at each horizon using all simple forecast methods
@@ -371,7 +371,128 @@ function matrix avgfc (const series y "Series",
         cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1)", " "))
     else
         cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1) smean snaive", " "))
-    endif    
+    endif
     rnameset(fc, rownam(h))
     return fc
 end function
+
+
+# public functions
+function void NaiveTsCv (bundle *b, string which)
+
+    # This function estimates the point estimates in either (i) a rolling or (ii) recursive manner
+    # and stores these point estimates
+
+    # Estimator:
+    b.which = which # "meanf", etc.
+
+    if !inbundle(b, "y")
+        funcerr "!!! Provide suitable series ('y')."
+    endif
+    if !inbundle(b, "wsize")
+        funcerr "!!! Please set the window-lenght ('wsize')"
+    endif
+    if !inbundle(b, "h")
+        printf "\nWe set the forecast horizon to h=12.\n"
+        scalar b.h = 12
+    endif
+
+    if !inbundle(b, "type_roll") 	# former fcroll (scalar))
+        string b.type_roll = "rolling" # "recursive"
+        printf "*** %s regressions will be estimated\n", b.type_roll
+    endif
+
+
+    # Data set settings
+    #-------------------
+    series y = b.y
+    smpl y --no-missing
+
+    scalar b.initobs = $t1				# we make sure that in each window the no. of obs is equal among all horizons!
+    scalar b.obsend = b.initobs + b.wsize# - 1		# FIXME: last obs. of 1st forecast
+    scalar b.nsteps = $t2 - b.obsend				# no. of windows for estimation
+
+    smpl b.initobs b.obsend
+
+    printf "\n*********************************************************************\n"
+    printf "Effective sample used: %s to %s (T=%d)\n", obslabel($t1), obslabel($t2), ($t2-$t1)
+    printf "Number of %s estimations = %d\n", b.type_roll, b.nsteps
+    printf "First 1-step ahead forecast will be computed for %s\n", obslabel($t2+1)
+    printf "*********************************************************************\n"
+    printf "\n"
+
+    matrix FC = zeros(b.nsteps, b.h)
+
+    # START ESTIMATION
+    scalar roundcount=0
+
+    loop lwin=1..b.nsteps -q 	# loop over date iterations
+
+        if lwin == b.nsteps
+            scalar b.lastfc = $t2
+        endif
+        init = $t1
+        last = $t2
+
+        smpl init last				# restrict sample
+        if lwin == 1
+            scalar b.initfc = 1+$t2			# 1st obs being forecasted (h=1)
+        endif
+
+        # COMPUTE and store FCs
+        if which=="rwfd"
+            FC[lwin,] = rwf(y, b.h, 1)'
+		elif which=="avgfc"
+            FC[lwin,] = @which(y, b.h)[,1]'
+        else
+            FC[lwin,] = @which(y, b.h)'
+        endif
+
+
+        # Shift in time
+        if b.type_roll == "recursive"
+            smpl ; +1
+        elif b.type_roll == "rolling"
+            smpl +1 +1
+        endif
+
+        /*	Print how far you are...
+
+           if roundcount == ceil(0.1*b.nsteps)
+           printf "\n%d pct. of all %s-windows finished\n", $lwin/b.nsteps*100, b.type_roll
+           flush
+           roundcount=0
+           else
+           roundcount++
+           endif
+        */
+
+    endloop		# END bwin-loop
+
+	# adjust rows to make sure that each 'h' refers to the same period being forecasted
+	b.FC = FC[,1]
+	loop i=1..(b.h-1) -q
+		b.FC ~= mlag(FC[,i+1],$i, NA)
+	endloop
+
+	# attach column-/rownames
+	strings S = array(b.h)
+	loop i=1..b.h -q
+		S[i] = "h=$i"
+	endloop
+	cnameset(b.FC, S)
+
+	# attach column-/rownames	
+	cnameset(b.FC, rownam(b.h))
+	# on rows we put date strings
+	strings S = array(b.nsteps)
+	loop i=1..b.nsteps -q
+		S[i] = sprintf("%s", obslabel(b.initfc+$i-1) )
+	endloop
+
+	rnameset(b.FC, S)
+
+end function
+
+
+
