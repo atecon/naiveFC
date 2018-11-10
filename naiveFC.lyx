@@ -99,7 +99,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.11
+Version 0.3
 \end_layout
 
 \begin_layout Standard
@@ -127,6 +127,20 @@ status open
 Changelog
 \end_layout
 
+\begin_layout Itemize
+Version 0.3 (Oct, 2018)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+add NaiveThroughTime() for computing rolling/ recursive forecasts
+\end_layout
+
+\begin_layout Itemize
+add nttplot() for computing plotting rolling/ recursive forecasts
+\end_layout
+
+\end_deeper
 \begin_layout Itemize
 Version 0.11 (Oct, 2018)
 \end_layout
@@ -236,6 +250,10 @@ Easy computation of an average of forecasts by taking the mean point forecasts
 
 \begin_layout Itemize
 Plotting of the h-step ahead forecasts.
+\end_layout
+
+\begin_layout Itemize
+Computation of either rolling or recursive forecasts.
 \end_layout
 
 \begin_layout Standard
@@ -531,26 +549,180 @@ status open
 
 \begin_layout Plain Layout
 
-        average-fc     sd           meanf        rwf         rwf+drift 
-   AR(1)		smean        snaive
+   average-fc   sd       meanf     rwf    rwf+drift  AR(1)  smean  snaive
 \end_layout
 
 \begin_layout Plain Layout
 
-h=1      0.99176    0.0025708      0.99446      0.99160      0.99154      0.99181
-      0.99397      0.98720
+h=1 0.991     0.002      0.994     0.991   0.991    0.991   0.993  0.987
 \end_layout
 
 \begin_layout Plain Layout
 
-h=2      0.99203    0.0022136      0.99446      0.99160      0.99149      0.99201
-      0.99426      0.98840
+h=2 0.992     0.002      0.994     0.991   0.991    0.992   0.994  0.988
 \end_layout
 
 \begin_layout Plain Layout
 
-h=3      0.99264    0.0015085      0.99446      0.99160      0.99143      0.99219
-      0.99465      0.99150      
+h=3 0.992     0.001      0.994     0.991   0.991    0.992   0.994  0.991
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The NaiveThroughTime() function allows the user to easily compute rolling
+ (fixed window length) or recursive (expanding window length) forecasts
+ for a specific naive forecast type.
+ The following sample script computes the 1- to 4-steps ahead seasonal mean
+ (smeanf) forecasts over time.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+bundle b = null      # generate an empty bundle
+\end_layout
+
+\begin_layout Plain Layout
+
+b.y = x              # put objetcs into the bundle
+\end_layout
+
+\begin_layout Plain Layout
+
+b.h = 4              # max.
+ horizon
+\end_layout
+
+\begin_layout Plain Layout
+
+b.wsize = 33         # window size
+\end_layout
+
+\begin_layout Plain Layout
+
+string which = "smeanf"   # choose a method
+\end_layout
+
+\begin_layout Plain Layout
+
+NaiveThroughTime(&b, which) # Call the function
+\end_layout
+
+\begin_layout Plain Layout
+
+matrix FC = b.FC     # grab matrix of forecasts
+\end_layout
+
+\begin_layout Plain Layout
+
+print FC             # rows: period being forecasted, cols: fc-horizon
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The results are stored in matrix FC.
+ Thus, the 1-step ahead forecast for series 
+\begin_inset Formula $x$
+\end_inset
+
+ made in 1980Q1 for 1980Q2 is 1.0059.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+                h=1          h=2          h=3          h=4
+\end_layout
+
+\begin_layout Plain Layout
+
+1980:2       1.0059          nan          nan          nan
+\end_layout
+
+\begin_layout Plain Layout
+
+1980:3       1.0059       1.0045          nan          nan
+\end_layout
+
+\begin_layout Plain Layout
+
+1980:4       1.0058       1.0051       1.0060          nan
+\end_layout
+
+\begin_layout Plain Layout
+
+1981:1       1.0058       1.0051       1.0060       1.0062
+\end_layout
+
+\begin_layout Plain Layout
+
+1981:2       1.0043       1.0053       1.0058       1.0073 
 \end_layout
 
 \end_inset
@@ -1261,6 +1433,340 @@ An
 \end_inset
 
 ) forecasts will be returned.
+\end_layout
+
+\begin_layout Subsection
+NaiveThroughTime
+\end_layout
+
+\begin_layout Standard
+This function computes a selected naive forecast method through time for
+ specific forecast horizons.
+ Either 
+\begin_inset Quotes eld
+\end_inset
+
+rolling
+\begin_inset Quotes erd
+\end_inset
+
+ (fixed window length shifting through time) or 
+\begin_inset Quotes eld
+\end_inset
+
+recursive
+\begin_inset Quotes erd
+\end_inset
+
+ (expanding window through time) are supported.
+ This allows you to analyze the 
+\begin_inset Formula $h$
+\end_inset
+
+-step ahead forecast made at specific observations.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+NaiveThroughTime
+\family typewriter
+(
+\family default
+bundle *b, string which, bool verbose[1]
+\family typewriter
+)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: adds matrix FC which is of dimension 
+\begin_inset Formula $R\times h$
+\end_inset
+
+ where R refers to the no.
+ of rolling/ recursive forecasts and 
+\begin_inset Formula $h$
+\end_inset
+
+ to the max.
+ forecast horizon.
+\end_layout
+
+\begin_layout Standard
+The function arguments are:
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+bundle b:
+\family default
+ provide some at least required information in a bundle
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string which
+\family default
+: provide a string for selecting the underlying forecast method (
+\begin_inset Quotes eld
+\end_inset
+
+meanf
+\begin_inset Quotes erd
+\end_inset
+
+, 
+\begin_inset Quotes eld
+\end_inset
+
+smean
+\begin_inset Quotes erd
+\end_inset
+
+, 
+\begin_inset Quotes eld
+\end_inset
+
+snaive
+\begin_inset Quotes erd
+\end_inset
+
+, 
+\begin_inset Quotes eld
+\end_inset
+
+rwf
+\begin_inset Quotes erd
+\end_inset
+
+, 
+\begin_inset Quotes eld
+\end_inset
+
+rwfd
+\begin_inset Quotes erd
+\end_inset
+
+ (random-walk with drift), 
+\begin_inset Quotes eld
+\end_inset
+
+avgfc
+\begin_inset Quotes erd
+\end_inset
+
+)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+bool verbose
+\family default
+[1]: print some information (default: print)
+\end_layout
+
+\begin_layout Standard
+The user needs to put at least the following information into the bundle:
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+series b.y
+\family default
+: series to be forecasted
+\end_layout
+
+\begin_layout Standard
+Furthermore, the user can set the following additional parameters:
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int b.wsize
+\family default
+: length of the (initial) window (default 
+\begin_inset Formula $0.25\times T$
+\end_inset
+
+ where 
+\begin_inset Formula $T$
+\end_inset
+
+ is the total no.
+ of observations of series y)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+int h
+\family default
+: max.
+ forecast horizon (default 12)
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string type_roll
+\family default
+: Choose between "rolling" or "recursive" window forecasts (default 
+\begin_inset Quotes eld
+\end_inset
+
+rolling
+\begin_inset Quotes erd
+\end_inset
+
+)
+\end_layout
+
+\begin_layout Standard
+After having called NaiveThroughTime
+\family typewriter
+()
+\family default
+, the bundle will contain a matrix named 
+\begin_inset Quotes eld
+\end_inset
+
+FC
+\begin_inset Quotes eld
+\end_inset
+
+ of dimension 
+\begin_inset Formula $R\times h$
+\end_inset
+
+ where 
+\begin_inset Formula $R$
+\end_inset
+
+ denotes the total number of forecasts made and 
+\begin_inset Formula $h$
+\end_inset
+
+ to the max.
+ forecast horizon selected.
+\end_layout
+
+\begin_layout Subsection
+nttplot
+\end_layout
+
+\begin_layout Standard
+This function plots the rolling/ recursive h-step ahead forecasts computed
+ by function NaiveThroughTime() before.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+nttplot(bundle *b, string title[null], string ylab[null], string xlab[null],
+ string filename[null] "'display' OR 'Path+filename'")
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+void
+\end_layout
+
+\begin_layout Standard
+The function arguments are:
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+bundle b:
+\family default
+ provide bundle after having called NaiveThroughTime() before.
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string title
+\family default
+[null]: provide a string for the title.
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string ylab
+\family default
+[null]: provide a string for the y-label.
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string xlab
+\family default
+[null]: provide a string for the x-label.
+\end_layout
+
+\begin_layout Enumerate
+
+\family typewriter
+string filename
+\family default
+[null]: provide a string for the x-label (default 'display' which plots
+ the forecast directly on the screen).
 \end_layout
 
 \end_body

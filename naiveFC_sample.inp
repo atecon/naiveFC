@@ -1,7 +1,8 @@
 set verbose off
 clear
 #include naiveFC.gfn --force
-include "/home/ninja/BrainLocalData/shared/git_atecon/naiveFC/naiveFC.inp"
+#include "/home/ninja/BrainLocalData/shared/git_atecon/naiveFC/naiveFC.inp"
+include "/home/at/git/naiveFC/naiveFC.inp"
 
 open AWM.gdt --quiet
 
@@ -49,27 +50,30 @@ fcplot(x, avg_fc[,1], "Avg. of Forecasts")
 # NaiveTsCv
 # Conduct rolling-sample naiveFC()
 #-------------------------------------
-
 bundle b = null
 b.y = x
 b.h = 4				# max. horizon
 b.wsize = 33			# window size
-string which = "avgfc"	# choose a method
+string which = "smeanf"	# choose a method
 # R U N
-NaiveTsCv(&b, which)
+NaiveThroughTime(&b, which)
 matrix FC = b.FC		# grab matrix of forecasts; rows: period forecasted, cols: fc-horizon
+print FC
+# Plot
+nttplot(&b)
 
-# Generate series out of vector
+/* Optional
+# Generate series out of forecast vectors and plot results
 smpl x --no-missing --replace
 smpl b.initfc ;
 list L = x
 loop i=1..b.h -q
-	series FC_y_h$i = FC[,i]
-	setinfo FC_y_h$i --description="@which $i-step ahead FC"
-	L += FC_y_h$i
+	series FC_@which_h$i = FC[,i]
+	setinfo FC_@which_h$i --description="@which $i-step ahead FC"
+	L += FC_@which_h$i
 endloop
 gnuplot L --with-lines --time-series --output=display
-
+*/
 
 
 
