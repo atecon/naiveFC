@@ -617,9 +617,7 @@ return fc
 <sample-script>
 set verbose off
 clear
-#include naiveFC.gfn --force
-#include &quot;/home/ninja/BrainLocalData/shared/git_atecon/naiveFC/naiveFC.inp&quot;
-include &quot;/home/at/git/naiveFC/naiveFC.inp&quot;
+include naiveFC.gfn --force
 
 open AWM.gdt --quiet
 
