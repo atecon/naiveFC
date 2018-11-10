@@ -52,15 +52,14 @@ fcplot(x, avg_fc[,1], "Avg. of Forecasts")
 #-------------------------------------
 bundle b = null
 b.y = x
-b.h = 4				# max. horizon
+b.h = 4					# max. horizon
 b.wsize = 33			# window size
 string which = "smeanf"	# choose a method
 # R U N
 NaiveThroughTime(&b, which)
 matrix FC = b.FC		# grab matrix of forecasts; rows: period forecasted, cols: fc-horizon
 print FC
-# Plot
-nttplot(&b)
+nttplot(&b)				# Plot
 
 /* Optional
 # Generate series out of forecast vectors and plot results
