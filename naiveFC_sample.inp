@@ -1,8 +1,6 @@
 set verbose off
 clear
-#include naiveFC.gfn --force
-#include "/home/ninja/BrainLocalData/shared/git_atecon/naiveFC/naiveFC.inp"
-include "/home/at/git/naiveFC/naiveFC.inp"
+include naiveFC.gfn --force
 
 open AWM.gdt --quiet
 
