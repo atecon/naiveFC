@@ -3,7 +3,7 @@
 """
 Created on Sat Jan 19 10:52:58 2019
 
-@author: at
+@author: Artur Tarassow
 """
 
 # Set working dir
@@ -19,29 +19,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sb
 
-# Read-in raw data into Pandas dataframe
-df = pd.read_csv('beer.csv', index_col='obs', na_values=["NA"]) 
+"""
+Read-in raw data into Pandas dataframe
+"""
+opt_date = 1        # SELECT
 
-# Assign date string to index
-df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
-#pd.date_range('1992-01', periods = len(df), freq="Q")
+if opt_date==1:
+    #pd.read_csv('beer.csv', index_col='obs', na_values=["NA"]) 
+    df = pd.read_csv('beer.csv', na_values=["NA"]) 
+    df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
+    del df["obs"]
+elif opt_date==2:
+    df = pd.read_csv('beer.csv', na_values=["NA"])   
+    df.index = pd.to_datetime(df["obs"])
+    del df["obs"]
 
-#pd.infer_freq(df)
-df.index.freq
 
-df.resample('Q').mean()
-
-Series.dt.freq
 
 #df.groupby(pd.Grouper(freq='Q')).mean()  # update for v0.21+
 
-
-# %%
-
-#pd.infer_freq(df["x"])
-
-#print(df.index)
-#print(df.index.dtype)
 
 
 def print_noboot():
@@ -87,13 +83,24 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         print_noboot()
         return None
     if nboot==0:
+    
+        # print frequency
+        period = y.index.freqstr
+        print(period)
+    
+        # Once we have the frequency, we can construct a periodicity series
+        #if period.find('Q'):        
+        if period.startswith('A'):
+           y["period"] = period.startswith('A')
+        elif period.startswith('Q'):
+            y["period"] = period.startswith('Q')
+        elif period.startswith('M'):
+            y["period"] = period.startswith('M')
+        elif period.startswith('D'):
+            y["period"] = period.startswith('D')
+    
+        print(y)
         
-        print(df.resample('Q').mean())
-        
-        #fc = pd.Series(np.ones((h)),gen_index(h)) * np.mean(y)
-        #fc.name = gen_colname()
-        #return fc
-
 fc_smeanf = smeanf(df["x"])
 #print(fc_smeanf)
 
