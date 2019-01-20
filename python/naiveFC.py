@@ -10,7 +10,7 @@ Created on Sat Jan 19 10:52:58 2019
 import os
 os.getcwd()
 # ADJUST THIS PATH ACCORDING TO YOUR MACHINE
-os.chdir("/home/at/git/python_exercises/src/naiveFC")
+os.chdir("/home/at/git/naiveFC/python")
 os.getcwd()
 
 # Load some packages/ functions
@@ -20,13 +20,28 @@ import matplotlib.pyplot as plt
 import seaborn as sb
 
 # Read-in raw data into Pandas dataframe
-# Note: the dataset doesn't seem to include missings
-df = pd.read_csv('beer.csv', na_values=["NA"]) 
+df = pd.read_csv('beer.csv', index_col='obs', na_values=["NA"]) 
 
 # Assign date string to index
-df.index = pd.to_datetime(df['obs'])
-print(df.index)
-print(df.index.dtype)
+df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
+#pd.date_range('1992-01', periods = len(df), freq="Q")
+
+#pd.infer_freq(df)
+df.index.freq
+
+df.resample('Q').mean()
+
+Series.dt.freq
+
+#df.groupby(pd.Grouper(freq='Q')).mean()  # update for v0.21+
+
+
+# %%
+
+#pd.infer_freq(df["x"])
+
+#print(df.index)
+#print(df.index.dtype)
 
 
 def print_noboot():
@@ -60,7 +75,30 @@ def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         fc.name = gen_colname()
         return fc
     
+    
+def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
+    """
+    Forecasts of all future values are equal to the mean of
+    specific seasons based on historical data.    
+    Returns forecasts (and prediction intervals for an iid model)
+    applied to y
+    """    
+    if nboot>0:
+        print_noboot()
+        return None
+    if nboot==0:
+        
+        print(df.resample('Q').mean())
+        
+        #fc = pd.Series(np.ones((h)),gen_index(h)) * np.mean(y)
+        #fc.name = gen_colname()
+        #return fc
 
+fc_smeanf = smeanf(df["x"])
+#print(fc_smeanf)
+
+
+# %%
 
 def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
     """
@@ -86,11 +124,16 @@ def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
         fc.name = gen_colname()
         return fc
 
+
+
 def my_ols(y,X):
-    return np.linalg.lstsq(X,y,rcond=None)[0] # 0=only coeff. matrix
+    """
+    Estimate params. by OLS using linear algebra
+    """
+    return np.linalg.lstsq(X,y,rcond=None)[0] # 0=grab only coeff. matrix
 
     
-def ar1f (y, h=10, const=True, trend=True, level=90, fan=False, nboot=0, blength=4):
+def ar1f (y, h=10, const=True, trend=False, level=90, fan=False, nboot=0, blength=4):
     """
     AR(1) forecast with or withou linear trend.
     Returns forecasts (and prediction intervals for an iid model)
@@ -111,50 +154,53 @@ def ar1f (y, h=10, const=True, trend=True, level=90, fan=False, nboot=0, blength
             Y["time"] = pd.Series(1*np.ones(T).cumsum(), index=Y.index)
             
         # Add 1st lag
-        Y["Y_1"] = Y.iloc[:,0].shift(1)
+        Y["Y_1"] = Y.iloc[:,0].shift(1)     # y~const~trend~y(-1)
         Y.dropna(axis=0, inplace=True)
         
         # OLS        
         y = Y.iloc[:,0]
-        X = Y.iloc[:,1:]
+        X = Y.iloc[:,1:]    # const~trend~y(-1)
         bhat = my_ols(y,X)
                 
         # Iterative forecast
         return recfc(Y,bhat,h,const,trend)
 
         
-def recfc(y,bhat,h,const,trend):
+def recfc(Y,bhat,h,const,trend):
     """
     Construct h-step ahead iterative forecast based on AR(1)
+    Y:  data frame, T by (1+k) with elements y~const~trend~y(-1)
     """
-    
+        
     fc = np.zeros((h,1))
-    m = y.iloc[:,-1]    # grab last obs.
+    m = np.asmatrix(Y.iloc[-1,:-1])   # 1 by (1+k); grab last obs. row
+    # position y(t) at last position    
+    m = np.concatenate((m[:,1:], m[:,0]), axis=1)   # const~trend~y(t)
+    bhat = np.asmatrix(bhat)       # 1 by k
+
+    # 1-step ahead forecast     
+    fc[0] = m * np.transpose(bhat)
     
-    if const:
-        fc[0] = bhat[0]    
-    if trend: 
-        fc[0] += bhat[1]*m[1] + bhat[2]*m[2]
-    else:
-         fc[0] += bhat[1]*m[1]            
-
-    # Start the recursion
-    for i in range(1,h):
-        if const:
-            fc[i] = bhat[0]    
-        if trend: 
-#            print((m[2]+1))
-            fc[i] += bhat[1]*(m[2]+1) + bhat[2]*fc[i-1]
-        else:
-            fc[i] += bhat[1]*fc[i-1]
+    if h>1:
+        # Start the recursion for 2-step-ahead forecast
+        for i in range(1,h):
             
-    return fc
+            # replace y(t) by last forecast value
+            m[:,-1] = fc[i-1]   
+            
+            if trend: 
+                # update the linear trend value
+                m[:,1] += 1
+                
+            # compute new point forecast
+            fc[i] = m * np.transpose(bhat)
+            
+    return pd.Series(fc[:,0])
 
 
 
-fc_ar1 = ar1f(df["x"])
-print(fc_ar1)
 
+## %%
     
 # =============================================================================
 # # CALL
@@ -169,3 +215,5 @@ fc_rwd = rwf(df["x"], drift=True)
 print(fc_rwd)
 
 fc_ar1 = ar1f(df["x"])
+print(fc_ar1)
+
