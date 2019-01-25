@@ -26,22 +26,10 @@ df = pd.read_csv('beer.csv', index_col='obs', na_values=["NA"])
 df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
 #pd.date_range('1992-01', periods = len(df), freq="Q")
 
-#pd.infer_freq(df)
-df.index.freq
+#df.resample('Q').mean()
 
-df.resample('Q').mean()
-
-Series.dt.freq
-
+# testing only
 #df.groupby(pd.Grouper(freq='Q')).mean()  # update for v0.21+
-
-
-# %%
-
-#pd.infer_freq(df["x"])
-
-#print(df.index)
-#print(df.index.dtype)
 
 
 def print_noboot():
@@ -50,7 +38,7 @@ def print_noboot():
     print("Error: Bootstrap confidence intervals are not supported, yet")
 
 def gen_index(h):
-    """ Construct list of rownames for index """
+    """ Construct list of rownames for the index if the fc-matrix """
     L = ["h="] * h
     for i in range(h):
         L[i] += str(i+1)        
@@ -74,6 +62,71 @@ def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         fc = pd.Series(np.ones((h)),gen_index(h)) * np.mean(y)        
         fc.name = gen_colname()
         return fc
+
+   
+    
+def series_mat_concat(y, m):    
+    """
+        concatenate series y with a vector m
+        of the same length
+        return matrix T by 2 matrix
+    """
+    # TODO: add a check that y and m have the same length
+    my = np.asmatrix(y).transpose() # TODO: vec() rather t. transpose()
+    return np.concatenate((my, m), axis=1)
+
+
+def get_freq_as_vector(y):
+    """
+        Obtain a series of the minor observations
+        of y
+    """        
+    
+    """ Determine the frequency of series 'y' """
+    # TODO: add a check whether y.index has TS-structure    
+    f = y.index.freqstr # string indicating frequency (A, Q; M, D)    
+        
+    if f.find("Q",0,1) is not -1: # quarterly
+        return np.asmatrix(y.index.quarter).transpose()        
+    elif f.find("M",0,1) is not -1: # monthly
+        return np.asmatrix(y.index.month).transpose()
+    elif f.find("d",0,1) is not -1: # daily
+        return np.asmatrix(y.index.day).transpose()
+    elif f.find("A",0,1) is not -1:
+        print("You cannot apply the choosen method to annual data.")
+        return -1
+    
+
+def get_mean_obsminor(y, h):
+    """
+    obtain historical mean value for each separate quarter, month,
+    or day across all years
+    """
+    
+    # Concatenate series y with vector of minor frequency of y
+    m = series_mat_concat(y, get_freq_as_vector(y))
+        
+        
+    if m is not -1:
+        df = pd.DataFrame(m, columns=["y", "freq"])
+        df.index = y.index
+    
+        # get mean-value for each minor frequency
+        fmean = df.groupby("freq").mean()
+    
+    """
+    omin = $obsminor
+    scalar n = max(uniq(omin))
+    matrix ymeans = zeros(n, 1)
+
+    loop i=1..n -q	# filter by $obsminor
+        smpl omin==$i --restrict --replace
+        ymeans[i] = mean(y)
+    endloop
+    smpl full    
+    return stack_fc(ymeans, h)
+    """
+
     
     
 def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
@@ -88,7 +141,8 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         return None
     if nboot==0:
         
-        print(df.resample('Q').mean())
+        get_mean_obsminor(y, h)
+        #print(df.resample('Q').mean())
         
         #fc = pd.Series(np.ones((h)),gen_index(h)) * np.mean(y)
         #fc.name = gen_colname()
