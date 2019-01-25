@@ -3,7 +3,7 @@
 """
 Created on Sat Jan 19 10:52:58 2019
 
-@author: at
+@author: Artur Tarassow
 """
 
 # Set working dir
@@ -19,17 +19,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sb
 
-# Read-in raw data into Pandas dataframe
-df = pd.read_csv('beer.csv', index_col='obs', na_values=["NA"]) 
+"""
+Read-in raw data into Pandas dataframe
+"""
+opt_date = 1        # SELECT
 
-# Assign date string to index
-df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
-#pd.date_range('1992-01', periods = len(df), freq="Q")
+if opt_date==1:
+    #pd.read_csv('beer.csv', index_col='obs', na_values=["NA"]) 
+    df = pd.read_csv('beer.csv', na_values=["NA"]) 
+    df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
+    del df["obs"]
+elif opt_date==2:
+    df = pd.read_csv('beer.csv', na_values=["NA"])   
+    df.index = pd.to_datetime(df["obs"])
+    del df["obs"]
 
-#df.resample('Q').mean()
-
-# testing only
-#df.groupby(pd.Grouper(freq='Q')).mean()  # update for v0.21+
 
 
 def print_noboot():
@@ -132,6 +136,23 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         print_noboot()
         return None
     if nboot==0:
+    
+        # print frequency
+        period = y.index.freqstr
+        print(period)
+    
+        # Once we have the frequency, we can construct a periodicity series
+        #if period.find('Q'):        
+        if period.startswith('A'):
+           y["period"] = period.startswith('A')
+        elif period.startswith('Q'):
+            y["period"] = period.startswith('Q')
+        elif period.startswith('M'):
+            y["period"] = period.startswith('M')
+        elif period.startswith('D'):
+            y["period"] = period.startswith('D')
+    
+        print(y)
         
         """ obtain historical mean value for each separate freq """
         fmean = get_mean_obsminor(y, h)  # T by 2 data frame                
@@ -188,8 +209,8 @@ def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
     """
     Random-walk forecast of all future values are equal to the
     last historical data point.
-    Random-walk w. dtrift and forecast of all future values are equal to the
-    last historical data point.
+    Random-walk w. dtrift and forecast of all future values are
+    equal to the last historical data point.
     Returns forecasts (and prediction intervals for an iid model)
     applied to y  
     """    
@@ -201,8 +222,9 @@ def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
         fc = np.ones(h) * y[-1]
         
         if drift:        
-            # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
-            g = (y[-1]-y[0])/(np.shape(y)[0]-1)     # average growth rate (drift)        
+            # equivalent to an ARIMA(0,1,0) model with an
+            # optional drift coefficient
+            g = (y[-1]-y[0])/(np.shape(y)[0]-1)  # avg. growth rate (drift)        
             fc = fc + np.cumsum(np.ones(h)) * g            
             
         # Finalize: add row and column strings to series        
