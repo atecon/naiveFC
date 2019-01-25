@@ -53,12 +53,22 @@ end function
 
 
 function matrix stack_fc (matrix fc "Forecast(s)",
-  int h "Forecast horizon")
-  
-    # construct h-step ahdead forecasts
-    fc = vec(fc)
-    fc
-    stop
+                          int h "Forecast horizon")  
+
+    # Check which value $obsminor takes for the last
+    # obs. 
+    scalar last = $obsminor[$tmax]
+    # Now re-order fc to make sure that 1st forecast
+    # corresponds to the right month, quarter etc.
+    
+                          
+    # construct h-step ahdead forecasts                            
+    fc = vec(fc)	# pd by 1
+    scalar k = ceil(h/rows(fc)	# Anz. d stackings
+    fc = ones(rows(fc),k) .* fc	# pd by k
+    fc = vec(fc)[1:h]			# row-vector
+
+    /* Deprectated
     # stack forecasts
     if h>rows(fc)
         loop i=1..ceil(h/rows(fc)) -q
@@ -68,6 +78,7 @@ function matrix stack_fc (matrix fc "Forecast(s)",
     else
         fc = fc[1:h]
     endif
+    */
     return fc
 end function
 
@@ -75,22 +86,8 @@ function matrix get_mean_obsminor (const series y, int h)
     
     # obtain for each periodicity (quarterly=4,
     # monthly=12, etc.) the mean value
-    series omin = $obsminor
-    print y omin -o
-    stop
-    
     matrix ymeans = aggregate(y,$obsminor,mean)
 
-    /* Deprecated
-    series omin = $obsminor
-    scalar n = max(uniq(omin))
-    matrix ymeans = zeros(n, 1)
-    loop i=1..n -q	# filter by $obsminor
-        smpl omin==$i --restrict --replace
-        ymeans[i] = mean(y)
-    endloop
-    smpl full
-    */
     return stack_fc(ymeans[,3], h)
 end function
 
@@ -406,7 +403,8 @@ function matrix snaive (const series y "Series",
     smpl y --contiguous
     
     if fan==0
-        # forecast simply equals last obs for each specific periodicity (month, quarter)
+        # forecast simply equals last obs for each specific
+        # periodicity (month, quarter)
         fc = get_last_obsminor(y, h)
         # matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
         matrix fc = ones(h,1) .* fc
@@ -414,7 +412,8 @@ function matrix snaive (const series y "Series",
     else
         funcerr "Fan forecasts are not available, yet."
         /* NEEDS
-           # forecast simply equals last obs for each specific periodicity (month, quarter)
+        # forecast simply equals last obs for each specific
+        # periodicity (month, quarter)
            # FIXME: This destroys the seasonality structure
            matrix yb = re_sample({y}, nboot, blength)
            fc_b = zeros(h, nboot)
