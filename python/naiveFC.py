@@ -16,25 +16,27 @@ os.getcwd()
 # Load some packages/ functions
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sb
+#import matplotlib.pyplot as plt
+#import seaborn as sb
 
 """
 Read-in raw data into Pandas dataframe
 """
-opt_date = 1        # SELECT
+opt_date = 1           # SELECT (default = 1)
 
 if opt_date==1:
     #pd.read_csv('beer.csv', index_col='obs', na_values=["NA"]) 
     df = pd.read_csv('beer.csv', na_values=["NA"]) 
     df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
     del df["obs"]
+    
 elif opt_date==2:
     df = pd.read_csv('beer.csv', na_values=["NA"])   
     df.index = pd.to_datetime(df["obs"])
     del df["obs"]
 
-
+#=========================================================
+    
 
 def print_noboot():
     """ Print Error"""
@@ -59,7 +61,7 @@ def series_mat_concat(y, m):
         of the same length
         return matrix T by 2 matrix
     """
-    # TODO: add a check that y and m have the same length
+    # TODO: add a check that y and m have the same length    
     my = np.asmatrix(y).transpose() # TODO: vec() rather t. transpose()
     return np.concatenate((my, m), axis=1)
 
@@ -135,29 +137,13 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     if nboot>0:
         print_noboot()
         return None
-    if nboot==0:
     
-        # print frequency
-        period = y.index.freqstr
-        print(period)
+    elif nboot==0:
     
-        # Once we have the frequency, we can construct a periodicity series
-        #if period.find('Q'):        
-        if period.startswith('A'):
-           y["period"] = period.startswith('A')
-        elif period.startswith('Q'):
-            y["period"] = period.startswith('Q')
-        elif period.startswith('M'):
-            y["period"] = period.startswith('M')
-        elif period.startswith('D'):
-            y["period"] = period.startswith('D')
-    
-        print(y)
-        
         """ obtain historical mean value for each separate freq """
         fmean = get_mean_obsminor(y, h)  # T by 2 data frame                
         last = fmean.index[-1]      # last obsminor value, e.g. last quarter
-
+        
         # Reorder fmean according to 'last'
         # For instance, if last=Q3 then next is Q4 and then Q1 etc.
         # We construct a len(fmean) by 1 vector whose indices direct
@@ -174,8 +160,10 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
             last=last+1       # update
 
         # Finalize: add row and column strings to series        
-        return pd.Series(fc[:,0], index=gen_index(h), name=gen_colname())
-            
+        return pd.Series(fc[:,0],
+                         index=gen_index(h),
+                         name=gen_colname())  
+
 
 def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
     """
@@ -193,16 +181,27 @@ def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
         m = series_mat_concat(y, get_freq_as_vector(y))
 
         # read periodicity per year (A=1, Q=4, ..)
-        freq = m[:,1].max() 
-        
-        # read kast 'freq' obsminor values, e.g. last 4 quarters, etc.
-        fc = m[:,0][-freq:]    
-        print(fc)
-        # Stack 'last' vertically
-        
-        
+        freq = m[:,1].max()
+
+        # read last 'freq' obsminor values, e.g. last 4 quarters, etc.
+        fc = m[-min(h,freq):,0]
+       
+        if h<=freq:            
+            return pd.Series(fc[-h:,0],
+                             index=gen_index(h),
+                             name=gen_colname())
+        else:
+            for i in range(h-freq): # fill up remaining horizons
+                fcnew = fc[-freq]                
+                fc = np.concatenate((fc,fcnew))
+                
         # Finalize: add row and column strings to series        
-        #return pd.Series(fc[:,0], index=gen_index(h), name=gen_colname())
+        return fc
+        """
+        return pd.Series(fc[:,0],
+                         index=gen_index(h),
+                         name=gen_colname())
+        """
 
 
 def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
@@ -315,7 +314,7 @@ def recfc(Y,bhat,h,const,trend):
 # =============================================================================
 
 fc_snaive= snaive(df["x"])
-print(fc_snaive)
+#rint(fc_snaive)
 
 
 # %%
@@ -330,7 +329,7 @@ fc_ar1 = ar1f(df["x"])
 print(fc_ar1)
 
 fc_ar1trend = ar1f(df["x"], trend=True)
-print(fc_fc_ar1trend)
+print(fc_ar1trend)
 
 fc_rw = rwf(df["x"])
 print(fc_rw)
