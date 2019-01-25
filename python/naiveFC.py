@@ -36,7 +36,9 @@ def series_mat_concat(y, m):
         return matrix T by 2 matrix
     """
     # TODO: add a check that y and m have the same length    
-    my = np.asmatrix(y).transpose() # TODO: vec() rather t. transpose()
+    my = np.asmatrix(y).transpose() # TODO: .ravel() rather t. transpose()
+    #my = np.asmatrix(y).ravel()
+    print(my)
     return np.concatenate((my, m), axis=1)
 
 
