@@ -6,37 +6,11 @@ Created on Sat Jan 19 10:52:58 2019
 @author: Artur Tarassow
 """
 
-# Set working dir
-import os
-os.getcwd()
-# ADJUST THIS PATH ACCORDING TO YOUR MACHINE
-os.chdir("/home/at/git/naiveFC/python")
-os.getcwd()
-
-# Load some packages/ functions
-import pandas as pd
-import numpy as np
-#import matplotlib.pyplot as plt
-#import seaborn as sb
-
-"""
-Read-in raw data into Pandas dataframe
-"""
-opt_date = 1           # SELECT (default = 1)
-
-if opt_date==1:
-    #pd.read_csv('beer.csv', index_col='obs', na_values=["NA"]) 
-    df = pd.read_csv('beer.csv', na_values=["NA"]) 
-    df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
-    del df["obs"]
-    
-elif opt_date==2:
-    df = pd.read_csv('beer.csv', na_values=["NA"])   
-    df.index = pd.to_datetime(df["obs"])
-    del df["obs"]
 
 #=========================================================
     
+import pandas as pd
+import numpy as np
 
 def print_noboot():
     """ Print Error"""
@@ -49,7 +23,7 @@ def gen_index(h):
     for i in range(h):
         L[i] += str(i+1)        
     return L
-    
+
 def gen_colname():
     """ construct column names """
     return "point"   
@@ -100,11 +74,13 @@ def get_mean_obsminor(y, h):
         df = pd.DataFrame(m, columns=["y", "freq"])
         df.index = y.index
     
-        # get mean-value for each minor frequency        
-        # NOTE: it is assumed that at least 1 obs for every
-        # potential obsminor value exists in y
-        # TODO: add a check and warning in future that seasonal-fc
-        # won't be available in this case -- at least for some freq.
+        """
+        get mean-value for each minor frequency        
+        NOTE: it is assumed that at least 1 obs for every
+        potential obsminor value exists in y
+        TODO: add a check and warning in future that seasonal-fc
+        won't be available in this case -- at least for some freq.
+        """
         fmean = df.groupby("freq").mean()       # TODO: add median()
         return fmean
     
@@ -125,7 +101,7 @@ def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
                        index=gen_index(h),
                        name=gen_colname()) * np.mean(y)        
         return fc
-    
+
     
 def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     """
@@ -237,7 +213,8 @@ def my_ols(y,X):
     return np.linalg.lstsq(X,y,rcond=None)[0] # 0=grab only coeff. matrix
 
     
-def ar1f (y, h=10, const=True, trend=False, level=90, fan=False, nboot=0, blength=4):
+def ar1f(y, h=10, const=True, trend=False, level=90,
+          fan=False, nboot=0, blength=4):
     """
     AR(1) forecast with or withou linear trend.
     Returns forecasts (and prediction intervals for an iid model)
@@ -278,7 +255,7 @@ def recfc(Y,bhat,h,const,trend):
     Construct h-step ahead iterative forecast based on AR(1)
     Y:  data frame, T by (1+k) with elements y~const~trend~y(-1)
     """
-        
+    
     fc = np.zeros((h,1))
     m = np.asmatrix(Y.iloc[-1,:-1])   # 1 by (1+k); grab last obs. row
     # position y(t) at last position    
@@ -307,35 +284,43 @@ def recfc(Y,bhat,h,const,trend):
 
 
 
-# %%
-    
-# =============================================================================
-# # CALL
-# =============================================================================
-
-fc_snaive= snaive(df["x"])
-#rint(fc_snaive)
-
-
-# %%
-
-fc_meanf = meanf(df["x"])
-print(fc_meanf)
-
-fc_smeanf = smeanf(df["x"])
-print(fc_smeanf)
-
-fc_ar1 = ar1f(df["x"])
-print(fc_ar1)
-
-fc_ar1trend = ar1f(df["x"], trend=True)
-print(fc_ar1trend)
-
-fc_rw = rwf(df["x"])
-print(fc_rw)
-
-fc_rwd = rwf(df["x"], drift=True)
-print(fc_rwd)
-
-
-
+#def avgfc(y, h=10, const=True, trend=False, level=90,
+#          fan=False, nboot=0, blength=4):
+#    
+#    """
+#    Computes the mean (average) and cross-sectional (across forecast methods)
+#    standard deviation at each horizon using all simple forecast methods
+#    available.
+#    """
+#
+#    if nboot>0:
+#            print_noboot()
+#            return None      
+#    else:
+#
+#        # Base models
+#        """
+#        (1) Define a list of base model:
+#            defarray("meanf(y,h)", "rwf(y,h)", "rwf(y,h,1)", "ar1f(y,h)")
+#        (2) if $pd>1	# for seasonal data only
+#            += "smeanf(y,h)"
+#            += "snaive(y,h)"
+#        (3) Use feval()
+#        """
+#    
+#    
+#        fc = np.matrix(zeros(h,nelem(M))
+#        
+#    loop i=1..nelem(M) -q
+#        string s = sprintf("%s", M[i])
+#        fc[,i] = @s[,1]	# only point-fc
+#    endloop
+#    fc = meanr(fc) ~ sdc(fc', rows(fc')-1)' ~ fc
+#    if $pd == 1
+#        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1)", " "))
+#    else
+#        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1) smean snaive", " "))
+#    endif
+#    rnameset(fc, rownam(h))
+#    return fc
+#end function
