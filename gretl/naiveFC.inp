@@ -20,8 +20,8 @@ end function
 
 
 function matrix get_last_obsminor (const series y, int h)
-    # obtain last k (quarterly=4, monthly=12, etc. obs)
-    smpl y --no-missing
+    # obtain last k (quarterly=4, monthly=12, etc. obs)    
+    smpl y --contiguous    
     smpl ($t2-$pd+1) $t2	# last $pd values
     return stack_fc({y}, h)
 end function
@@ -53,9 +53,12 @@ end function
 
 
 function matrix stack_fc (matrix fc "Forecast(s)",
-      int h "Forecast horizon")
+  int h "Forecast horizon")
+  
     # construct h-step ahdead forecasts
-    matrix fc = vec(fc)
+    fc = vec(fc)
+    fc
+    stop
     # stack forecasts
     if h>rows(fc)
         loop i=1..ceil(h/rows(fc)) -q
@@ -69,9 +72,13 @@ function matrix stack_fc (matrix fc "Forecast(s)",
 end function
 
 function matrix get_mean_obsminor (const series y, int h)
+    
     # obtain for each periodicity (quarterly=4,
     # monthly=12, etc.) the mean value
-
+    series omin = $obsminor
+    print y omin -o
+    stop
+    
     matrix ymeans = aggregate(y,$obsminor,mean)
 
     /* Deprecated
@@ -84,8 +91,7 @@ function matrix get_mean_obsminor (const series y, int h)
     endloop
     smpl full
     */
-
-    return stack_fc(ymeans, h)
+    return stack_fc(ymeans[,3], h)
 end function
 
 
@@ -229,6 +235,8 @@ function matrix meanf (const series y "Actuals",
 
     matrix ci = genci(level,fan)
 
+    smpl y --contiguous
+    
     if nboot==0
         #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
         matrix ymean = ones(h,1) .* mean(y)
@@ -264,7 +272,9 @@ function matrix medianf (const series y "Actuals",
     endif
 
     matrix ci = genci(level,fan)
-
+    
+    smpl y --contiguous
+    
     if nboot==0
         #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
         matrix ymean = ones(h,1) .* median(y)
@@ -299,6 +309,8 @@ function matrix smeanf (const series y "Series",
 
     matrix ci = genci(level, fan)
 
+    smpl y --contiguous
+    
     if fan==0
         # forecast simply equals the mean for each specific $obsminor
         # periodicity (month, quarter etc.)
@@ -351,10 +363,11 @@ function matrix rwf (const series y "Actuals",
 
     matrix ci = genci(level,fan)
 
-    #matrix fc = ones(h,3) .* ( y[$t2] ~ NA ~ NA )
-    smpl y --no-missing
+    smpl y --contiguous
+    
     matrix fc = ones(h,1) .* y[$t2]
-
+    #matrix fc = ones(h,3) .* ( y[$t2] ~ NA ~ NA )
+    
     if drift
         # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
         scalar avg = (y[$t2]-y[$t1])/(nobs(y)-1)	# average growth rate (drift)
@@ -389,7 +402,9 @@ function matrix snaive (const series y "Series",
     seas_check(y)
 
     matrix ci = genci(level,fan)
-
+    
+    smpl y --contiguous
+    
     if fan==0
         # forecast simply equals last obs for each specific periodicity (month, quarter)
         fc = get_last_obsminor(y, h)
@@ -428,7 +443,9 @@ function matrix ar1f (const series y "Series",
     endif
     matrix ci = genci(level,fan)
 
-    smpl y --no-missing
+    smpl y --contiguous
+    
+    # Start    
     ols y 0 y(-1) --quiet				# estimation via OLS
     matrix fc = recfc(y, $coeff, h)		# iterative forecast
 
@@ -438,7 +455,7 @@ function matrix ar1f (const series y "Series",
 end function
 
 
-function matrix recfc(const series y, matrix bhat, int h)
+function matrix recfc (const series y, matrix bhat, int h)
     matrix fc = zeros(h,1)
     fc[1] = bhat[1] + bhat[2]*y[$t2]
     loop i=2..h -q
@@ -447,12 +464,14 @@ function matrix recfc(const series y, matrix bhat, int h)
     return fc
 end function
 
+
 function matrix avgfc_gui (const series y "Series",
                            int h[1::10] "Horizon")
     matrix FC = avgfc(y,h)
     printf "%12.4f\n", FC
     return FC
 end function
+
 
 function matrix avgfc (const series y "Series",
                        int h[1::10] "Horizon",
@@ -521,8 +540,8 @@ function void NaiveThroughTime (bundle *b, string which, bool verbose[1])
 
     # Data set settings
     #-------------------
-    series y = b.y
-    smpl y --no-missing
+    series y = b.y    
+    smpl y --contiguous    
     scalar b.initobs = $t1
     scalar b.obsend = b.initobs + b.wsize
     scalar b.nsteps = $t2 - b.obsend	# no. of windows
