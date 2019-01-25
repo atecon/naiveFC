@@ -1,6 +1,7 @@
 set verbose off
 clear
-include naiveFC.gfn --force
+#include naiveFC.gfn --force
+include /home/at/git/naiveFC/gretl/naiveFC.inp --force
 
 open AWM.gdt --quiet
 

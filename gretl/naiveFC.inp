@@ -225,7 +225,6 @@ function matrix meanf (const series y "Actuals",
     if nboot==0
         #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
         matrix ymean = ones(h,1) .* mean(y)
-
     else
     /*
        matrix yb = vec( re_sample({y}, nboot, blength) )
@@ -236,6 +235,42 @@ function matrix meanf (const series y "Actuals",
     rnameset(ymean, rownam(h))
     return ymean
 end function
+
+function matrix medianf (const series y "Actuals",
+                       int h[1::10] "Forecast horizon",
+                       scalar level[64:99:90] "Confidence level",
+                       bool fan[0],
+                       int nboot[0::0],
+                       int blength[2::4] "Block length bootstrap")
+    # forecasts of all future values are equal to the median
+    # of the historical data
+    # Returns forecasts and prediction intervals for an
+    # iid model applied to y
+    /* R func:
+       meanf(y, h = 10, level = c(80, 95), fan = FALSE, lambda = NULL,
+       biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
+    */
+
+    if nboot>0
+        print_noboot()
+    endif
+
+    matrix ci = genci(level,fan)
+
+    if nboot==0
+        #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
+        matrix ymean = ones(h,1) .* median(y)
+    else
+    /*
+       matrix yb = vec( re_sample({y}, nboot, blength) )
+       matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
+    */
+    endif
+    cnameset(ymean, colnam(ci))
+    rnameset(ymean, rownam(h))
+    return ymean
+end function
+
 
 function matrix smeanf (const series y "Series",
                         int h[1::10] "Horizon",
