@@ -38,7 +38,7 @@ def print_noboot():
     print("Error: Bootstrap confidence intervals are not supported, yet")
 
 def gen_index(h):
-    """ Construct list of rownames for the index if the fc-matrix """
+    """ Construct list of rownames for the index of the fc-matrix """
     L = ["h="] * h
     for i in range(h):
         L[i] += str(i+1)        
@@ -48,22 +48,6 @@ def gen_colname():
     """ construct column names """
     return "point"   
 
-def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
-    """
-    Mean forecasts of all future values are equal to the
-    mean of historical data
-    Returns forecasts (and prediction intervals for an iid model)
-    applied to y
-    """    
-    if nboot>0:
-        print_noboot()
-        return None
-    if nboot==0:
-        fc = pd.Series(np.ones((h)),gen_index(h)) * np.mean(y)        
-        fc.name = gen_colname()
-        return fc
-
-   
     
 def series_mat_concat(y, m):    
     """
@@ -105,28 +89,36 @@ def get_mean_obsminor(y, h):
     
     # Concatenate series y with vector of minor frequency of y
     m = series_mat_concat(y, get_freq_as_vector(y))
-        
-        
+
     if m is not -1:
         df = pd.DataFrame(m, columns=["y", "freq"])
         df.index = y.index
     
-        # get mean-value for each minor frequency
-        fmean = df.groupby("freq").mean()
+        # get mean-value for each minor frequency        
+        # NOTE: it is assumed that at least 1 obs for every
+        # potential obsminor value exists in y
+        # TODO: add a check and warning in future that seasonal-fc
+        # won't be available in this case -- at least for some freq.
+        fmean = df.groupby("freq").mean()       # TODO: add median()
+        return fmean
     
+      
+    
+def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     """
-    omin = $obsminor
-    scalar n = max(uniq(omin))
-    matrix ymeans = zeros(n, 1)
-
-    loop i=1..n -q	# filter by $obsminor
-        smpl omin==$i --restrict --replace
-        ymeans[i] = mean(y)
-    endloop
-    smpl full    
-    return stack_fc(ymeans, h)
-    """
-
+    Mean forecasts of all future values are equal to the
+    mean of historical data
+    Returns forecasts (and prediction intervals for an iid model)
+    applied to y
+    """    
+    if nboot>0:
+        print_noboot()
+        return None
+    if nboot==0:
+        fc = pd.Series(np.ones((h)),
+                       index=gen_index(h),
+                       name=gen_colname()) * np.mean(y)        
+        return fc
     
     
 def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
@@ -141,18 +133,56 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         return None
     if nboot==0:
         
-        get_mean_obsminor(y, h)
-        #print(df.resample('Q').mean())
+        """ obtain historical mean value for each separate freq """
+        fmean = get_mean_obsminor(y, h)  # T by 2 data frame                
+        last = fmean.index[-1]      # last obsminor value, e.g. last quarter
+
+        # Reorder fmean according to 'last'
+        # For instance, if last=Q3 then next is Q4 and then Q1 etc.
+        # We construct a len(fmean) by 1 vector whose indices direct
+        # to a sequence of the following obsminor frequencies        
+        fc = np.zeros((max(h,len(fmean)),1))
+                        
+        for i in range(len(fc)):
+            
+            if (last)==len(fmean):
+                last = 0           # back to 1st obsminor value
+                                        
+            fc[i] = fmean["y"][last+1]  # fmean.index is 1-based
+                        
+            last=last+1       # update
+
+        # Finalize: add row and column strings to series        
+        return pd.Series(fc[:,0], index=gen_index(h), name=gen_colname())
+            
+
+def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
+    """
+    Returns forecasts and prediction intervals from an
+    ARIMA(0,0,0)(0,1,0)
+    model where m is the seasonal period.
+    """
+    
+    if nboot>0:
+        print_noboot()
+        return None
+    if nboot==0:
+        # Concatenate series y with vector of minor frequency of y
+        # return T by 2 vector 'm'
+        m = series_mat_concat(y, get_freq_as_vector(y))
+
+        # read periodicity per year (A=1, Q=4, ..)
+        freq = m[:,1].max() 
         
-        #fc = pd.Series(np.ones((h)),gen_index(h)) * np.mean(y)
-        #fc.name = gen_colname()
-        #return fc
+        # read kast 'freq' obsminor values, e.g. last 4 quarters, etc.
+        fc = m[:,0][-freq:]    
+        print(fc)
+        # Stack 'last' vertically
+        
+        
+        # Finalize: add row and column strings to series        
+        #return pd.Series(fc[:,0], index=gen_index(h), name=gen_colname())
 
-fc_smeanf = smeanf(df["x"])
-#print(fc_smeanf)
-
-
-# %%
 
 def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
     """
@@ -168,16 +198,15 @@ def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
         return None
     
     else:                
-        fc = pd.Series(np.ones(h),gen_index(h)) * y[-1]
+        fc = np.ones(h) * y[-1]
         
         if drift:        
             # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
             g = (y[-1]-y[0])/(np.shape(y)[0]-1)     # average growth rate (drift)        
             fc = fc + np.cumsum(np.ones(h)) * g            
             
-        fc.name = gen_colname()
-        return fc
-
+        # Finalize: add row and column strings to series        
+        return pd.Series(fc, index=gen_index(h), name=gen_colname())
 
 
 def my_ols(y,X):
@@ -217,9 +246,12 @@ def ar1f (y, h=10, const=True, trend=False, level=90, fan=False, nboot=0, blengt
         bhat = my_ols(y,X)
                 
         # Iterative forecast
-        return recfc(Y,bhat,h,const,trend)
+        fc = recfc(Y,bhat,h,const,trend)
 
-        
+        # Finalize: add row and column strings to series        
+        return pd.Series(fc[:,0], index=gen_index(h), name=gen_colname())
+    
+    
 def recfc(Y,bhat,h,const,trend):
     """
     Construct h-step ahead iterative forecast based on AR(1)
@@ -249,18 +281,34 @@ def recfc(Y,bhat,h,const,trend):
             # compute new point forecast
             fc[i] = m * np.transpose(bhat)
             
-    return pd.Series(fc[:,0])
+    return fc
 
 
 
 
-## %%
+# %%
     
 # =============================================================================
 # # CALL
 # =============================================================================
+
+fc_snaive= snaive(df["x"])
+print(fc_snaive)
+
+
+# %%
+
 fc_meanf = meanf(df["x"])
 print(fc_meanf)
+
+fc_smeanf = smeanf(df["x"])
+print(fc_smeanf)
+
+fc_ar1 = ar1f(df["x"])
+print(fc_ar1)
+
+fc_ar1trend = ar1f(df["x"], trend=True)
+print(fc_fc_ar1trend)
 
 fc_rw = rwf(df["x"])
 print(fc_rw)
@@ -268,6 +316,5 @@ print(fc_rw)
 fc_rwd = rwf(df["x"], drift=True)
 print(fc_rwd)
 
-fc_ar1 = ar1f(df["x"])
-print(fc_ar1)
+
 
