@@ -545,6 +545,10 @@ function void NaiveThroughTime (bundle *b, string which, bool verbose[1])
             FC[lwin,] = rwf(y, b.h, 1)'
         elif which=="avgfc"
             FC[lwin,] = @which(y, b.h)[,1]'
+        elif which=="medianf"
+            FC[lwin,] = meanf(y, b.h, 1)[,1]'
+        elif which=="smedianf"
+            FC[lwin,] = smeanf(y, b.h, 1)[,1]'
         else
             FC[lwin,] = @which(y, b.h)'
         endif
