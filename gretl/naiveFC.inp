@@ -18,14 +18,6 @@ function strings rownam (scalar h)
     return r
 end function
 
-
-function matrix get_last_obsminor (const series y, int h)
-    # obtain last k (quarterly=4, monthly=12, etc. obs)    
-    smpl y --contiguous    
-    smpl ($t2-$pd+1) $t2	# last $pd values
-    return stack_fc({y}, h)
-end function
-
 /*
    function matrix re_sample (const matrix y, int nboot, int blength)
    # NOTE: requires SB.gfn package
@@ -52,43 +44,53 @@ function matrix genci (scalar level[1:99:90] "confidence sign. level",
 end function
 
 
+function matrix get_last_obsminor (const series y, int h)
+    # obtain last k (quarterly=4, monthly=12, etc. obs)    
+    smpl y --contiguous    
+    smpl ($t2-$pd+1) $t2	# last $pd values
+    return stack_fc({y}, h)
+end function
+
+
 function matrix stack_fc (matrix fc "Forecast(s)",
                           int h "Forecast horizon")  
 
     # Check which value $obsminor takes for the last
-    # obs. 
+    # obs.
     scalar last = $obsminor[$tmax]
-    # Now re-order fc to make sure that 1st forecast
-    # corresponds to the right month, quarter etc.
+    fc = vec(fc)				# $pd by 1
     
-                          
-    # construct h-step ahdead forecasts                            
-    fc = vec(fc)	# pd by 1
-    scalar k = ceil(h/rows(fc)	# Anz. d stackings
-    fc = ones(rows(fc),k) .* fc	# pd by k
-    fc = vec(fc)[1:h]			# row-vector
-
-    /* Deprectated
-    # stack forecasts
-    if h>rows(fc)
-        loop i=1..ceil(h/rows(fc)) -q
-            fc |= fc
+    # Re-order fc to make sure that 1st forecast
+    # corresponds to the right month, quarter etc.
+    if last<max($obsminor)	# last quarter/month/day-of-week
+        matrix selmat = zeros(max(values($obsminor)),1)
+        scalar counter = last+1
+        loop i=1..max(values($obsminor)) -q                        
+            selmat[counter] = $i
+            counter = (counter==max(values($obsminor))) ? 1 : (counter+1)
         endloop
-        fc = fc[1:h]
-    else
-        fc = fc[1:h]
+        fc = msortby(fc~selmat,2)[,1]
     endif
-    */
-    return fc
+    
+    # construct h-step ahead forecasts    
+    scalar k = ceil(h/rows(fc))	# Anz. d. notwend. stackings
+    fc = ones(rows(fc),k) .* fc	# pd by k
+    
+    return vec(fc)[1:h]			# row-vector
 end function
 
-function matrix get_mean_obsminor (const series y, int h)
-    
-    # obtain for each periodicity (quarterly=4,
-    # monthly=12, etc.) the mean value
-    matrix ymeans = aggregate(y,$obsminor,mean)
 
-    return stack_fc(ymeans[,3], h)
+function matrix get_mean_obsminor (const series y "Actuals",
+                                   int h "FC-horizon",
+                                   bool use_median[0] "compute median")
+    # obtain for each periodicity (quarterly=4,
+    # monthly=12, etc.) the mean/ median value    
+    if use_median
+        matrix ybar = aggregate(y,$obsminor,median)
+    else        
+        matrix ybar = aggregate(y,$obsminor,mean)
+    endif
+    return stack_fc(ybar[,3], h)
 end function
 
 
@@ -215,6 +217,7 @@ end function
 
 function matrix meanf (const series y "Actuals",
                        int h[1::10] "Forecast horizon",
+                       bool use_median[0] "Median instead of mean",
                        scalar level[64:99:90] "Confidence level",
                        bool fan[0],
                        int nboot[0::0],
@@ -236,59 +239,26 @@ function matrix meanf (const series y "Actuals",
     
     if nboot==0
         #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
-        matrix ymean = ones(h,1) .* mean(y)
+        if use_median
+            matrix fc = ones(h,1) .* median(y) 
+        else
+            matrix fc = ones(h,1) .* mean(y)
+        endif        
     else
     /*
        matrix yb = vec( re_sample({y}, nboot, blength) )
-       matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
+       matrix fc = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
         */
     endif
-    cnameset(ymean, colnam(ci))
-    rnameset(ymean, rownam(h))
-    return ymean
-end function
-
-
-function matrix medianf (const series y "Actuals",
-                       int h[1::10] "Forecast horizon",
-                       scalar level[64:99:90] "Confidence level",
-                       bool fan[0],
-                       int nboot[0::0],
-                       int blength[2::4] "Block length bootstrap")
-    # forecasts of all future values are equal to the median
-    # of the historical data
-    # Returns forecasts and prediction intervals for an
-    # iid model applied to y
-    /* R func:
-       meanf(y, h = 10, level = c(80, 95), fan = FALSE, lambda = NULL,
-       biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
-    */
-
-    if nboot>0
-        print_noboot()
-    endif
-
-    matrix ci = genci(level,fan)
-    
-    smpl y --contiguous
-    
-    if nboot==0
-        #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
-        matrix ymean = ones(h,1) .* median(y)
-    else
-    /*
-       matrix yb = vec( re_sample({y}, nboot, blength) )
-       matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
-    */
-    endif
-    cnameset(ymean, colnam(ci))
-    rnameset(ymean, rownam(h))
-    return ymean
+    cnameset(fc, colnam(ci))
+    rnameset(fc, rownam(h))
+    return fc
 end function
 
 
 function matrix smeanf (const series y "Series",
                         int h[1::10] "Horizon",
+                        bool use_median[0] "Median instead of mean",
                         scalar level[64:99:90] "Confidence level",
                         bool fan[0],
                         int nboot[0::0],
@@ -311,7 +281,7 @@ function matrix smeanf (const series y "Series",
     if fan==0
         # forecast simply equals the mean for each specific $obsminor
         # periodicity (month, quarter etc.)
-        fc = get_mean_obsminor(y, h)
+        fc = get_mean_obsminor(y, h, use_median)          
         #matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
         matrix fc = ones(h,1) .* fc
     else

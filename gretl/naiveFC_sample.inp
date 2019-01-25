@@ -11,13 +11,22 @@ scalar h = 11		# set forecast horizon
 # MEANFC
 xmean = meanf(x, h)
 #xmean
-#fcplot(x, xmean, "Mean Forecast", "nice ylabel", "nice xlabel")
+fcplot(x, xmean, "Mean Forecast", "nice ylabel", "nice xlabel")
 
-# SMEANF:
+# MEANFC but use median
+xmedian = meanf(x, h)
+fcplot(x, xmedian, "Median Forecast")
+
+
+# SMEANF
 smean = smeanf(x, h)
 smean
 fcplot(x, smean, "Seasonal Mean Forecast")
 
+# SMEANF but use median:
+smedian = smeanf(x, h, 1)
+smedian
+fcplot(x, smedian, "Seasonal Median Forecast")
 stop
 
 # SNAIVE:
