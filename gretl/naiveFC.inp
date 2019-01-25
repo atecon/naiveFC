@@ -9,6 +9,7 @@ function strings colnam (matrix ci)
     return c
 end function
 
+
 function strings rownam (scalar h)
     # construct row names (horizons)
     strings r = array(h)
@@ -18,18 +19,6 @@ function strings rownam (scalar h)
     return r
 end function
 
-/*
-   function matrix re_sample (const matrix y, int nboot, int blength)
-   # NOTE: requires SB.gfn package
-   # not considered yet
-
-   matrix bb=zeros(nobs(y),nboot)
-   loop boot=1..nboot --quiet
-   bb[,boot]=SB(y,blength)
-   endloop
-   return bb
-   end function
-*/
 
 function matrix genci (scalar level[1:99:90] "confidence sign. level",
                        bool fan[0])
@@ -144,7 +133,6 @@ function void fcplot (const series y, matrix fc,
 end function
 
 
-
 function void nttplot (bundle *b "Filled bundle after NaiveThroughTime()",
                       string title[null],
                       string ylab[null],
@@ -203,7 +191,6 @@ function void nttplot (bundle *b "Filled bundle after NaiveThroughTime()",
 end function
 
 
-
 function void seas_check (const series y "Actuals")
     if $pd==1
         funcerr "The method you requested is not available for annual data."
@@ -222,8 +209,10 @@ function matrix meanf (const series y "Actuals",
                        bool fan[0],
                        int nboot[0::0],
                        int blength[2::4] "Block length bootstrap")
-    # forecasts of all future values are equal to the mean of the historical data
-    # Returns forecasts and prediction intervals for an iid model applied to y
+    # forecasts of all future values are equal to the mean/median
+    # of the historical data
+    # Returns forecasts and prediction intervals for an iid
+    # model applied to y
     /* R func:
        meanf(y, h = 10, level = c(80, 95), fan = FALSE, lambda = NULL,
        biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
@@ -238,7 +227,7 @@ function matrix meanf (const series y "Actuals",
     smpl y --contiguous
     
     if nboot==0
-        #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
+        #matrix fc = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
         if use_median
             matrix fc = ones(h,1) .* median(y) 
         else
@@ -248,7 +237,7 @@ function matrix meanf (const series y "Actuals",
     /*
        matrix yb = vec( re_sample({y}, nboot, blength) )
        matrix fc = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
-        */
+    */
     endif
     cnameset(fc, colnam(ci))
     rnameset(fc, rownam(h))
@@ -407,6 +396,8 @@ function matrix ar1f (const series y "Series",
                       int nboot[0::0],
                       int blength[2::4] "Block length bootstrap")
 
+    # TODO: add linear trend case
+
     if nboot>0
         print_noboot()
     endif
@@ -425,6 +416,7 @@ end function
 
 
 function matrix recfc (const series y, matrix bhat, int h)
+    # compute the iterative forecast for an AR(1)
     matrix fc = zeros(h,1)
     fc[1] = bhat[1] + bhat[2]*y[$t2]
     loop i=2..h -q
@@ -449,8 +441,9 @@ function matrix avgfc (const series y "Series",
                        int nboot[0::0],
                        int blength[2::4] "Block length bootstrap")
 
-    # Computes the mean (average) and cross-sectional (across forecast methods)
-    # standard deviation at each horizon using all simple forecast methods
+    # Computes the mean (average) and cross-sectional
+    # (across forecast methods) standard deviation at
+    # each horizon using all simple forecast methods
     # available.
 
     if nboot>0
@@ -458,9 +451,11 @@ function matrix avgfc (const series y "Series",
     endif
 
     # Base models
-    strings M = defarray("meanf(y,h)", "rwf(y,h)", "rwf(y,h,1)", "ar1f(y,h)")
+    strings M = defarray("meanf(y,h)", "meanf(y,h,1)", "rwf(y,h)", \
+      "rwf(y,h,1)", "ar1f(y,h)")
     if $pd>1	# for seasonal data only
         M += "smeanf(y,h)"
+        M += "smeanf(y,h,1)"
         M += "snaive(y,h)"
     endif
 
@@ -471,9 +466,11 @@ function matrix avgfc (const series y "Series",
     endloop
     fc = meanr(fc) ~ sdc(fc', rows(fc')-1)' ~ fc
     if $pd == 1
-        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1)", " "))
+        cnameset(fc, strsplit("average-fc sd meanf medianf rwf \
+          rwf+drift AR(1)", " "))
     else
-        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1) smean snaive", " "))
+        cnameset(fc, strsplit("average-fc sd meanf medianf rwf \
+          rwf+drift AR(1) smean smedian snaive", " "))
     endif
     rnameset(fc, rownam(h))
     return fc

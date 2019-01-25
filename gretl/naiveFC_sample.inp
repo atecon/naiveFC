@@ -27,7 +27,6 @@ fcplot(x, smean, "Seasonal Mean Forecast")
 smedian = smeanf(x, h, 1)
 smedian
 fcplot(x, smedian, "Seasonal Median Forecast")
-stop
 
 # SNAIVE:
 snaiv = snaive(x, h)
@@ -54,7 +53,6 @@ fcplot(x, ar_1, "AR(1) Forecast")
 avg_fc = avgfc(x, h)
 avg_fc		# 1st col: point forecast, 2nd col: std. deviation
 fcplot(x, avg_fc[,1], "Avg. of Forecasts")
-
 
 #-------------------------------------
 # NaiveTsCv
