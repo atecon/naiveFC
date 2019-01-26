@@ -260,7 +260,15 @@ literal "false"
 \family typewriter
 naiveFC
 \family default
- are inspired by Hyndman's well-known forecast package for R.
+ are inspired by Hyndman's well-known 
+\emph on
+forecast
+\emph default
+ package for 
+\emph on
+R
+\emph default
+.
 \end_layout
 
 \begin_layout Standard
@@ -297,6 +305,18 @@ Plotting of the
 
 \begin_layout Itemize
 Computation of either rolling or recursive forecasts.
+\end_layout
+
+\begin_layout Itemize
+Easy GUI access through the gret menu 
+\begin_inset Quotes eld
+\end_inset
+
+Model –> Time series –> naive forecast(s)
+\begin_inset Quotes erd
+\end_inset
+
+
 \end_layout
 
 \begin_layout Standard
@@ -796,6 +816,29 @@ status open
 
 \begin_layout Section
 List of public functions
+\end_layout
+
+\begin_layout Standard
+The following public functions are only intended to be used for scripting
+ purposes only.
+ Hence, calling these functions through the GUI will not return any printout.
+ Instead, the user can access the function 
+\family typewriter
+avgfc_gui()
+\family default
+ through the gretl GUI menu 
+\begin_inset Quotes eld
+\end_inset
+
+Model –> Time series –> naive forecast(s)
+\begin_inset Quotes erd
+\end_inset
+
+ which allows steering key functions by 
+\emph on
+point and click
+\emph default
+.
 \end_layout
 
 \begin_layout Subsection
@@ -1749,7 +1792,7 @@ bool verbose
 \end_layout
 
 \begin_layout Standard
-The user needs to put at least the following information into the bundle:
+The user needs to pass at least the following information into the bundle:
 \end_layout
 
 \begin_layout Enumerate
@@ -1807,9 +1850,9 @@ rolling
 \end_layout
 
 \begin_layout Standard
-After having called NaiveThroughTime
+After having called 
 \family typewriter
-()
+NaiveThroughTime()
 \family default
 , the bundle will contain a matrix named 
 \begin_inset Quotes eld
@@ -1840,8 +1883,15 @@ nttplot
 \end_layout
 
 \begin_layout Standard
-This function plots the rolling/ recursive h-step ahead forecasts computed
- by function NaiveThroughTime() before.
+This function plots the rolling/ recursive 
+\begin_inset Formula $h$
+\end_inset
+
+-step ahead forecasts computed by function 
+\family typewriter
+NaiveThroughTime()
+\family default
+ before.
  
 \end_layout
 
@@ -1891,7 +1941,11 @@ The function arguments are:
 \family typewriter
 bundle b:
 \family default
- provide bundle after having called NaiveThroughTime() before.
+ provide bundle after having called 
+\family typewriter
+NaiveThroughTime()
+\family default
+ before.
 \end_layout
 
 \begin_layout Enumerate
