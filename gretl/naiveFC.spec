@@ -1,7 +1,7 @@
 author = Artur Tarassow
 email = atecon@cryptolab.net
-version = 0.3
-date = 2018-11-10
+version = 0.4
+date = 2019-01-22
 description = Simple forecasting methods
 tags = C53
 min-version = 2018a

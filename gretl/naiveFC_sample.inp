@@ -9,40 +9,47 @@ scalar h = 11		# set forecast horizon
 
 # MEANFC
 xmean = meanf(x, h)
-xmean
+#xmean
 fcplot(x, xmean, "Mean Forecast", "nice ylabel", "nice xlabel")
 
-# SMEANF:
+# MEANFC but use median
+xmedian = meanf(x, h)
+#fcplot(x, xmedian, "Median Forecast")
+
+# SMEANF
 smean = smeanf(x, h)
 smean
-fcplot(x, smean, "Seasonal Mean Forecast")
+#fcplot(x, smean, "Seasonal Mean Forecast")
+
+# SMEANF but use median:
+smedian = smeanf(x, h, 1)
+smedian
+#fcplot(x, smedian, "Seasonal Median Forecast")
 
 # SNAIVE:
 snaiv = snaive(x, h)
 snaiv
-fcplot(x, snaiv, "Naive Seasonal Forecast")
+#fcplot(x, snaiv, "Naive Seasonal Forecast")
 
 # RW wo drift
 rw = rwf(x, h)
 rw
-fcplot(x, rw, "Random-Walk Forecast")
+#fcplot(x, rw, "Random-Walk Forecast")
 
 # RW with drift
 rwd = rwf(x, h, 1)
 rwd
-fcplot(x, rwd, "Random-Walk + Drift Forecast")
+#fcplot(x, rwd, "Random-Walk + Drift Forecast")
 
 # AR(1)
 ar_1 = ar1f(x, h)
 ar_1
-fcplot(x, ar_1, "AR(1) Forecast")
-
+#fcplot(x, ar_1, "AR(1) Forecast")
 
 # Average of Forecasts
 avg_fc = avgfc(x, h)
-avg_fc		# 1st col: point forecast, 2nd col: std. deviation
+printf "%9.3f", avg_fc		# 1st col: point forecast, 2nd col: std. deviation
 fcplot(x, avg_fc[,1], "Avg. of Forecasts")
-
 
 #-------------------------------------
 # NaiveTsCv
@@ -52,7 +59,7 @@ bundle b = null
 b.y = x
 b.h = 4					# max. horizon
 b.wsize = 33			# window size
-string which = "smeanf"	# choose a method
+string which = "meanf"	# choose a method
 # R U N
 NaiveThroughTime(&b, which)
 matrix FC = b.FC		# grab matrix of forecasts; rows: period forecasted, cols: fc-horizon
@@ -71,11 +78,4 @@ loop i=1..b.h -q
 endloop
 gnuplot L --with-lines --time-series --output=display
 */
-
-
-
-
-
-
-
 

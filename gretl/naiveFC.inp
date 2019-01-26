@@ -9,6 +9,7 @@ function strings colnam (matrix ci)
     return c
 end function
 
+
 function strings rownam (scalar h)
     # construct row names (horizons)
     strings r = array(h)
@@ -18,26 +19,6 @@ function strings rownam (scalar h)
     return r
 end function
 
-
-function matrix get_last_obsminor (const series y, int h)
-    # obtain last k (quarterly=4, monthly=12, etc. obs)
-    smpl y --no-missing
-    smpl ($t2-$pd+1) $t2	# last $pd values
-    return stack_fc({y}, h)
-end function
-
-/*
-   function matrix re_sample (const matrix y, int nboot, int blength)
-   # NOTE: requires SB.gfn package
-   # not considered yet
-
-   matrix bb=zeros(nobs(y),nboot)
-   loop boot=1..nboot --quiet
-   bb[,boot]=SB(y,blength)
-   endloop
-   return bb
-   end function
-*/
 
 function matrix genci (scalar level[1:99:90] "confidence sign. level",
                        bool fan[0])
@@ -51,34 +32,54 @@ function matrix genci (scalar level[1:99:90] "confidence sign. level",
     return ci
 end function
 
-function matrix stack_fc (matrix fc "Forecast(s)",
-      int h "Forecast horizon")
-    # construct h-step ahdead forecasts
-    matrix fc = vec(fc)
-    # stack forecasts
-    if h>rows(fc)
-        loop i=1..ceil(h/rows(fc)) -q
-            fc |= fc
-        endloop
-        fc = fc[1:h]
-    else
-        fc = fc[1:h]
-    endif
-    return fc
+
+function matrix get_last_obsminor (const series y, int h)
+    # obtain last k (quarterly=4, monthly=12, etc. obs)    
+    smpl y --contiguous    
+    smpl ($t2-$pd+1) $t2	# last $pd values
+    return stack_fc({y}, h)
 end function
 
-function matrix get_mean_obsminor (const series y, int h)
-    # obtain last k (quarterly=4, monthly=12, etc. obs)
-    series omin = $obsminor
-    scalar n = max(uniq(omin))
-    matrix ymeans = zeros(n, 1)
 
-    loop i=1..n -q	# filter by $obsminor
-        smpl omin==$i --restrict --replace
-        ymeans[i] = mean(y)
-    endloop
-    smpl full
-    return stack_fc(ymeans, h)
+function matrix stack_fc (matrix fc "Forecast(s)",
+                          int h "Forecast horizon")  
+
+    # Check which value $obsminor takes for the last
+    # obs.
+    scalar last = $obsminor[$tmax]
+    fc = vec(fc)				# $pd by 1
+    
+    # Re-order fc to make sure that 1st forecast
+    # corresponds to the right month, quarter etc.
+    if last<max($obsminor)	# last quarter/month/day-of-week
+        matrix selmat = zeros(max(values($obsminor)),1)
+        scalar counter = last+1
+        loop i=1..max(values($obsminor)) -q                        
+            selmat[counter] = $i
+            counter = (counter==max(values($obsminor))) ? 1 : (counter+1)
+        endloop
+        fc = msortby(fc~selmat,2)[,1]
+    endif
+    
+    # construct h-step ahead forecasts    
+    scalar k = ceil(h/rows(fc))	# Anz. d. notwend. stackings
+    fc = ones(rows(fc),k) .* fc	# pd by k
+    
+    return vec(fc)[1:h]			# row-vector
+end function
+
+
+function matrix get_mean_obsminor (const series y "Actuals",
+                                   int h "FC-horizon",
+                                   bool use_median[0] "compute median")
+    # obtain for each periodicity (quarterly=4,
+    # monthly=12, etc.) the mean/ median value    
+    if use_median
+        matrix ybar = aggregate(y,$obsminor,median)
+    else        
+        matrix ybar = aggregate(y,$obsminor,mean)
+    endif
+    return stack_fc(ybar[,3], h)
 end function
 
 
@@ -130,7 +131,6 @@ function void fcplot (const series y, matrix fc,
         printf "set title \"%s\"", title
     end plot --output=@out
 end function
-
 
 
 function void nttplot (bundle *b "Filled bundle after NaiveThroughTime()",
@@ -191,7 +191,6 @@ function void nttplot (bundle *b "Filled bundle after NaiveThroughTime()",
 end function
 
 
-
 function void seas_check (const series y "Actuals")
     if $pd==1
         funcerr "The method you requested is not available for annual data."
@@ -205,12 +204,15 @@ end function
 
 function matrix meanf (const series y "Actuals",
                        int h[1::10] "Forecast horizon",
+                       bool use_median[0] "Median instead of mean",
                        scalar level[64:99:90] "Confidence level",
                        bool fan[0],
                        int nboot[0::0],
                        int blength[2::4] "Block length bootstrap")
-    # forecasts of all future values are equal to the mean of the historical data
-    # Returns forecasts and prediction intervals for an iid model applied to y
+    # forecasts of all future values are equal to the mean/median
+    # of the historical data
+    # Returns forecasts and prediction intervals for an iid
+    # model applied to y
     /* R func:
        meanf(y, h = 10, level = c(80, 95), fan = FALSE, lambda = NULL,
        biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
@@ -222,30 +224,38 @@ function matrix meanf (const series y "Actuals",
 
     matrix ci = genci(level,fan)
 
+    smpl y --contiguous
+    
     if nboot==0
-        #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
-        matrix ymean = ones(h,1) .* mean(y)
-
+        #matrix fc = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
+        if use_median
+            matrix fc = ones(h,1) .* median(y) 
+        else
+            matrix fc = ones(h,1) .* mean(y)
+        endif        
     else
     /*
        matrix yb = vec( re_sample({y}, nboot, blength) )
-       matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
-        */
+       matrix fc = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
+    */
     endif
-    cnameset(ymean, colnam(ci))
-    rnameset(ymean, rownam(h))
-    return ymean
+    cnameset(fc, colnam(ci))
+    rnameset(fc, rownam(h))
+    return fc
 end function
+
 
 function matrix smeanf (const series y "Series",
                         int h[1::10] "Horizon",
+                        bool use_median[0] "Median instead of mean",
                         scalar level[64:99:90] "Confidence level",
                         bool fan[0],
                         int nboot[0::0],
                         int blength[2::4] "Block length bootstrap")
 
-    # forecasts of all future values are equal to the mean of season of the historical data
-    # model where m is the seasonal period.
+    # forecasts of all future values are equal to the mean of
+    # the respective historical seasonal period
+    # where m is the seasonal period.
 
     if nboot>0
         print_noboot()
@@ -255,16 +265,20 @@ function matrix smeanf (const series y "Series",
 
     matrix ci = genci(level, fan)
 
+    smpl y --contiguous
+    
     if fan==0
-        # forecast simply equals the mean for each specific $obsminor periodicity (month, quarter etc.)
-        fc = get_mean_obsminor(y, h)
+        # forecast simply equals the mean for each specific $obsminor
+        # periodicity (month, quarter etc.)
+        fc = get_mean_obsminor(y, h, use_median)          
         #matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
         matrix fc = ones(h,1) .* fc
     else
         funcerr "Fan forecasts are not available, yet."
 
         /* Not implemented yet
-           # forecast simply equals last obs for each specific periodicity (month, quarter)
+        # forecast simply equals last obs for each specific
+        # periodicity (month, quarter)
            # FIXME: This destroys the seasonality structure
            matrix yb = re_sample({y}, nboot, blength)
            fc_b = zeros(h, nboot)
@@ -305,10 +319,11 @@ function matrix rwf (const series y "Actuals",
 
     matrix ci = genci(level,fan)
 
-    #matrix fc = ones(h,3) .* ( y[$t2] ~ NA ~ NA )
-    smpl y --no-missing
+    smpl y --contiguous
+    
     matrix fc = ones(h,1) .* y[$t2]
-
+    #matrix fc = ones(h,3) .* ( y[$t2] ~ NA ~ NA )
+    
     if drift
         # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
         scalar avg = (y[$t2]-y[$t1])/(nobs(y)-1)	# average growth rate (drift)
@@ -343,9 +358,12 @@ function matrix snaive (const series y "Series",
     seas_check(y)
 
     matrix ci = genci(level,fan)
-
+    
+    smpl y --contiguous
+    
     if fan==0
-        # forecast simply equals last obs for each specific periodicity (month, quarter)
+        # forecast simply equals last obs for each specific
+        # periodicity (month, quarter)
         fc = get_last_obsminor(y, h)
         # matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
         matrix fc = ones(h,1) .* fc
@@ -353,7 +371,8 @@ function matrix snaive (const series y "Series",
     else
         funcerr "Fan forecasts are not available, yet."
         /* NEEDS
-           # forecast simply equals last obs for each specific periodicity (month, quarter)
+        # forecast simply equals last obs for each specific
+        # periodicity (month, quarter)
            # FIXME: This destroys the seasonality structure
            matrix yb = re_sample({y}, nboot, blength)
            fc_b = zeros(h, nboot)
@@ -377,12 +396,16 @@ function matrix ar1f (const series y "Series",
                       int nboot[0::0],
                       int blength[2::4] "Block length bootstrap")
 
+    # TODO: add linear trend case
+
     if nboot>0
         print_noboot()
     endif
     matrix ci = genci(level,fan)
 
-    smpl y --no-missing
+    smpl y --contiguous
+    
+    # Start    
     ols y 0 y(-1) --quiet				# estimation via OLS
     matrix fc = recfc(y, $coeff, h)		# iterative forecast
 
@@ -392,7 +415,8 @@ function matrix ar1f (const series y "Series",
 end function
 
 
-function matrix recfc(const series y, matrix bhat, int h)
+function matrix recfc (const series y, matrix bhat, int h)
+    # compute the iterative forecast for an AR(1)
     matrix fc = zeros(h,1)
     fc[1] = bhat[1] + bhat[2]*y[$t2]
     loop i=2..h -q
@@ -401,12 +425,14 @@ function matrix recfc(const series y, matrix bhat, int h)
     return fc
 end function
 
+
 function matrix avgfc_gui (const series y "Series",
                            int h[1::10] "Horizon")
     matrix FC = avgfc(y,h)
     printf "%12.4f\n", FC
     return FC
 end function
+
 
 function matrix avgfc (const series y "Series",
                        int h[1::10] "Horizon",
@@ -415,8 +441,9 @@ function matrix avgfc (const series y "Series",
                        int nboot[0::0],
                        int blength[2::4] "Block length bootstrap")
 
-    # Computes the mean (average) and cross-sectional (across forecast methods)
-    # standard deviation at each horizon using all simple forecast methods
+    # Computes the mean (average) and cross-sectional
+    # (across forecast methods) standard deviation at
+    # each horizon using all simple forecast methods
     # available.
 
     if nboot>0
@@ -424,9 +451,11 @@ function matrix avgfc (const series y "Series",
     endif
 
     # Base models
-    strings M = defarray("meanf(y,h)", "rwf(y,h)", "rwf(y,h,1)", "ar1f(y,h)")
+    strings M = defarray("meanf(y,h)", "meanf(y,h,1)", "rwf(y,h)", \
+      "rwf(y,h,1)", "ar1f(y,h)")
     if $pd>1	# for seasonal data only
         M += "smeanf(y,h)"
+        M += "smeanf(y,h,1)"
         M += "snaive(y,h)"
     endif
 
@@ -437,9 +466,11 @@ function matrix avgfc (const series y "Series",
     endloop
     fc = meanr(fc) ~ sdc(fc', rows(fc')-1)' ~ fc
     if $pd == 1
-        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1)", " "))
+        cnameset(fc, strsplit("average-fc sd meanf medianf rwf \
+          rwf+drift AR(1)", " "))
     else
-        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1) smean snaive", " "))
+        cnameset(fc, strsplit("average-fc sd meanf medianf rwf \
+          rwf+drift AR(1) smean smedian snaive", " "))
     endif
     rnameset(fc, rownam(h))
     return fc
@@ -475,8 +506,8 @@ function void NaiveThroughTime (bundle *b, string which, bool verbose[1])
 
     # Data set settings
     #-------------------
-    series y = b.y
-    smpl y --no-missing
+    series y = b.y    
+    smpl y --contiguous    
     scalar b.initobs = $t1
     scalar b.obsend = b.initobs + b.wsize
     scalar b.nsteps = $t2 - b.obsend	# no. of windows
@@ -514,6 +545,10 @@ function void NaiveThroughTime (bundle *b, string which, bool verbose[1])
             FC[lwin,] = rwf(y, b.h, 1)'
         elif which=="avgfc"
             FC[lwin,] = @which(y, b.h)[,1]'
+        elif which=="medianf"
+            FC[lwin,] = meanf(y, b.h, 1)[,1]'
+        elif which=="smedianf"
+            FC[lwin,] = smeanf(y, b.h, 1)[,1]'
         else
             FC[lwin,] = @which(y, b.h)'
         endif

@@ -1749,7 +1749,7 @@ bool verbose
 \end_layout
 
 \begin_layout Standard
-The user needs to pass at least the following information into the bundle:
+The user needs to put at least the following information into the bundle:
 \end_layout
 
 \begin_layout Enumerate

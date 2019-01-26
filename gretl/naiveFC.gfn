@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2018a" lives-in-subdir="true">
 <author email="atecon@cryptolab.net">Artur Tarassow</author>
-<version>0.3</version>
-<date>2018-11-10</date>
+<version>0.4</version>
+<date>2019-01-22</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
 <label>naive forecast(s)</label>
@@ -12,12 +12,15 @@
 pdfdoc:naiveFC.pdf
 </help>
 <gretl-function name="meanf" type="matrix">
- <params count="6">
+ <params count="7">
   <param name="y" type="series" const="true">
 <description>Actuals</description>
   </param>
   <param name="h" type="int" min="1" default="10">
 <description>Forecast horizon</description>
+  </param>
+  <param name="use_median" type="bool" default="0">
+<description>Median instead of mean</description>
   </param>
   <param name="level" type="scalar" min="64" max="99" default="90">
 <description>Confidence level</description>
@@ -28,8 +31,10 @@ pdfdoc:naiveFC.pdf
 <description>Block length bootstrap</description>
   </param>
  </params>
-<code># forecasts of all future values are equal to the mean of the historical data
-# Returns forecasts and prediction intervals for an iid model applied to y
+<code># forecasts of all future values are equal to the mean/median
+# of the historical data
+# Returns forecasts and prediction intervals for an iid
+# model applied to y
 /* R func:
 meanf(y, h = 10, level = c(80, 95), fan = FALSE, lambda = NULL, biasadj = FALSE, bootstrap = FALSE, npaths = 5000, x = y)
 */
@@ -37,18 +42,23 @@ if nboot&gt;0
   print_noboot()
 endif
 matrix ci = genci(level,fan)
+smpl y --contiguous
 if nboot==0
-  #matrix ymean = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
-  matrix ymean = ones(h,1) .* mean(y)
+  #matrix fc = ones(h,cols(ci)+1) .* ( mean(y) ~ NA ~ NA ) # ~ quantile({y},ci)' )
+  if use_median
+    matrix fc = ones(h,1) .* median(y)
+  else
+    matrix fc = ones(h,1) .* mean(y)
+  endif
 else
   /*
   matrix yb = vec( re_sample({y}, nboot, blength) )
-  matrix ymean = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
+  matrix fc = ones(h,cols(ci)+1) .* ( meanc(yb) ~ quantile(yb,ci)' )
   */
 endif
-cnameset(ymean, colnam(ci))
-rnameset(ymean, rownam(h))
-return ymean
+cnameset(fc, colnam(ci))
+rnameset(fc, rownam(h))
+return fc
 </code>
 </gretl-function>
 <gretl-function name="rwf" type="matrix">
@@ -81,9 +91,9 @@ if nboot&gt;0
   print_noboot()
 endif
 matrix ci = genci(level,fan)
-#matrix fc = ones(h,3) .* ( y[$t2] ~ NA ~ NA )
-smpl y --no-missing
+smpl y --contiguous
 matrix fc = ones(h,1) .* y[$t2]
+#matrix fc = ones(h,3) .* ( y[$t2] ~ NA ~ NA )
 if drift
   # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
   scalar avg = (y[$t2]-y[$t1])/(nobs(y)-1)	# average growth rate (drift)
@@ -122,15 +132,18 @@ if nboot&gt;0
 endif
 seas_check(y)
 matrix ci = genci(level,fan)
+smpl y --contiguous
 if fan==0
-  # forecast simply equals last obs for each specific periodicity (month, quarter)
+  # forecast simply equals last obs for each specific
+  # periodicity (month, quarter)
   fc = get_last_obsminor(y, h)
   # matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
   matrix fc = ones(h,1) .* fc
 else
   funcerr &quot;Fan forecasts are not available, yet.&quot;
   /* NEEDS
-  # forecast simply equals last obs for each specific periodicity (month, quarter)
+  # forecast simply equals last obs for each specific
+  # periodicity (month, quarter)
   # FIXME: This destroys the seasonality structure
   matrix yb = re_sample({y}, nboot, blength)
   fc_b = zeros(h, nboot)
@@ -214,12 +227,15 @@ end plot --output=@out
 </code>
 </gretl-function>
 <gretl-function name="smeanf" type="matrix">
- <params count="6">
+ <params count="7">
   <param name="y" type="series" const="true">
 <description>Series</description>
   </param>
   <param name="h" type="int" min="1" default="10">
 <description>Horizon</description>
+  </param>
+  <param name="use_median" type="bool" default="0">
+<description>Median instead of mean</description>
   </param>
   <param name="level" type="scalar" min="64" max="99" default="90">
 <description>Confidence level</description>
@@ -230,22 +246,26 @@ end plot --output=@out
 <description>Block length bootstrap</description>
   </param>
  </params>
-<code># forecasts of all future values are equal to the mean of season of the historical data
-# model where m is the seasonal period.
+<code># forecasts of all future values are equal to the mean of
+# the respective historical seasonal period
+# where m is the seasonal period.
 if nboot&gt;0
   print_noboot()
 endif
 seas_check(y)
 matrix ci = genci(level, fan)
+smpl y --contiguous
 if fan==0
-  # forecast simply equals the mean for each specific $obsminor periodicity (month, quarter etc.)
-  fc = get_mean_obsminor(y, h)
+  # forecast simply equals the mean for each specific $obsminor
+  # periodicity (month, quarter etc.)
+  fc = get_mean_obsminor(y, h, use_median)
   #matrix fc = ones(h,3) .* ( fc ~ NA ~ NA )
   matrix fc = ones(h,1) .* fc
 else
   funcerr &quot;Fan forecasts are not available, yet.&quot;
   /* Not implemented yet
-  # forecast simply equals last obs for each specific periodicity (month, quarter)
+  # forecast simply equals last obs for each specific
+  # periodicity (month, quarter)
   # FIXME: This destroys the seasonality structure
   matrix yb = re_sample({y}, nboot, blength)
   fc_b = zeros(h, nboot)
@@ -279,11 +299,13 @@ return fc
 <description>Block length bootstrap</description>
   </param>
  </params>
-<code>if nboot&gt;0
+<code># TODO: add linear trend case
+if nboot&gt;0
   print_noboot()
 endif
 matrix ci = genci(level,fan)
-smpl y --no-missing
+smpl y --contiguous
+# Start
 ols y 0 y(-1) --quiet				# estimation via OLS
 matrix fc = recfc(y, $coeff, h)		# iterative forecast
 cnameset(fc, colnam(ci))
@@ -308,16 +330,18 @@ return fc
 <description>Block length bootstrap</description>
   </param>
  </params>
-<code># Computes the mean (average) and cross-sectional (across forecast methods)
-# standard deviation at each horizon using all simple forecast methods
+<code># Computes the mean (average) and cross-sectional
+# (across forecast methods) standard deviation at
+# each horizon using all simple forecast methods
 # available.
 if nboot&gt;0
   print_noboot()
 endif
 # Base models
-strings M = defarray(&quot;meanf(y,h)&quot;, &quot;rwf(y,h)&quot;, &quot;rwf(y,h,1)&quot;, &quot;ar1f(y,h)&quot;)
+strings M = defarray(&quot;meanf(y,h)&quot;, &quot;meanf(y,h,1)&quot;, &quot;rwf(y,h)&quot;, &quot;rwf(y,h,1)&quot;, &quot;ar1f(y,h)&quot;)
 if $pd&gt;1	# for seasonal data only
   M += &quot;smeanf(y,h)&quot;
+  M += &quot;smeanf(y,h,1)&quot;
   M += &quot;snaive(y,h)&quot;
 endif
 matrix fc = zeros(h,nelem(M))
@@ -327,9 +351,9 @@ loop i=1..nelem(M) -q
 endloop
 fc = meanr(fc) ~ sdc(fc', rows(fc')-1)' ~ fc
 if $pd == 1
-  cnameset(fc, strsplit(&quot;average-fc sd meanf rwf rwf+drift AR(1)&quot;, &quot; &quot;))
+  cnameset(fc, strsplit(&quot;average-fc sd meanf medianf rwf            rwf+drift AR(1)&quot;, &quot; &quot;))
 else
-  cnameset(fc, strsplit(&quot;average-fc sd meanf rwf rwf+drift AR(1) smean snaive&quot;, &quot; &quot;))
+  cnameset(fc, strsplit(&quot;average-fc sd meanf medianf rwf            rwf+drift AR(1) smean smedian snaive&quot;, &quot; &quot;))
 endif
 rnameset(fc, rownam(h))
 return fc
@@ -363,7 +387,7 @@ endif
 # Data set settings
 #-------------------
 series y = b.y
-smpl y --no-missing
+smpl y --contiguous
 scalar b.initobs = $t1
 scalar b.obsend = b.initobs + b.wsize
 scalar b.nsteps = $t2 - b.obsend	# no. of windows
@@ -395,6 +419,10 @@ loop lwin=1..b.nsteps -q
     FC[lwin,] = rwf(y, b.h, 1)'
   elif which==&quot;avgfc&quot;
     FC[lwin,] = @which(y, b.h)[,1]'
+  elif which==&quot;medianf&quot;
+    FC[lwin,] = meanf(y, b.h, 1)[,1]'
+  elif which==&quot;smedianf&quot;
+    FC[lwin,] = smeanf(y, b.h, 1)[,1]'
   else
     FC[lwin,] = @which(y, b.h)'
   endif
@@ -517,17 +545,6 @@ endloop
 return r
 </code>
 </gretl-function>
-<gretl-function name="get_last_obsminor" type="matrix" private="1">
- <params count="2">
-  <param name="y" type="series" const="true"/>
-  <param name="h" type="int"/>
- </params>
-<code># obtain last k (quarterly=4, monthly=12, etc. obs)
-smpl y --no-missing
-smpl ($t2-$pd+1) $t2	# last $pd values
-return stack_fc({y}, h)
-</code>
-</gretl-function>
 <gretl-function name="genci" type="matrix" private="1">
  <params count="2">
   <param name="level" type="scalar" min="1" max="99" default="90">
@@ -545,6 +562,17 @@ endif
 return ci
 </code>
 </gretl-function>
+<gretl-function name="get_last_obsminor" type="matrix" private="1">
+ <params count="2">
+  <param name="y" type="series" const="true"/>
+  <param name="h" type="int"/>
+ </params>
+<code># obtain last k (quarterly=4, monthly=12, etc. obs)
+smpl y --contiguous
+smpl ($t2-$pd+1) $t2	# last $pd values
+return stack_fc({y}, h)
+</code>
+</gretl-function>
 <gretl-function name="stack_fc" type="matrix" private="1">
  <params count="2">
   <param name="fc" type="matrix">
@@ -554,35 +582,47 @@ return ci
 <description>Forecast horizon</description>
   </param>
  </params>
-<code># construct h-step ahdead forecasts
-matrix fc = vec(fc)
-# stack forecasts
-if h&gt;rows(fc)
-  loop i=1..ceil(h/rows(fc)) -q
-    fc |= fc
+<code># Check which value $obsminor takes for the last
+# obs.
+scalar last = $obsminor[$tmax]
+fc = vec(fc)				# $pd by 1
+# Re-order fc to make sure that 1st forecast
+# corresponds to the right month, quarter etc.
+if last&lt;max($obsminor)	# last quarter/month/day-of-week
+  matrix selmat = zeros(max(values($obsminor)),1)
+  scalar counter = last+1
+  loop i=1..max(values($obsminor)) -q
+    selmat[counter] = $i
+    counter = (counter==max(values($obsminor))) ? 1 : (counter+1)
   endloop
-  fc = fc[1:h]
-else
-  fc = fc[1:h]
+  fc = msortby(fc~selmat,2)[,1]
 endif
-return fc
+# construct h-step ahead forecasts
+scalar k = ceil(h/rows(fc))	# Anz. d. notwend. stackings
+fc = ones(rows(fc),k) .* fc	# pd by k
+return vec(fc)[1:h]			# row-vector
 </code>
 </gretl-function>
 <gretl-function name="get_mean_obsminor" type="matrix" private="1">
- <params count="2">
-  <param name="y" type="series" const="true"/>
-  <param name="h" type="int"/>
+ <params count="3">
+  <param name="y" type="series" const="true">
+<description>Actuals</description>
+  </param>
+  <param name="h" type="int">
+<description>FC-horizon</description>
+  </param>
+  <param name="use_median" type="bool" default="0">
+<description>compute median</description>
+  </param>
  </params>
-<code># obtain last k (quarterly=4, monthly=12, etc. obs)
-series omin = $obsminor
-scalar n = max(uniq(omin))
-matrix ymeans = zeros(n, 1)
-loop i=1..n -q	# filter by $obsminor
-  smpl omin==$i --restrict --replace
-  ymeans[i] = mean(y)
-endloop
-smpl full
-return stack_fc(ymeans, h)
+<code># obtain for each periodicity (quarterly=4,
+# monthly=12, etc.) the mean/ median value
+if use_median
+  matrix ybar = aggregate(y,$obsminor,median)
+else
+  matrix ybar = aggregate(y,$obsminor,mean)
+endif
+return stack_fc(ybar[,3], h)
 </code>
 </gretl-function>
 <gretl-function name="seas_check" type="void" private="1">
@@ -606,7 +646,8 @@ endif
   <param name="bhat" type="matrix"/>
   <param name="h" type="int"/>
  </params>
-<code>matrix fc = zeros(h,1)
+<code># compute the iterative forecast for an AR(1)
+matrix fc = zeros(h,1)
 fc[1] = bhat[1] + bhat[2]*y[$t2]
 loop i=2..h -q
   fc[i] = bhat[1] + bhat[2]*fc[i-1]
@@ -626,40 +667,47 @@ scalar h = 11		# set forecast horizon
 
 # MEANFC
 xmean = meanf(x, h)
-xmean
+#xmean
 fcplot(x, xmean, &quot;Mean Forecast&quot;, &quot;nice ylabel&quot;, &quot;nice xlabel&quot;)
 
-# SMEANF:
+# MEANFC but use median
+xmedian = meanf(x, h)
+#fcplot(x, xmedian, &quot;Median Forecast&quot;)
+
+# SMEANF
 smean = smeanf(x, h)
 smean
-fcplot(x, smean, &quot;Seasonal Mean Forecast&quot;)
+#fcplot(x, smean, &quot;Seasonal Mean Forecast&quot;)
+
+# SMEANF but use median:
+smedian = smeanf(x, h, 1)
+smedian
+#fcplot(x, smedian, &quot;Seasonal Median Forecast&quot;)
 
 # SNAIVE:
 snaiv = snaive(x, h)
 snaiv
-fcplot(x, snaiv, &quot;Naive Seasonal Forecast&quot;)
+#fcplot(x, snaiv, &quot;Naive Seasonal Forecast&quot;)
 
 # RW wo drift
 rw = rwf(x, h)
 rw
-fcplot(x, rw, &quot;Random-Walk Forecast&quot;)
+#fcplot(x, rw, &quot;Random-Walk Forecast&quot;)
 
 # RW with drift
 rwd = rwf(x, h, 1)
 rwd
-fcplot(x, rwd, &quot;Random-Walk + Drift Forecast&quot;)
+#fcplot(x, rwd, &quot;Random-Walk + Drift Forecast&quot;)
 
 # AR(1)
 ar_1 = ar1f(x, h)
 ar_1
-fcplot(x, ar_1, &quot;AR(1) Forecast&quot;)
-
+#fcplot(x, ar_1, &quot;AR(1) Forecast&quot;)
 
 # Average of Forecasts
 avg_fc = avgfc(x, h)
-avg_fc		# 1st col: point forecast, 2nd col: std. deviation
+printf &quot;%9.3f&quot;, avg_fc		# 1st col: point forecast, 2nd col: std. deviation
 fcplot(x, avg_fc[,1], &quot;Avg. of Forecasts&quot;)
-
 
 #-------------------------------------
 # NaiveTsCv
@@ -669,7 +717,7 @@ bundle b = null
 b.y = x
 b.h = 4					# max. horizon
 b.wsize = 33			# window size
-string which = &quot;smeanf&quot;	# choose a method
+string which = &quot;meanf&quot;	# choose a method
 # R U N
 NaiveThroughTime(&amp;b, which)
 matrix FC = b.FC		# grab matrix of forecasts; rows: period forecasted, cols: fc-horizon
