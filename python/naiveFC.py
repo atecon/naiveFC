@@ -6,39 +6,11 @@ Created on Sat Jan 19 10:52:58 2019
 @author: Artur Tarassow
 """
 
-# Set working dir
-import os
-os.getcwd()
-# ADJUST THIS PATH ACCORDING TO YOUR MACHINE
-os.chdir("/home/at/git/naiveFC/python")
-os.getcwd()
 
-# Load some packages/ functions
+#=========================================================
+    
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sb
-
-"""
-Read-in raw data into Pandas dataframe
-"""
-opt_date = 1        # SELECT
-
-if opt_date==1:
-    #pd.read_csv('beer.csv', index_col='obs', na_values=["NA"]) 
-    df = pd.read_csv('beer.csv', na_values=["NA"]) 
-    df.index = pd.period_range('1992-01', periods = len(df), freq="Q")
-    del df["obs"]
-elif opt_date==2:
-    df = pd.read_csv('beer.csv', na_values=["NA"])   
-    df.index = pd.to_datetime(df["obs"])
-    del df["obs"]
-
-
-
-#df.groupby(pd.Grouper(freq='Q')).mean()  # update for v0.21+
-
-
 
 def print_noboot():
     """ Print Error"""
@@ -46,16 +18,76 @@ def print_noboot():
     print("Error: Bootstrap confidence intervals are not supported, yet")
 
 def gen_index(h):
-    """ Construct list of rownames for index """
+    """ Construct list of rownames for the index of the fc-matrix """
     L = ["h="] * h
     for i in range(h):
         L[i] += str(i+1)        
     return L
-    
+
 def gen_colname():
     """ construct column names """
     return "point"   
 
+    
+def series_mat_concat(y, m):    
+    """
+        concatenate series y with a vector m
+        of the same length
+        return matrix T by 2 matrix
+    """
+    # TODO: add a check that y and m have the same length    
+    my = np.asmatrix(y).transpose() # TODO: .ravel() rather t. transpose()
+    #my = np.asmatrix(y).ravel()
+    print(my)
+    return np.concatenate((my, m), axis=1)
+
+
+def get_freq_as_vector(y):
+    """
+        Obtain a series of the minor observations
+        of y
+    """        
+    
+    """ Determine the frequency of series 'y' """
+    # TODO: add a check whether y.index has TS-structure    
+    f = y.index.freqstr # string indicating frequency (A, Q; M, D)    
+        
+    if f.find("Q",0,1) is not -1: # quarterly
+        return np.asmatrix(y.index.quarter).transpose()        
+    elif f.find("M",0,1) is not -1: # monthly
+        return np.asmatrix(y.index.month).transpose()
+    elif f.find("d",0,1) is not -1: # daily
+        return np.asmatrix(y.index.day).transpose()
+    elif f.find("A",0,1) is not -1:
+        print("You cannot apply the choosen method to annual data.")
+        return -1
+    
+
+def get_mean_obsminor(y, h):
+    """
+    obtain historical mean value for each separate quarter, month,
+    or day across all years
+    """
+    
+    # Concatenate series y with vector of minor frequency of y
+    m = series_mat_concat(y, get_freq_as_vector(y))
+
+    if m is not -1:
+        df = pd.DataFrame(m, columns=["y", "freq"])
+        df.index = y.index
+    
+        """
+        get mean-value for each minor frequency        
+        NOTE: it is assumed that at least 1 obs for every
+        potential obsminor value exists in y
+        TODO: add a check and warning in future that seasonal-fc
+        won't be available in this case -- at least for some freq.
+        """
+        fmean = df.groupby("freq").mean()       # TODO: add median()
+        return fmean
+    
+      
+    
 def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     """
     Mean forecasts of all future values are equal to the
@@ -67,10 +99,11 @@ def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         print_noboot()
         return None
     if nboot==0:
-        fc = pd.Series(np.ones((h)),gen_index(h)) * np.mean(y)        
-        fc.name = gen_colname()
+        fc = pd.Series(np.ones((h)),
+                       index=gen_index(h),
+                       name=gen_colname()) * np.mean(y)        
         return fc
-    
+
     
 def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     """
@@ -82,37 +115,79 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     if nboot>0:
         print_noboot()
         return None
-    if nboot==0:
     
-        # print frequency
-        period = y.index.freqstr
-        print(period)
+    elif nboot==0:
     
-        # Once we have the frequency, we can construct a periodicity series
-        #if period.find('Q'):        
-        if period.startswith('A'):
-           y["period"] = period.startswith('A')
-        elif period.startswith('Q'):
-            y["period"] = period.startswith('Q')
-        elif period.startswith('M'):
-            y["period"] = period.startswith('M')
-        elif period.startswith('D'):
-            y["period"] = period.startswith('D')
-    
-        print(y)
+        """ obtain historical mean value for each separate freq """
+        fmean = get_mean_obsminor(y, h)  # T by 2 data frame                
+        last = fmean.index[-1]      # last obsminor value, e.g. last quarter
         
-fc_smeanf = smeanf(df["x"])
-#print(fc_smeanf)
+        # Reorder fmean according to 'last'
+        # For instance, if last=Q3 then next is Q4 and then Q1 etc.
+        # We construct a len(fmean) by 1 vector whose indices direct
+        # to a sequence of the following obsminor frequencies        
+        fc = np.zeros((max(h,len(fmean)),1))
+                        
+        for i in range(len(fc)):
+            
+            if (last)==len(fmean):
+                last = 0           # back to 1st obsminor value
+                                        
+            fc[i] = fmean["y"][last+1]  # fmean.index is 1-based
+                        
+            last=last+1       # update
+
+        # Finalize: add row and column strings to series        
+        return pd.Series(fc[:,0],
+                         index=gen_index(h),
+                         name=gen_colname())  
 
 
-# %%
+def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
+    """
+    Returns forecasts and prediction intervals from an
+    ARIMA(0,0,0)(0,1,0)
+    model where m is the seasonal period.
+    """
+    
+    if nboot>0:
+        print_noboot()
+        return None
+    if nboot==0:
+        # Concatenate series y with vector of minor frequency of y
+        # return T by 2 vector 'm'
+        m = series_mat_concat(y, get_freq_as_vector(y))
+
+        # read periodicity per year (A=1, Q=4, ..)
+        freq = m[:,1].max()
+
+        # read last 'freq' obsminor values, e.g. last 4 quarters, etc.
+        fc = m[-min(h,freq):,0]
+       
+        if h<=freq:            
+            return pd.Series(fc[-h:,0],
+                             index=gen_index(h),
+                             name=gen_colname())
+        else:
+            for i in range(h-freq): # fill up remaining horizons
+                fcnew = fc[-freq]                
+                fc = np.concatenate((fc,fcnew))
+                
+        # Finalize: add row and column strings to series        
+        return fc
+        """
+        return pd.Series(fc[:,0],
+                         index=gen_index(h),
+                         name=gen_colname())
+        """
+
 
 def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
     """
     Random-walk forecast of all future values are equal to the
     last historical data point.
-    Random-walk w. dtrift and forecast of all future values are equal to the
-    last historical data point.
+    Random-walk w. dtrift and forecast of all future values are
+    equal to the last historical data point.
     Returns forecasts (and prediction intervals for an iid model)
     applied to y  
     """    
@@ -121,16 +196,16 @@ def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
         return None
     
     else:                
-        fc = pd.Series(np.ones(h),gen_index(h)) * y[-1]
+        fc = np.ones(h) * y[-1]
         
         if drift:        
-            # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
-            g = (y[-1]-y[0])/(np.shape(y)[0]-1)     # average growth rate (drift)        
+            # equivalent to an ARIMA(0,1,0) model with an
+            # optional drift coefficient
+            g = (y[-1]-y[0])/(np.shape(y)[0]-1)  # avg. growth rate (drift)        
             fc = fc + np.cumsum(np.ones(h)) * g            
             
-        fc.name = gen_colname()
-        return fc
-
+        # Finalize: add row and column strings to series        
+        return pd.Series(fc, index=gen_index(h), name=gen_colname())
 
 
 def my_ols(y,X):
@@ -140,7 +215,8 @@ def my_ols(y,X):
     return np.linalg.lstsq(X,y,rcond=None)[0] # 0=grab only coeff. matrix
 
     
-def ar1f (y, h=10, const=True, trend=False, level=90, fan=False, nboot=0, blength=4):
+def ar1f(y, h=10, const=True, trend=False, level=90,
+          fan=False, nboot=0, blength=4):
     """
     AR(1) forecast with or withou linear trend.
     Returns forecasts (and prediction intervals for an iid model)
@@ -170,15 +246,18 @@ def ar1f (y, h=10, const=True, trend=False, level=90, fan=False, nboot=0, blengt
         bhat = my_ols(y,X)
                 
         # Iterative forecast
-        return recfc(Y,bhat,h,const,trend)
+        fc = recfc(Y,bhat,h,const,trend)
 
-        
+        # Finalize: add row and column strings to series        
+        return pd.Series(fc[:,0], index=gen_index(h), name=gen_colname())
+    
+    
 def recfc(Y,bhat,h,const,trend):
     """
     Construct h-step ahead iterative forecast based on AR(1)
     Y:  data frame, T by (1+k) with elements y~const~trend~y(-1)
     """
-        
+    
     fc = np.zeros((h,1))
     m = np.asmatrix(Y.iloc[-1,:-1])   # 1 by (1+k); grab last obs. row
     # position y(t) at last position    
@@ -202,25 +281,48 @@ def recfc(Y,bhat,h,const,trend):
             # compute new point forecast
             fc[i] = m * np.transpose(bhat)
             
-    return pd.Series(fc[:,0])
+    return fc
 
 
 
 
-## %%
-    
-# =============================================================================
-# # CALL
-# =============================================================================
-fc_meanf = meanf(df["x"])
-print(fc_meanf)
-
-fc_rw = rwf(df["x"])
-print(fc_rw)
-
-fc_rwd = rwf(df["x"], drift=True)
-print(fc_rwd)
-
-fc_ar1 = ar1f(df["x"])
-print(fc_ar1)
-
+#def avgfc(y, h=10, const=True, trend=False, level=90,
+#          fan=False, nboot=0, blength=4):
+#    
+#    """
+#    Computes the mean (average) and cross-sectional (across forecast methods)
+#    standard deviation at each horizon using all simple forecast methods
+#    available.
+#    """
+#
+#    if nboot>0:
+#            print_noboot()
+#            return None      
+#    else:
+#
+#        # Base models
+#        """
+#        (1) Define a list of base model:
+#            defarray("meanf(y,h)", "rwf(y,h)", "rwf(y,h,1)", "ar1f(y,h)")
+#        (2) if $pd>1	# for seasonal data only
+#            += "smeanf(y,h)"
+#            += "snaive(y,h)"
+#        (3) Use feval()
+#        """
+#    
+#    
+#        fc = np.matrix(zeros(h,nelem(M))
+#        
+#    loop i=1..nelem(M) -q
+#        string s = sprintf("%s", M[i])
+#        fc[,i] = @s[,1]	# only point-fc
+#    endloop
+#    fc = meanr(fc) ~ sdc(fc', rows(fc')-1)' ~ fc
+#    if $pd == 1
+#        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1)", " "))
+#    else
+#        cnameset(fc, strsplit("average-fc sd meanf rwf rwf+drift AR(1) smean snaive", " "))
+#    endif
+#    rnameset(fc, rownam(h))
+#    return fc
+#end function
