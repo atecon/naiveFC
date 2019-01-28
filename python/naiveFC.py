@@ -17,9 +17,10 @@ def print_noboot():
     # TODO: look for funcerr
     print("Error: Bootstrap confidence intervals are not supported, yet")
 
+
 def gen_index(h):
-    """ sfor generating list of rownames
-    for the index of the fc-matrix """
+    """ Helper function for generating rownames for the
+    index of the fc-matrix """
     L = ["h="] * h
     for i in range(h):
         L[i] += str(i+1)        
@@ -70,14 +71,29 @@ def get_freq_as_vector(y):
         return -1
     
 
-def get_mean_obsminor(y, h):
+def get_mean_obsminor(y, h, use_median=False):
     """
-        Helper function obtain historical mean value for each separate
-        quarter, month, or day across all years
+    Helper function obtain historical mean value for each separate
+    quarter, month, or day across all years
+        
+    Parameters
+    ----------
+    y: series
+        The dependent series of length T
+    h: integer
+        Compute up to the 'h' forecast horizon (default 10 periods)
+    use_median: bool
+        Compute median instead of mean (default False)
+    --------
+    Returns a pd by 1 matrix with mean/ median values where pd
+    is the periodicity of y (quarterly: pd=4, monthly: pd=12,
+    daily: pd=7 etc.)
     """
     
     # Concatenate series y with vector of minor frequency of y
     m = series_mat_concat(y, get_freq_as_vector(y))
+    
+    # TODO: funcerr if y has no freq-index
 
     if m is not -1:
         df = pd.DataFrame(m, columns=["y", "freq"])
@@ -91,9 +107,12 @@ def get_mean_obsminor(y, h):
         TODO: Given the NOTE, add a check and warning that seasonal-fc
         won't be available in this case -- at least for some freq.
         """
-        fmean = df.groupby("freq").mean()       # TODO: add median()
+        if use_median==True:
+            out = df.groupby("freq").mean()
+        else:
+            out = df.groupby("freq").median()
         
-        return fmean
+        return out
 
     
 def my_ols(y,X):
@@ -107,13 +126,12 @@ def my_ols(y,X):
     X: data frame
         data frame of regressors of dimension T by k
     --------
-    Returns a k by 1 matrix
-    
+    Returns a k by 1 matrix    
     """
     
-    return np.linalg.lstsq(X,y,rcond=None)[0] # 0=grab only coeff. matrix
+    return np.linalg.lstsq(X,y,rcond=None)[0]   # 0=grab only coeff. matrix
       
-    
+
 def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         
     """
@@ -347,8 +365,8 @@ def ar1f(y, h=10, const=True, trend=False, level=90,
         return None
     
     else:
-        T = df.shape[0]        
-        Y = pd.DataFrame(df["x"])
+        T = y.shape[0]        
+        Y = pd.DataFrame(y["y"])    # BUGFIX: check this + following
         
         # Add intercept
         if const:            

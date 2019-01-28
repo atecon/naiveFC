@@ -9,12 +9,18 @@ Created on Fri Jan 25 19:25:19 2019
 @author: Artur Tarassow
 """
 
+machine = 2         # 1=AT-home, 2=DSB
 
 # Set working dir
 import os
 os.getcwd()
-# ADJUST THIS PATH ACCORDING TO YOUR MACHINE
-os.chdir("/home/at/git/naiveFC/python")
+
+if machine==1:
+    # ADJUST THIS PATH ACCORDING TO YOUR MACHINE
+    os.chdir("/home/at/git/naiveFC/python")
+elif machine==2:
+    os.chdir("/home/ninja/BrainLocalData/shared/git_atecon/naiveFC/python")
+
 os.getcwd()
 
 # Load some packages/ functions
@@ -40,7 +46,6 @@ elif opt_date==2:
     df = pd.read_csv('beer.csv', na_values=["NA"])   
     df.index = pd.to_datetime(df["obs"])
     del df["obs"]
-
 
 
 """
