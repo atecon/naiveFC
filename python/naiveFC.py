@@ -43,9 +43,7 @@ def series_mat_concat(y, m):
         return matrix T by 2 matrix
     """
     # TODO: add a check that y and m have the same length    
-    my = np.asmatrix(y).transpose() # TODO: .ravel() rather t. transpose()
-    #my = np.asmatrix(y).ravel()
-    print(my)
+    my = np.asmatrix(y).transpose() # TODO: .ravel() rather t. transpose()    
     
     return np.concatenate((my, m), axis=1)
 
@@ -129,7 +127,9 @@ def my_ols(y,X):
     Returns a k by 1 matrix    
     """
     
-    return np.linalg.lstsq(X,y,rcond=None)[0]   # 0=grab only coeff. matrix
+    return np.linalg.lstsq(X,y)[0].ravel()   # 0=grab only coeff. matrix
+    # Note: rcond=none works only for latest numpy (Jan. 2019)
+    #return np.linalg.lstsq(X,y),rcond=None)[0]   # 0=grab only coeff. matrix
       
 
 def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
@@ -366,9 +366,9 @@ def ar1f(y, h=10, const=True, trend=False, level=90,
     
     else:
         T = y.shape[0]        
-        Y = pd.DataFrame(y["y"])    # BUGFIX: check this + following
-        
-        # Add intercept
+        Y = pd.DataFrame({'y': y})
+                
+        # Add intercept/ trend
         if const:            
             Y["const"] = 1        
         if trend:
@@ -377,15 +377,17 @@ def ar1f(y, h=10, const=True, trend=False, level=90,
         # Add 1st lag
         Y["Y_1"] = Y.iloc[:,0].shift(1)     # y~const~trend~y(-1)
         Y.dropna(axis=0, inplace=True)
-        
+                
         # OLS        
         y = Y.iloc[:,0]
-        X = Y.iloc[:,1:]    # const~trend~y(-1)
-        bhat = my_ols(y,X)
-                
+        X = Y.iloc[:,1:]    # const~(trend)~y(-1)
+        bhat = my_ols(y,X)        
+
         # Iterative forecast
         fc = recfc(Y,bhat,h,const,trend)
 
+        print(fc)
+        
         # Finalize: add row and column strings to series        
         return pd.Series(fc[:,0], index=gen_index(h), name=gen_colname())
     

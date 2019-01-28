@@ -18,6 +18,7 @@ os.getcwd()
 if machine==1:
     # ADJUST THIS PATH ACCORDING TO YOUR MACHINE
     os.chdir("/home/at/git/naiveFC/python")
+    
 elif machine==2:
     os.chdir("/home/ninja/BrainLocalData/shared/git_atecon/naiveFC/python")
 
