@@ -13,25 +13,31 @@ import pandas as pd
 import numpy as np
 
 def print_noboot():
-    """ Print Error"""
+    """ Helper function printing error when CIs are demanded"""
     # TODO: look for funcerr
     print("Error: Bootstrap confidence intervals are not supported, yet")
 
 def gen_index(h):
-    """ Construct list of rownames for the index of the fc-matrix """
+    """ sfor generating list of rownames
+    for the index of the fc-matrix """
     L = ["h="] * h
     for i in range(h):
         L[i] += str(i+1)        
+        
     return L
 
+
 def gen_colname():
-    """ construct column names """
-    return "point"   
+    """ Helper function constructing column name(s)
+    NOTE: add CIs later
+    """    
+    
+    return "point"
 
     
 def series_mat_concat(y, m):    
     """
-        concatenate series y with a vector m
+        Helper function concatenating series y with a vector m
         of the same length
         return matrix T by 2 matrix
     """
@@ -39,13 +45,14 @@ def series_mat_concat(y, m):
     my = np.asmatrix(y).transpose() # TODO: .ravel() rather t. transpose()
     #my = np.asmatrix(y).ravel()
     print(my)
+    
     return np.concatenate((my, m), axis=1)
 
 
 def get_freq_as_vector(y):
     """
-        Obtain a series of the minor observations
-        of y
+        Helper function obtain a series of the minor
+        observations of y
     """        
     
     """ Determine the frequency of series 'y' """
@@ -65,8 +72,8 @@ def get_freq_as_vector(y):
 
 def get_mean_obsminor(y, h):
     """
-    obtain historical mean value for each separate quarter, month,
-    or day across all years
+        Helper function obtain historical mean value for each separate
+        quarter, month, or day across all years
     """
     
     # Concatenate series y with vector of minor frequency of y
@@ -77,24 +84,62 @@ def get_mean_obsminor(y, h):
         df.index = y.index
     
         """
-        get mean-value for each minor frequency        
+        Get mean-value for each minor frequency
+        
         NOTE: it is assumed that at least 1 obs for every
-        potential obsminor value exists in y
-        TODO: add a check and warning in future that seasonal-fc
+        potential obsminor value exists in 'y'
+        TODO: Given the NOTE, add a check and warning that seasonal-fc
         won't be available in this case -- at least for some freq.
         """
         fmean = df.groupby("freq").mean()       # TODO: add median()
+        
         return fmean
+
     
+def my_ols(y,X):
+    """
+    Helper function estimating coefficients by OLS using linear algebra
+    
+    Parameters
+    ----------
+    y: series
+        The dependent series of length T
+    X: data frame
+        data frame of regressors of dimension T by k
+    --------
+    Returns a k by 1 matrix
+    
+    """
+    
+    return np.linalg.lstsq(X,y,rcond=None)[0] # 0=grab only coeff. matrix
       
     
 def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
+        
     """
-    Mean forecasts of all future values are equal to the
+    Compute mean forecasts of all future values which are equal to the
     mean of historical data
-    Returns forecasts (and prediction intervals for an iid model)
-    applied to y
+    Parameters
+    ----------
+    y: series
+        The series which to forecast 
+    h: integer
+        Compute up to the 'h' forecast horizon (default 10 periods)
+    level: scalar
+        The 'alpha'-quantile level for computing the for 1-alpha forecast
+        intervall (default 90 pct.) -- not implemented, yet!
+    fan: bool
+        Compute fan-chart (default FALSE) -- not implemented, yet!
+    nboot: integer
+        No. of bootstrap replications (default 0) -- not relevant, yet!
+    blength: integer
+        Mean length of block-bootstrap sample. If (nboot>0 && blength==0), run
+        iid bootstrape; if (nboot>0 && blength>0) run block-bootstrap);
+        (default = 0) -- not implemented, yet!
+    --------
+    Returns h by 1 series of forecast values    
     """    
+    
     if nboot>0:
         print_noboot()
         return None
@@ -107,11 +152,30 @@ def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     
 def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     """
-    Forecasts of all future values are equal to the mean of
-    specific seasons based on historical data.    
-    Returns forecasts (and prediction intervals for an iid model)
-    applied to y
-    """    
+    Compute seasonal mean forecasts which are equal to the season specific
+    mean value based on historical data.    
+    
+    Parameters
+    ----------
+    y: series
+        The series which to forecast 
+    h: integer
+        Compute up to the 'h' forecast horizon (default 10 periods)
+    level: scalar
+        The 'alpha'-quantile level for computing the for 1-alpha forecast
+        intervall (default 90 pct.) -- not implemented, yet!
+    fan: bool
+        Compute fan-chart (default FALSE) -- not implemented, yet!
+    nboot: integer
+        No. of bootstrap replications (default 0) -- not relevant, yet!
+    blength: integer
+        Mean length of block-bootstrap sample. If (nboot>0 && blength==0), run
+        iid bootstrape; if (nboot>0 && blength>0) run block-bootstrap);
+        (default = 0) -- not implemented, yet!
+    --------
+    Returns h by 1 series of forecast values    
+    """
+      
     if nboot>0:
         print_noboot()
         return None
@@ -145,9 +209,28 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
 
 def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
     """
-    Returns forecasts and prediction intervals from an
-    ARIMA(0,0,0)(0,1,0)
-    model where m is the seasonal period.
+    Compute the seasonal naive forecasts which are equivalent to forecasts
+    from ARIMA(0,0,0)(0,1,0) model.
+        
+    Parameters
+    ----------
+    y: series
+        The series which to forecast 
+    h: integer
+        Compute up to the 'h' forecast horizon (default 10 periods)
+    level: scalar
+        The 'alpha'-quantile level for computing the for 1-alpha forecast
+        intervall (default 90 pct.) -- not implemented, yet!
+    fan: bool
+        Compute fan-chart (default FALSE) -- not implemented, yet!
+    nboot: integer
+        No. of bootstrap replications (default 0) -- not relevant, yet!
+    blength: integer
+        Mean length of block-bootstrap sample. If (nboot>0 && blength==0), run
+        iid bootstrape; if (nboot>0 && blength>0) run block-bootstrap);
+        (default = 0) -- not implemented, yet!
+    --------
+    Returns h by 1 series of forecast values    
     """
     
     if nboot>0:
@@ -175,7 +258,8 @@ def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
                 
         # Finalize: add row and column strings to series        
         return fc
-        """
+        # TODO: the following commented block doesn't work
+        """        
         return pd.Series(fc[:,0],
                          index=gen_index(h),
                          name=gen_colname())
@@ -184,13 +268,33 @@ def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
 
 def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
     """
-    Random-walk forecast of all future values are equal to the
-    last historical data point.
-    Random-walk w. dtrift and forecast of all future values are
-    equal to the last historical data point.
-    Returns forecasts (and prediction intervals for an iid model)
-    applied to y  
-    """    
+    Compute random-walk forecasts which are equal to the last realization
+    in case of no drift or to the last realization plus some historical mean
+    growth rate per period, respectively.
+        
+    Parameters
+    ----------
+    y: series
+        The series which to forecast
+    h: integer
+        Compute up to the 'h' forecast horizon (default 10 periods)
+    drift: bool
+        Add and consider historial mean growth rate (drift) (default False)
+    level: scalar
+        The 'alpha'-quantile level for computing the for 1-alpha forecast
+        intervall (default 90 pct.) -- not implemented, yet!
+    fan: bool
+        Compute fan-chart (default FALSE) -- not implemented, yet!
+    nboot: integer
+        No. of bootstrap replications (default 0) -- not relevant, yet!
+    blength: integer
+        Mean length of block-bootstrap sample. If (nboot>0 && blength==0), run
+        iid bootstrape; if (nboot>0 && blength>0) run block-bootstrap);
+        (default = 0) -- not implemented, yet!
+    --------
+    Returns h by 1 series of forecast values    
+    """
+
     if nboot>0:
         print_noboot()
         return None
@@ -206,22 +310,38 @@ def rwf (y, h=10, drift=False, level=90, fan=False, nboot=0, blength=4):
             
         # Finalize: add row and column strings to series        
         return pd.Series(fc, index=gen_index(h), name=gen_colname())
-
-
-def my_ols(y,X):
-    """
-    Estimate params. by OLS using linear algebra
-    """
-    return np.linalg.lstsq(X,y,rcond=None)[0] # 0=grab only coeff. matrix
-
+    
     
 def ar1f(y, h=10, const=True, trend=False, level=90,
           fan=False, nboot=0, blength=4):
+    
     """
-    AR(1) forecast with or withou linear trend.
-    Returns forecasts (and prediction intervals for an iid model)
-    applied to y  
+    Compute AR(1)-based forecast with or without linear trend.    
+        
+    Parameters
+    ----------
+    y: series
+        The series which to forecast
+    h: integer
+        Compute up to the 'h' forecast horizon (default 10 periods)
+    trend: bool
+        Add and consider linear trend as additional regressor
+    level: scalar
+        The 'alpha'-quantile level for computing the for 1-alpha forecast
+        intervall (default 90 pct.) -- not implemented, yet!
+    fan: bool
+        Compute fan-chart (default FALSE) -- not implemented, yet!
+    nboot: integer
+        No. of bootstrap replications (default 0) -- not relevant, yet!
+    blength: integer
+        Mean length of block-bootstrap sample. If (nboot>0 && blength==0), run
+        iid bootstrape; if (nboot>0 && blength>0) run block-bootstrap);
+        (default = 0) -- not implemented, yet!
+    --------
+    Returns h by 1 series of forecast values    
     """
+    
+
     if nboot>0:
         print_noboot()
         return None
@@ -254,8 +374,23 @@ def ar1f(y, h=10, const=True, trend=False, level=90,
     
 def recfc(Y,bhat,h,const,trend):
     """
-    Construct h-step ahead iterative forecast based on AR(1)
-    Y:  data frame, T by (1+k) with elements y~const~trend~y(-1)
+    Helper function for constructing h-step ahead iterative forecasts
+    based on AR(1) model.
+    
+    Parameters
+    ----------
+    Y: data frame
+        Y has size T by (1+k) with elements y~const~trend~y(-1)
+    bhat: matrix
+        k by 1 vector of (OLS-based) point estimates
+    h: integer
+        Compute up to the 'h' forecast horizon (default 10 periods)
+    const: bool
+        Estimated model with intercept
+    trend: bool
+        Estimated model with linear trend
+    --------
+    Returns h by 1 series of forecast values
     """
     
     fc = np.zeros((h,1))
@@ -285,7 +420,7 @@ def recfc(Y,bhat,h,const,trend):
 
 
 
-
+# TODO: add a wrapper to estimate all models at once and combine FCs
 #def avgfc(y, h=10, const=True, trend=False, level=90,
 #          fan=False, nboot=0, blength=4):
 #    
