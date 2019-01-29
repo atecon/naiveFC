@@ -14,8 +14,11 @@ import numpy as np
 
 def print_noboot():
     """ Helper function printing error when CIs are demanded"""
-    # TODO: look for funcerr
-    print("Error: Bootstrap confidence intervals are not supported, yet")
+    try:
+        raise NoBootCi
+    except NoBootCi:
+        print("Error: Bootstrap confidence intervals are not supported, yet")
+        print()
 
 
 def gen_index(h):
@@ -23,7 +26,7 @@ def gen_index(h):
     index of the fc-matrix """
     L = ["h="] * h
     for i in range(h):
-        L[i] += str(i+1)        
+        L[i] += str(i+1)
         
     return L
 
@@ -42,10 +45,16 @@ def series_mat_concat(y, m):
         of the same length
         return matrix T by 2 matrix
     """
-    # TODO: add a check that y and m have the same length    
-    my = np.asmatrix(y).transpose() # TODO: .ravel() rather t. transpose()    
-    
-    return np.concatenate((my, m), axis=1)
+    # TODO: add a check that y and m have the same length
+    try:
+        if y.shape[0] == m.flatten(order="F").shape[0]:
+            my = np.asmatrix(y).transpose() # TODO: flatten()
+            return np.concatenate((my, m), axis=1)
+        else:
+            raise UnequalLength        
+    except UnequalLength:
+        print("Series y and vector m are of different length")
+        print()
 
 
 def get_freq_as_vector(y):
@@ -56,7 +65,7 @@ def get_freq_as_vector(y):
     
     """ Determine the frequency of series 'y' """
     # TODO: add a check whether y.index has TS-structure    
-    f = y.index.freqstr # string indicating frequency (A, Q; M, D)    
+    f = y.index.freqstr # string indicating frequency (A, Q; M, D)
         
     if f.find("Q",0,1) is not -1: # quarterly
         return np.asmatrix(y.index.quarter).transpose()        
@@ -89,28 +98,31 @@ def get_mean_obsminor(y, h, use_median=False):
     """
     
     # Concatenate series y with vector of minor frequency of y
+    print(get_freq_as_vector(y).shape)
+    *** HIER WEITERMACHEN!! ***
+    
     m = series_mat_concat(y, get_freq_as_vector(y))
     
-    # TODO: funcerr if y has no freq-index
-
-    if m is not -1:
-        df = pd.DataFrame(m, columns=["y", "freq"])
-        df.index = y.index
-    
-        """
-        Get mean-value for each minor frequency
-        
-        NOTE: it is assumed that at least 1 obs for every
-        potential obsminor value exists in 'y'
-        TODO: Given the NOTE, add a check and warning that seasonal-fc
-        won't be available in this case -- at least for some freq.
-        """
-        if use_median==True:
-            out = df.groupby("freq").mean()
-        else:
-            out = df.groupby("freq").median()
-        
-        return out
+#    # TODO: funcerr if y has no freq-index
+#
+#    if m is not -1:
+#        df = pd.DataFrame(m, columns=["y", "freq"])
+#        df.index = y.index
+#    
+#        """
+#        Get mean-value for each minor frequency
+#        
+#        NOTE: it is assumed that at least 1 obs for every
+#        potential obsminor value exists in 'y'
+#        TODO: Given the NOTE, add a check and warning that seasonal-fc
+#        won't be available in this case -- at least for some freq.
+#        """
+#        if use_median==True:
+#            out = df.groupby("freq").mean()
+#        else:
+#            out = df.groupby("freq").median()
+#        
+#        return out
 
     
 def my_ols(y,X):
@@ -201,15 +213,18 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
     elif nboot==0:
     
         """ obtain historical mean value for each separate freq """
-        fmean = get_mean_obsminor(y, h)  # T by 2 data frame                
+        
+        fmean = get_mean_obsminor(y, h)  # T by 2 data frame
+        """
+        print(fmean)         
         last = fmean.index[-1]      # last obsminor value, e.g. last quarter
         
         # Reorder fmean according to 'last'
         # For instance, if last=Q3 then next is Q4 and then Q1 etc.
         # We construct a len(fmean) by 1 vector whose indices direct
-        # to a sequence of the following obsminor frequencies        
+        # to a sequence of the following obsminor frequencies                
         fc = np.zeros((max(h,len(fmean)),1))
-                        
+                
         for i in range(len(fc)):
             
             if (last)==len(fmean):
@@ -223,7 +238,8 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         return pd.Series(fc[:,0],
                          index=gen_index(h),
                          name=gen_colname())  
-
+"""
+        
 
 def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
     """
