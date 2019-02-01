@@ -214,20 +214,38 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         fmean = get_mean_obsminor(y, h)  # T by 2 data frame
         
         # last obsminor value, e.g. last quarter
-        last = get_freq_as_vector(y)[-1]
+        pd_last = np.asscalar(get_freq_as_vector(y)[-1]) # starts at '1'
       
 
         """ Re-order fc to make sure that 1st forecast
-            corresponds to the right month, quarter etc. """
-    pd = fmean.shape[0]:	# no. of periodicities
-    if last<pd:
-    
-        selmat = np.zeros(pd,1)
-        counter = last + 1
-        loop i=1..max(values($obsminor)) -q
-            selmat[counter] = $i
-            counter = (counter==max(values($obsminor))) ? 1 : (counter+1)
-        endloop
+            corresponds to the right month, quarter etc.
+            For instance, if last=Q3 then next is Q4 and then Q1 etc.
+            We construct a len(fmean) by 1 vector whose indices direct
+            to a sequence of the following obsminor frequencies      
+        """
+        pd = fmean.shape[0]	# no. of periodicities (4=quarterly)
+        
+        if pd_last <= pd:                 # FIXME: acually '<'
+            
+            selmat = np.zeros((pd,1))     # selection matrix            
+            counter = pd_last
+            
+            for i in range(0,pd):
+                if counter==pd:
+                    counter = 1
+                else:
+                    counter = counter + 1
+                    
+                selmat[counter-1] = 1+i     # '-1' -> consider "0-counting"
+                #print(selmat)
+                #print(counter)
+                
+        fc = np.concatenate((fmean, selmat), axis=1)
+        print(fc)
+        fc = fc[np.lexsort((fc[:,1], ))]
+        print(fc)
+                
+"""
         fc = msortby(fc~selmat,2)[,1]
         
         
@@ -252,7 +270,7 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         return pd.Series(fc[:,0],
                          index=gen_index(h),
                          name=gen_colname())  
-        """
+"""
         
 
 def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
