@@ -68,10 +68,10 @@ fc_meanf = meanf(df["x"])
 print(fc_meanf)
    # exit(0)
 
-"""
 fc_smeanf = smeanf(df["x"])
 print(fc_smeanf)
-"""
+
+
 fc_ar1 = ar1f(df["x"])
 print(fc_ar1)
 

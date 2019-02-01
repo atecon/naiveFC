@@ -45,17 +45,19 @@ def series_mat_concat(y, m):
         of the same length
         return matrix T by 2 matrix
     """
-    # TODO: add a check that y and m have the same length
-    try:
-        if y.shape[0] == m.flatten(order="F").shape[0]:
-            my = np.asmatrix(y).transpose() # TODO: flatten()
+    # TODO: add a check that y and m have the same length    
+    try:        
+        #if y.shape[0] == m.flatten(order="F").shape[0]:
+        # TODO: implement vec() equivalent!
+        if y.shape[0] == m.shape[0]:
+            my = np.asmatrix(y).transpose() # TODO: replace by vec()                        
             return np.concatenate((my, m), axis=1)
         else:
             raise UnequalLength        
     except UnequalLength:
         print("Series y and vector m are of different length")
         print()
-
+        
 
 def get_freq_as_vector(y):
     """
@@ -65,7 +67,7 @@ def get_freq_as_vector(y):
     
     """ Determine the frequency of series 'y' """
     # TODO: add a check whether y.index has TS-structure    
-    f = y.index.freqstr # string indicating frequency (A, Q; M, D)
+    f = y.index.freqstr # string indicating frequency (A, Q; M, D)    
         
     if f.find("Q",0,1) is not -1: # quarterly
         return np.asmatrix(y.index.quarter).transpose()        
@@ -78,51 +80,45 @@ def get_freq_as_vector(y):
         return -1
     
 
-#def get_mean_obsminor(y, h, use_median=False):
-#    """
-#    Helper function obtain historical mean value for each separate
-#    quarter, month, or day across all years
-#        
-#    Parameters
-#    ----------
-#    y: series
-#        The dependent series of length T
-#    h: integer
-#        Compute up to the 'h' forecast horizon (default 10 periods)
-#    use_median: bool
-#        Compute median instead of mean (default False)
-#    --------
-#    Returns a pd by 1 matrix with mean/ median values where pd
-#    is the periodicity of y (quarterly: pd=4, monthly: pd=12,
-#    daily: pd=7 etc.)
-#    """
-#    
-#    # Concatenate series y with vector of minor frequency of y
-#    print(get_freq_as_vector(y).shape)
-#    *** HIER WEITERMACHEN!! ***
-#    
-#    m = series_mat_concat(y, get_freq_as_vector(y))
-#    
-##    # TODO: funcerr if y has no freq-index
-##
-##    if m is not -1:
-##        df = pd.DataFrame(m, columns=["y", "freq"])
-##        df.index = y.index
-##    
-##        """
-##        Get mean-value for each minor frequency
-##        
-##        NOTE: it is assumed that at least 1 obs for every
-##        potential obsminor value exists in 'y'
-##        TODO: Given the NOTE, add a check and warning that seasonal-fc
-##        won't be available in this case -- at least for some freq.
-##        """
-##        if use_median==True:
-##            out = df.groupby("freq").mean()
-##        else:
-##            out = df.groupby("freq").median()
-##        
-##        return out
+def get_mean_obsminor(y, h, use_median=False):
+    """
+    Helper function obtain historical mean value for each separate
+    quarter, month, or day across all years
+        
+    Parameters
+    ----------
+    y: series
+        The dependent series of length T
+    h: integer
+        Compute up to the 'h' forecast horizon (default 10 periods)
+    use_median: bool
+        Compute median instead of mean (default False)
+    --------
+    Returns a pd by 1 matrix with mean/ median values where pd
+    is the periodicity of y (quarterly: pd=4, monthly: pd=12,
+    daily: pd=7 etc.)
+    """
+    
+    # TODO: add a check that "y" has no freq-index (is a TS)
+    
+    # Concatenate series y with vector of minor frequency of y   
+    out = series_mat_concat(y, get_freq_as_vector(y))
+        
+    df = pd.DataFrame(out, columns=["y", "freq"])
+    df.index = y.index
+    
+    """
+        Get mean-value for each minor frequency
+        
+        NOTE: it is assumed that at least 1 obs for every
+        potential obsminor value exists in 'y'
+        TODO: Given the NOTE, add a check and warning that seasonal-fc
+        won't be available in this case -- at least for some freq.
+    """
+    if use_median==False:
+        return df.groupby("freq").mean()
+    else:
+        return df.groupby("freq").median()
 
     
 def my_ols(y,X):
@@ -217,6 +213,8 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
         """ obtain historical mean value for each separate freq """
         
         fmean = get_mean_obsminor(y, h)  # T by 2 data frame
+        print(fmean)
+        
         """
         print(fmean)         
         last = fmean.index[-1]      # last obsminor value, e.g. last quarter
