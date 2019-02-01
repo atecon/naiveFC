@@ -78,51 +78,51 @@ def get_freq_as_vector(y):
         return -1
     
 
-def get_mean_obsminor(y, h, use_median=False):
-    """
-    Helper function obtain historical mean value for each separate
-    quarter, month, or day across all years
-        
-    Parameters
-    ----------
-    y: series
-        The dependent series of length T
-    h: integer
-        Compute up to the 'h' forecast horizon (default 10 periods)
-    use_median: bool
-        Compute median instead of mean (default False)
-    --------
-    Returns a pd by 1 matrix with mean/ median values where pd
-    is the periodicity of y (quarterly: pd=4, monthly: pd=12,
-    daily: pd=7 etc.)
-    """
-    
-    # Concatenate series y with vector of minor frequency of y
-    print(get_freq_as_vector(y).shape)
-    *** HIER WEITERMACHEN!! ***
-    
-    m = series_mat_concat(y, get_freq_as_vector(y))
-    
-#    # TODO: funcerr if y has no freq-index
-#
-#    if m is not -1:
-#        df = pd.DataFrame(m, columns=["y", "freq"])
-#        df.index = y.index
+#def get_mean_obsminor(y, h, use_median=False):
+#    """
+#    Helper function obtain historical mean value for each separate
+#    quarter, month, or day across all years
+#        
+#    Parameters
+#    ----------
+#    y: series
+#        The dependent series of length T
+#    h: integer
+#        Compute up to the 'h' forecast horizon (default 10 periods)
+#    use_median: bool
+#        Compute median instead of mean (default False)
+#    --------
+#    Returns a pd by 1 matrix with mean/ median values where pd
+#    is the periodicity of y (quarterly: pd=4, monthly: pd=12,
+#    daily: pd=7 etc.)
+#    """
 #    
-#        """
-#        Get mean-value for each minor frequency
-#        
-#        NOTE: it is assumed that at least 1 obs for every
-#        potential obsminor value exists in 'y'
-#        TODO: Given the NOTE, add a check and warning that seasonal-fc
-#        won't be available in this case -- at least for some freq.
-#        """
-#        if use_median==True:
-#            out = df.groupby("freq").mean()
-#        else:
-#            out = df.groupby("freq").median()
-#        
-#        return out
+#    # Concatenate series y with vector of minor frequency of y
+#    print(get_freq_as_vector(y).shape)
+#    *** HIER WEITERMACHEN!! ***
+#    
+#    m = series_mat_concat(y, get_freq_as_vector(y))
+#    
+##    # TODO: funcerr if y has no freq-index
+##
+##    if m is not -1:
+##        df = pd.DataFrame(m, columns=["y", "freq"])
+##        df.index = y.index
+##    
+##        """
+##        Get mean-value for each minor frequency
+##        
+##        NOTE: it is assumed that at least 1 obs for every
+##        potential obsminor value exists in 'y'
+##        TODO: Given the NOTE, add a check and warning that seasonal-fc
+##        won't be available in this case -- at least for some freq.
+##        """
+##        if use_median==True:
+##            out = df.groupby("freq").mean()
+##        else:
+##            out = df.groupby("freq").median()
+##        
+##        return out
 
     
 def my_ols(y,X):
@@ -139,9 +139,11 @@ def my_ols(y,X):
     Returns a k by 1 matrix    
     """
     
-    return np.linalg.lstsq(X,y)[0].ravel()   # 0=grab only coeff. matrix
-    # Note: rcond=none works only for latest numpy (Jan. 2019)
-    #return np.linalg.lstsq(X,y),rcond=None)[0]   # 0=grab only coeff. matrix
+    try:    # Note: rcond=none works only for numpy 1.15.4 and later
+        return np.linalg.lstsq(X,y,rcond=None)[0]  # 0=grab only coeff. matrix
+    except:
+        return np.linalg.lstsq(X,y)[0].ravel()
+    
       
 
 def meanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
