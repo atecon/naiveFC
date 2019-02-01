@@ -3,10 +3,8 @@
 """
     *** Sample script for running the naiveFC package ***
 
-
-Created on Fri Jan 25 19:25:19 2019
-
-@author: Artur Tarassow
+    Created on Fri Jan 25 19:25:19 2019
+    @author: Artur Tarassow
 """
 
 machine = 1         # 1=AT-home, 2=DSB
@@ -67,10 +65,9 @@ Call functions
 fc_meanf = meanf(df["x"])
 print(fc_meanf)
    # exit(0)
-
-fc_smeanf = smeanf(df["x"])
+   
+fc_smeanf = smeanf(df["x"],5)
 print(fc_smeanf)
-
 
 fc_ar1 = ar1f(df["x"])
 print(fc_ar1)

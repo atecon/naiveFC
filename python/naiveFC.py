@@ -11,6 +11,7 @@ Created on Sat Jan 19 10:52:58 2019
     
 import pandas as pd
 import numpy as np
+import math as ma
 
 def print_noboot():
     """ Helper function printing error when CIs are demanded"""
@@ -47,10 +48,9 @@ def series_mat_concat(y, m):
     """
     # TODO: add a check that y and m have the same length    
     try:        
-        #if y.shape[0] == m.flatten(order="F").shape[0]:
-        # TODO: implement vec() equivalent!
+        #if y.shape[0] == m.flatten(order="F").shape[0]:        
         if y.shape[0] == m.shape[0]:
-            my = np.asmatrix(y).transpose() # TODO: replace by vec()                        
+            my = np.asmatrix(y).ravel().T            
             return np.concatenate((my, m), axis=1)
         else:
             raise UnequalLength        
@@ -69,11 +69,11 @@ def get_freq_as_vector(y):
     f = y.index.freqstr # string indicating frequency (A, Q; M, D)    
         
     if f.find("Q",0,1) is not -1: # quarterly
-        return np.asmatrix(y.index.quarter).transpose()        
+        return np.asmatrix(y.index.quarter).ravel().T #transpose()        
     elif f.find("M",0,1) is not -1: # monthly
-        return np.asmatrix(y.index.month).transpose()
+        return np.asmatrix(y.index.month).ravel().T
     elif f.find("d",0,1) is not -1: # daily
-        return np.asmatrix(y.index.day).transpose()
+        return np.asmatrix(y.index.day).ravel().T
     elif f.find("A",0,1) is not -1:
         print("You cannot apply the choosen method to annual data.")
         return -1
@@ -101,8 +101,7 @@ def get_mean_obsminor(y, h, use_median=False):
     # TODO: add a check that "y" has no freq-index (is a TS)
     
     # Concatenate series y with vector of minor frequency of y   
-    out = series_mat_concat(y, get_freq_as_vector(y))
-        
+    out = series_mat_concat(y, get_freq_as_vector(y))        
     df = pd.DataFrame(out, columns=["y", "freq"])
     df.index = y.index
     
@@ -241,36 +240,22 @@ def smeanf(y, h=10, level=90, fan=False, nboot=0, blength=4):
                 #print(counter)
                 
         fc = np.concatenate((fmean, selmat), axis=1)
-        print(fc)
-        fc = fc[np.lexsort((fc[:,1], ))]
-        print(fc)
+        fc = np.asmatrix( fc[fc[:, 1].argsort()][:,0] ).T
                 
-"""
-        fc = msortby(fc~selmat,2)[,1]
+        # construct h-step ahead forecasts
+        fc_r = fc.shape[0]        
+        k = ma.ceil(h / fc_r)	 # no. of necessary stackings        
         
+        fc = np.multiply( np.ones((fc_r,k)), fc ).flatten('F').T # column-vector
         
-
-            #Reorder fmean according to 'last'
-            #For instance, if last=Q3 then next is Q4 and then Q1 etc.
-            #We construct a len(fmean) by 1 vector whose indices direct
-            #to a sequence of the following obsminor frequencies                        
-        print(fmean)
-        fc = np.zeros((max(h,len(fmean)),1))
-                
-        for i in range(len(fc)):
-            
-            if (last)==len(fmean):
-                last = 0           # back to 1st obsminor value
-                                        
-            fc[i] = fmean["y"][last+1]  # fmean.index is 1-based
-                        
-            last=last+1       # update
-
-        # Finalize: add row and column strings to series        
-        return pd.Series(fc[:,0],
+        return fc
+        
+        # Finalize: add row and column strings to series                
+        # BUG: can't transform fc to series
+        """return pd.Series(fc[0:h],
                          index=gen_index(h),
                          name=gen_colname())  
-"""
+        """
         
 
 def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
@@ -306,6 +291,9 @@ def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
         # Concatenate series y with vector of minor frequency of y
         # return T by 2 vector 'm'
         m = series_mat_concat(y, get_freq_as_vector(y))
+        # BUG: series_mat_concat() or get_freq_as_vector() results in 
+        # integer values for 'm'
+        #print(type(m))
 
         # read periodicity per year (A=1, Q=4, ..)
         freq = m[:,1].max()
@@ -324,7 +312,9 @@ def snaive(y, h=10, level=90, fan=False, nboot=0, blength=4):
                 
         # Finalize: add row and column strings to series        
         return fc
+    
         # TODO: the following commented block doesn't work
+        # BUG: can't transform fc to series
         """        
         return pd.Series(fc[:,0],
                          index=gen_index(h),
