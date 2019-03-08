@@ -27,12 +27,8 @@ os.getcwd()
 
 # Load some packages/ functions
 import pandas as pd
-import numpy as np
 #import matplotlib.pyplot as plt
 #import seaborn as sb
-
-# import naiveFC
-
 from naiveFC import *
 
 
@@ -87,4 +83,3 @@ print(fc_snaive)
 
 if __name__=="__main__":
     main()
-    
