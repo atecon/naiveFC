@@ -59,26 +59,45 @@ naive_obj = naiveFC(df.x)
 # Call methods
 #================
 fc_meanf = naive_obj.meanf()
+print("Mean FC:\n-------------")
 print(fc_meanf)
 
+naive_obj.use_median = True
+fc_medianf = naive_obj.meanf()
+print("Median FC:\n-------------")
+print(fc_medianf)
+
+naive_obj.use_median = False
 fc_smeanf = naive_obj.smeanf()
+print("Seasonal mean FC:\n-------------")
 print(fc_smeanf)
 
+naive_obj.use_median = True
+fc_smedianf = naive_obj.smeanf()
+print("Seasonal median FC:\n-------------")
+print(fc_smedianf)
+
+
 fc_ar1 = naive_obj.ar1f()
+print("AR(1):\n-------------")
 print(fc_ar1)
 
 naive_obj.trend = True
 fc_ar1trend = naive_obj.ar1f()
+print("AR(1) + trend:\n-------------")
 print(fc_ar1trend)
 
 fc_rw = naive_obj.rwf()
+print("RW:\n-------------")
 print(fc_rw)
 
 naive_obj.drift = True
 fc_rwd = naive_obj.rwf()
+print("RW + drift:\n-------------")
 print(fc_rwd)
 
 fc_snaive = naive_obj.snaive()
+print("Seasonal naive FC:\n-----------------")
 print(fc_snaive)
 
 

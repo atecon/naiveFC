@@ -27,6 +27,7 @@ class naiveFC(object):
         self.const = True               # add intercept to ar(1) model
         self.trend = False              # add linear trend to ar(1) model
         self.drift = False              # add drift to rw model
+        self.use_median = False           # use median instead of mean for mean forecast
 
 
     def print_noboot(self):
@@ -92,7 +93,7 @@ class naiveFC(object):
             return -1
         
     
-    def get_mean_obsminor(self, use_median=False):
+    def get_mean_obsminor(self):
         """
         Helper function obtain historical mean value for each separate
         quarter, month, or day across all years
@@ -126,7 +127,7 @@ class naiveFC(object):
             TODO: Given the NOTE, add a check and warning that seasonal-fc
             won't be available in this case -- at least for some freq.
         """
-        if use_median==False:
+        if self.use_median==False:
             return df.groupby("freq").mean()
         else:
             return df.groupby("freq").median()
@@ -238,9 +239,14 @@ class naiveFC(object):
             self.print_noboot()
             return None
         else:
-            return pd.Series(np.ones((self.h)),
+            if self.use_median == False:
+                return pd.Series(np.ones((self.h)),
                            index = self.gen_index(),
-                           name = self.gen_colname()) * np.mean(self.y)            
+                           name = self.gen_colname()) * np.mean(self.y)
+            else:
+                return pd.Series(np.ones((self.h)),
+                           index = self.gen_index(),
+                           name = self.gen_colname()) * np.median(self.y)
     
         
     def smeanf(self):
