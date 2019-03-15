@@ -509,7 +509,7 @@ function void NaiveThroughTime (bundle *b, string which, bool verbose[1])
     smpl y --contiguous    
     scalar b.initobs = $t1
     scalar b.obsend = b.initobs + b.wsize
-    scalar b.nsteps = $t2 - b.obsend	# no. of windows
+    scalar b.nsteps = $t2 - b.obsend		# no. of windows
     smpl b.initobs b.obsend
     if verbose
         printf "\n*********************************************************************\n"

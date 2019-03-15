@@ -1,0 +1,508 @@
+set verbose off
+
+function scalar isseas (const series y)
+    # flag seasonality
+    seas = ($pd>1) ? 1 : 0
+    return seas
+end function
+
+
+function void check_method (const series y)
+    if $pd==1
+        funcerr "The method you requested is not available for annual data."
+    endif
+end function
+
+
+function strings gen_colnam (matrix ci)
+    # construct column names
+    strings c = defarray("Point-Fc")
+    /* confidence intervals are not supported yet
+       loop i=1..cols(ci) -q
+       c += sprintf(" q%d", ci[i]*100)
+       endloop
+    */
+    return c
+end function
+
+
+function strings gen_rownam (scalar h)
+    # construct row names (horizons)
+    strings r = array(h)
+    loop i=1..h -q
+        r[i] = sprintf(" h=%d", i)
+    endloop
+    return r
+end function
+
+
+function void print_noboot()
+    funcerr "Bootstrap confidence intervals are not supported, yet"
+end function
+
+
+function matrix get_mean_obsminor (bundle *self)
+/* Helper function for obtaining for each periodicity
+    (quarterly=4,monthly=12, etc.) the mean/ median value.*/
+
+    string ops = (self.use_median==1) ? "median" : "mean"
+
+    if $pd == 4 || $pd == 12
+        string freq_comp = "$obsminor"
+
+    elif $pd == 5 || $pd == 7 || $pd == 52
+        freq_comp = "$obsmicro"
+        # TODO: in principle one could get the mean for both $obsminor + $obsmicro!
+        if self.verbose && self.type_roll=="static"
+            printf "\nWe compute the seasonal %s each specific day-week.\n", ops
+        endif
+    endif
+    # compute stats
+    matrix ybar = aggregate(self.y, @freq_comp, @ops)[,3]
+
+    self.freq_comp = freq_comp
+    return stack_fc(&self, ybar)
+end function
+
+
+function matrix stack_fc (bundle *self, matrix ybar)
+/* Check which value $obsminor takes for the last obs.
+    Do some re-ordering.*/
+    freq_comp = self.freq_comp
+    scalar last = @freq_comp[$tmax]
+
+    ybar = vec(ybar)				# $pd by 1 vector
+
+    matrix val_freq_com = values(@freq_comp)
+
+    # Re-order fc to make sure that 1st forecast
+    # corresponds to the right month, quarter etc.
+    if last < max(val_freq_com)		# last quarter/month/day-of-week
+        matrix selmat = zeros(max(val_freq_com), 1)
+        scalar counter = last+1
+        loop i=1..max(val_freq_com) -q
+            selmat[counter] = $i
+            counter = (counter==max(val_freq_com)) ? 1 : (counter+1)
+        endloop
+        ybar = msortby(ybar~selmat,2)[,1]
+    endif
+
+    # construct h-step ahead forecasts
+    scalar k = ceil(self.h/rows(ybar))	# Anz. d. notwend. stackings
+    ybar = ones(rows(ybar),k) .* ybar	# pd by k
+    return vec(ybar)[1:self.h]			# row-vector
+end function
+
+
+function bundle default_naiveFC_opts (const series y)
+    # Set default values
+
+    bundle self = null
+    self.h = 10							# forecast horizon
+    self.level = 90						# Confidence level
+    self.fan = 0						# plot fan chart
+    self.nboot = 0						# no. of bootstrap replications
+    self.blength = 4					# Block length bootstrap
+    self.is_seas = isseas(y)
+    self.verbose = 1					# print details (default: True)
+    self.use_median = 0					# compute median instead of mean (default: False)
+    self.w_drift = 0					# compute random-walk + drift (default: False)
+    self.w_trend = 0					# compute AR(1) + drift (default: False)
+
+    # For NaiveThroughTime()
+    self.type_roll = "static" 			# "static", "rolling" or "recursive"
+    self.wsize = ceil(0.25*nobs(y))		# default window length
+
+    return self
+end function
+
+
+function matrix call_method (bundle *self)
+    /* helper function for running actual model. */
+    if self.which=="meanFC"
+        return meanf(&self)
+    elif self.which=="medianFC"
+        return medianf(&self)
+    elif self.which=="ar1FC"
+        return ar1f(&self)
+    elif self.which=="ar1trendFC"
+        self.w_trend = 1
+        return ar1f(&self)
+    elif self.which=="rwFC"
+        return rwf(&self)
+    elif self.which=="rwdFC"
+        self.w_drift = 1
+        return rwf(&self)
+
+        # For seasonal series only
+        #------------------------
+    elif self.which=="smeanFC"
+        return smeanf(&self)
+
+    elif self.which=="smedianFC"
+        self.use_median = 1
+        return smeanf(&self)
+
+    elif self.which=="snaiveFC"
+        self.use_median = 1
+        return snaive(&self)
+
+    elif self.which=="avgFC" # forecast combination
+        return avgf(&self)
+    endif
+end function
+
+
+
+function matrix NaiveThroughTime (bundle *self)
+/* This function estimates the point estimates in either (i) a
+    rolling or (ii) recursive manner and stores these point estimates. */
+
+    # Data set settings
+    #-------------------
+    # add new obs. for built-in estimation and forecast methods e.g. "ols", "arima"
+    dataset addobs self.h
+
+    scalar self.initobs = $t1
+    scalar self.obsend = self.initobs + self.wsize
+    scalar self.nsteps = $t2 - self.obsend - self.h		# no. of windows
+    smpl self.initobs self.obsend
+    if self.verbose
+        printf "\n*********************************************************************\n"
+        printf "Initial effective sample used: %s to %s (T=%d)\n", obslabel($t1), obslabel($t2), ($t2-$t1)
+        printf "Number of %s estimations = %d\n", self.type_roll, self.nsteps
+        printf "Initial 1-step ahead forecast will be computed for %s\n", obslabel($t2+1)
+    endif
+
+    matrix FC = zeros(self.nsteps, self.h)
+
+    # START ESTIMATION
+    #==================
+    loop lwin = 1..self.nsteps -q
+
+        if lwin == self.nsteps
+            scalar self.lastfc = 1+$t2	# last obs. used for forecast being forecasted
+            if self.verbose
+                printf "Last forecast will be computed for %s\n", obslabel(self.lastfc)
+                printf "*********************************************************************\n"
+                printf "\n"
+            endif
+        endif
+
+        smpl $t1 $t2
+        if lwin == 1
+            scalar self.initfc = 1+$t2			# 1st obs being forecasted (h=1)
+        endif
+
+        # COMPUTE and store FCs
+        FC[lwin,] = call_method(&self)'
+
+        # Shift in time
+        if lwin < self.nsteps
+            if self.type_roll == "recursive"
+                smpl ; +1
+            elif self.type_roll == "rolling"
+                smpl +1 +1
+            endif
+        endif
+
+    endloop		# END bwin-loop
+
+    # adjust rows to make sure that each 'h' refers to the same period being forecasted
+    matrix FCret = FC[,1]
+    loop i=1..(self.h-1) -q
+        FCret ~= mlag(FC[,i+1],$i, NA)
+    endloop
+
+    return FCret
+
+end function
+
+
+function matrix ar1f (bundle *self)
+/* Returns forecasts from an AR(1) model
+    either with or without linear trend. */
+
+    scalar h = self.h
+    series y = self.y
+    t2 = $t2
+
+    if self.type_roll=="static"
+        # add new obs.
+        dataset addobs self.h
+    endif
+
+    # setup list of regressors
+    list L = 0 y(-1)
+    if self.w_trend
+        genr time
+        L += time
+    endif
+
+    # set training set
+    smpl ; t2
+
+    # Estimate
+    ols y L --quiet
+
+    # Set test set and forecast
+    string start = obslabel(1+t2)
+    string ende = obslabel(t2+self.h)
+    fcast @start @ende --dynamic --quiet
+
+    return $fcast #~ $fcse
+end function
+
+
+function void initial_checks (bundle *self)
+    /* Helper function perfoming some initial checks */
+
+    if self.is_seas==0
+        check_method(self.y)
+    endif
+
+    if self.nboot>0
+        print_noboot()
+    endif
+
+    if (self.type_roll=="rolling" || self.type_roll=="recursive") && self.which=="avgFC"
+        printf "Error: Automatic forecast averaging ('avgfc') is currently not compatible\n"
+        printf "with moving forecasts."
+        funcerr ""
+    endif
+
+end function
+
+
+function bundle naiveFC (const series y,
+                         string which "Select method",
+                         bundle opts[null])
+
+    /*=======================*/
+    /* Main package function */
+    /*=======================*/
+
+    # Set up the bundle
+    bundle self = default_naiveFC_opts(y)
+    if exists(opts)
+        # override defaults
+        self = opts + self
+    endif
+
+    self.which = which
+
+    # Check whether method is applicable
+    initial_checks(&self)
+
+    # drop missings
+    T = $nobs
+    smpl y --contiguous
+    if $nobs<T && self.verbose
+        printf "\nThe contiguous time-series sample has been restricted\n"
+        printf "due to %d missing values in the original dataset.\n", (T-$nobs)
+        printf "\n"
+    endif
+
+    series self.y = y
+
+    # call method
+    #==============
+    if self.type_roll=="static"
+
+        matrix fc = call_method(&self)
+
+        # add column/ row strings
+        if which != "avgFC"
+            cnameset(fc, gen_colnam(fc))
+        else
+            cnameset(fc, self.cnam)
+        endif
+        rnameset(fc, gen_rownam(self.h))
+
+
+    elif self.type_roll=="rolling" || self.type_roll=="recursive"
+        /* NaiveThroughTime */
+
+        matrix fc = NaiveThroughTime(&self)
+
+        # add column/ row strings
+        cnameset(fc, gen_rownam(self.h))
+        # attach rownames: on rows we put date strings
+        strings fcperiods = array(self.nsteps)
+        loop i=1..self.nsteps -q
+            fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-1) )
+        endloop
+        rnameset(fc, fcperiods)
+    endif
+
+    self.fc = fc
+
+    return self
+end function
+
+
+
+function matrix avgf (bundle *self)
+/* Computes the mean (average) and cross-sectional
+   (across forecast methods) standard deviation at
+   each horizon using all simple forecast methods
+    available.*/
+
+    # Models for both seasonal and non-seasonal frequencies
+    matrix FC = meanf(&self)
+    self.use_median = 1
+    FC ~= meanf(&self)
+    FC ~= rwf(&self)
+    self.w_drift = 1
+    FC ~= rwf(&self)
+    FC ~= ar1f(&self)
+    self.w_trend = 1
+    FC ~= ar1f(&self)
+
+    # Models for both seasonal frequencies only
+    if self.is_seas
+        self.use_median = 0
+        FC ~= smeanf(&self)
+        self.use_median = 1
+        FC ~= smeanf(&self)
+        FC ~= snaive(&self)
+    endif
+
+    # cross-sectional forecast-combination statistics
+    FC = meanr(FC) ~ sdc(FC', rows(FC')-1)' ~ FC
+
+    # add column names
+    strings cnam = strsplit("Average-FC SD Mean Median RW RW+Drift AR(1) AR(1)+Trend", " ")
+    if self.is_seas
+        cnam += strsplit("Seas-Mean Seas-Median Seas-Naive")
+    endif
+    self.cnam = cnam
+
+    return FC
+end function
+
+
+function matrix meanf (bundle *self)
+/* Forecasts of all future values are equal to the mean
+    # of the historical data*/
+    return ones(self.h, 1) .* mean(self.y)
+end function
+
+/* crashes
+   function void meanf (bundle *self)
+   self.fc = ones(self.h, 1) .* mean(self.y)
+   eval self.fc
+   end function
+*/
+
+
+function matrix medianf (bundle *self)
+/* Forecasts of all future values are equal to the median
+    # of the historical data*/
+    return ones(self.h, 1) .* median(self.y)
+end function
+
+
+function matrix smeanf (bundle *self)
+/* Forecasts of all future values are equal to the mean of
+   the respective historical seasonal period
+    where m is the seasonal period.*/
+    return get_mean_obsminor(&self)
+end function
+
+
+function matrix rwf (bundle *self)
+/* Naïve forecast is optimal when data follow a random-walk
+   or random-walk + drift.
+   R func:
+   https://www.rdocumentation.org/packages/forecast/versions/8.4/topics/rwf
+   rwf(y, h = 10, drift = FALSE, level = c(80, 95), fan = FALSE,
+   lambda = NULL, biasadj = FALSE, bootstrap = FALSE, npaths = 5000,
+      x = y) */
+    matrix fc = ones(self.h,1) .* self.y[$t2]
+    if self.w_drift==0
+        return fc
+    elif self.w_drift
+        # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
+        scalar avg = (self.y[$t2]-self.y[$t1])/(nobs(self.y)-1)	# average growth rate
+        return fc .+ cum(ones(self.h,1)) * avg
+    endif
+end function
+
+
+function matrix snaive (bundle *self)
+/* Returns forecasts from an ARIMA(0,0,0)(0,1,0)
+    model where m is the seasonal period.*/
+    series y = self.y
+    t2 = $t2
+    if self.type_roll=="static"
+        # add new obs.
+        dataset addobs self.h
+    endif
+
+    # set to training set
+    smpl ; t2
+    # Estimate
+    arima 0 0 0 ; 0 1 0 ; y --quiet
+
+    # Set test set and forecast
+    string start = obslabel(1+t2)
+    string ende = obslabel(t2+self.h)
+    # Forecast
+    fcast @start @ende --dynamic --quiet
+
+    return $fcast #~ $fcse
+end function
+
+
+
+# Example
+#============
+clear
+open nysewk.gdt -q
+
+
+# Call methods
+#==================
+bundle b = naiveFC(close, "meanFC")
+eval b.fc
+bundle b = naiveFC(close, "medianFC")
+eval b.fc
+bundle b = naiveFC(close, "rwFC")
+eval b.fc
+bundle b = naiveFC(close, "rwdFC")
+eval b.fc
+
+bundle b = naiveFC(close, "smeanFC")
+eval b.fc
+bundle b = naiveFC(close, "smedianFC")
+eval b.fc
+bundle b = naiveFC(close, "snaiveFC")
+eval b.fc
+
+bundle b = naiveFC(close, "ar1FC")
+eval b.fc
+bundle b = naiveFC(close, "ar1trendFC")
+eval b.fc
+
+# Forecast combination
+bundle b = naiveFC(close, "avgFC")
+eval b.fc
+
+
+# Rolling-window forecasting
+#===========================
+bundle opts = null				# setup additional options
+opts.type_roll = "rolling"		# type of moving-window forecasting
+opts.wsize = 100				# window length
+opts.verbose = 0				# don't print details
+
+bundle b = naiveFC(close, "meanFC", opts)
+#eval b.fc
+
+
+
+
+
+
+
