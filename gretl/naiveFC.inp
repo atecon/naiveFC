@@ -503,7 +503,6 @@ function void NaiveThroughTime (bundle *b, string which, bool verbose[1])
         #printf "*** %s regressions will be estimated\n", b.type_roll
     endif
 
-
     # Data set settings
     #-------------------
     series y = b.y    

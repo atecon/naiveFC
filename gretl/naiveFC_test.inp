@@ -15,20 +15,19 @@ include "@wd/gretl/naiveFC.inp"
 # nysewk (weekly)
 # intrates (monthly)
 
-string sel_ds = "fep"
+string sel_ds = "lomp"
 open @dat/@sel_ds.csv --quiet
 
 # set forecast horizon
 scalar h = 11
 
 # check whether current frequency has season
-catch series is_seas = $obsminor
-scalar isseas = (exists(is_seas)) ? 1 : 0
+scalar isseas = ($pd>1) ? 1 : 0
 
 # Generate periodic dummies
 if isseas
     genr dummy
-    list D = dq*
+    list D = d*
 else
     list D = null
 endif
@@ -44,7 +43,7 @@ xmean = meanf(x, h)
 fcplot(x, xmean, "Mean Forecast", "nice ylabel", "nice xlabel")
 
 # MEANFC but use median
-xmedian = meanf(x, h)
+xmedian = meanf(x, h, 1)
 xmedian
 #fcplot(x, xmedian, "Median Forecast")
 
@@ -56,7 +55,13 @@ if isseas
     #fcplot(x, smean, "Seasonal Mean Forecast")
 endif
 
-# SMEANF but use median:
+loop i=1..7 -q
+    smpl dummy_$i==1 --restrict --replace
+    #eval mean(x)
+    eval median(x)
+endloop
+
+    # SMEANF but use median:
 if isseas
     smedian = smeanf(x, h, 1)
     smedian
