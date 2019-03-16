@@ -335,11 +335,11 @@ function bundle naiveFC (const series y,
         rnameset(fc, fcperiods)
     endif
 
+    # attache output matrix to bundle
     self.fc = fc
 
     return self
 end function
-
 
 
 function matrix avgf (bundle *self)
@@ -455,6 +455,85 @@ function matrix snaive (bundle *self)
 end function
 
 
+function void naivePlot (bundle *self "Bundle returned from naiveFC()")
+   /*
+   string title[null],
+   string ylab[null],
+   string xlab[null],
+   string filename[null] "'display' OR 'Path+filename'")
+   */
+
+    # Plot point forecast
+    string title = !inbundle(self,"title") ? "" : self.title
+    string ylab = !inbundle(self,"ylab") ? "" : self.ylab
+    string xlab = !inbundle(self,"xlab") ? "" : self.xlab
+    string out = !inbundle(self,"filename") ? "display" : self.filename
+    scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25 * $nobs) : self.preobs_fc # no. of pre-forecast obs. to graph
+
+    series y = self.y 
+    scalar T = $nobs	# current lenght
+    dataset addobs self.h
+    
+    /* Doesn't work
+    scalar t2 = $t2
+    string start = obslabel(t2+1)
+    string ende = obslabel($t2)
+    start
+    ende
+    smpl (t2+1) ;
+    */
+    # workaround
+    matrix zeromat = zeros(T,1)
+    zeromat = (zeromat.=0) ? NA : zeromat
+    series fc = (zeromat | self.fc)
+
+    /*
+    set warnings off
+    # construct matrix for plotting
+    matrix mplot = {y}
+    loop i=1..cols(self.fc) -q
+        mplot ~= NA
+    endloop
+    mplot |= (NA ~ self.fc)
+    if cols(self.fc)>1
+        cnameset(mplot, strsplit("Actuals Point-FC Low High", " "))
+    else
+        cnameset(mplot, strsplit("Actuals Point-FC", " "))
+    endif
+    set warnings on
+    */
+    
+    smpl ($nobs-preobs_fc) ; 
+    list lplot = y fc
+    setinfo y --graph-name="Actuals"
+    setinfo fc --graph-name="Point-Fc"
+
+    # Setup and plot
+    ylo = xmin(min(y),min(fc))-0.05*xmin(min(y),min(fc))
+    yup = xmax(max(y),max(fc))+0.05*xmax(max(y),max(fc))
+    plot lplot
+        options with-lines time-series single-yaxis
+        literal set linetype 1 lc rgb "black"
+        literal set linetype 2 lc rgb "red" lw 2
+        literal set linetype 3 lc rgb "black" lw 1.5
+        literal set linetype 4 lc rgb "black" lw 1.5
+        literal set key bottom below
+        #put the border more to the background by applying it
+        # only on the left and bottom part and put it and the tics in gray
+        literal set style line 11 lc rgb "#808080" lt 1
+        literal set border 3 back ls 11			# get rid of upper + left border
+        literal set tics nomirror
+        #add a slight grid to make it easier to follow the exact position of the curves
+        literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
+        literal set grid back ls 12
+        printf "set yrange[%g:%g]", ylo, yup
+        printf "set ylabel \"%s\"", ylab
+        printf "set xlabel \"%s\"", xlab
+        printf "set title \"%s\"", title
+    end plot --output="@out"
+end function
+
+
 
 # Example
 #============
@@ -466,8 +545,10 @@ open nysewk.gdt -q
 #==================
 bundle b = naiveFC(close, "meanFC")
 eval b.fc
+
 bundle b = naiveFC(close, "medianFC")
 eval b.fc
+
 bundle b = naiveFC(close, "rwFC")
 eval b.fc
 bundle b = naiveFC(close, "rwdFC")
@@ -477,8 +558,10 @@ bundle b = naiveFC(close, "smeanFC")
 eval b.fc
 bundle b = naiveFC(close, "smedianFC")
 eval b.fc
-bundle b = naiveFC(close, "snaiveFC")
+bundle b = naiveFC(close, "snaiveFC")		# seems buggy!
 eval b.fc
+#naivePlot(&b)			# 
+#stop
 
 bundle b = naiveFC(close, "ar1FC")
 eval b.fc
