@@ -7,13 +7,6 @@ function scalar isseas (const series y)
 end function
 
 
-function void check_method (const series y)
-    if $pd==1
-        funcerr "The method you requested is not available for annual data."
-    endif
-end function
-
-
 function strings gen_colnam (matrix ci)
     # construct column names
     strings c = defarray("Point-Fc")
@@ -41,56 +34,58 @@ function void print_noboot()
 end function
 
 
+function bundle gen_season_series (bundle *self)
+    /* Generates a series indicating the separate seasonal
+    periods. */
+    list s = seasonals() 	# returns e.g. S1...S52 for weekly data
+    series obs_season = NA
+    if nelem(s)==$pd
+        loop i=1..$pd -q
+            obs_season = (S$i == 1) ? i : obs_season
+        endloop
+        self.obs_season = obs_season
+        return self
+    else
+        funcerr "Periodicity ($pd) does not correspond to what seasonals() in fact returns."
+    endif
+end function
+
+
 function matrix get_mean_obsminor (bundle *self)
 /* Helper function for obtaining for each periodicity
-    (quarterly=4,monthly=12, etc.) the mean/ median value.*/
+    (quarterly=4,monthly=12, weeky=52, etc.) the mean/ median value.*/
+    # TODO: in principle one could get the mean for instance for
+    # weekly data on the monthly, weekly or daily frequency level.
 
     string ops = (self.use_median==1) ? "median" : "mean"
-
-    if $pd == 4 || $pd == 12
-        string freq_comp = "$obsminor"
-
-    elif $pd == 5 || $pd == 7 || $pd == 52
-        freq_comp = "$obsmicro"
-        # TODO: in principle one could get the mean for both $obsminor + $obsmicro!
-        if self.verbose && self.type_roll=="static"
-            printf "\nWe compute the seasonal %s each specific day-week.\n", ops
-        endif
-    endif
-    # compute stats
-    matrix ybar = aggregate(self.y, @freq_comp, @ops)[,3]
-
-    self.freq_comp = freq_comp
+    # construct seasonal indicator series
+    gen_season_series(&self)
+    matrix ybar = aggregate(self.y, self.obs_season, @ops)[,3] # $pd by 1 vector
     return stack_fc(&self, ybar)
 end function
 
 
 function matrix stack_fc (bundle *self, matrix ybar)
 /* Check which value $obsminor takes for the last obs.
-    Do some re-ordering.*/
-    freq_comp = self.freq_comp
-    scalar last = @freq_comp[$tmax]
-
-    ybar = vec(ybar)				# $pd by 1 vector
-
-    matrix val_freq_com = values(@freq_comp)
+    Do some re-ordering. */
+    matrix val_obs_season = values(self.obs_season)
 
     # Re-order fc to make sure that 1st forecast
     # corresponds to the right month, quarter etc.
-    if last < max(val_freq_com)		# last quarter/month/day-of-week
-        matrix selmat = zeros(max(val_freq_com), 1)
-        scalar counter = last+1
-        loop i=1..max(val_freq_com) -q
-            selmat[counter] = $i
-            counter = (counter==max(val_freq_com)) ? 1 : (counter+1)
+    if self.obs_season[$tmax] < max(val_obs_season)		# last quarter/month/day-of-week
+        matrix selmat = zeros(max(val_obs_season), 1)
+        scalar counter = self.obs_season[$tmax] + 1
+        loop i=1..rows(val_obs_season) -q
+            selmat[counter] = val_obs_season[i]
+            counter = (counter==max(val_obs_season)) ? 1 : (counter+1)
         endloop
-        ybar = msortby(ybar~selmat,2)[,1]
+        ybar_sorted = msortby(ybar~selmat,2)[,1]
     endif
 
     # construct h-step ahead forecasts
-    scalar k = ceil(self.h/rows(ybar))	# Anz. d. notwend. stackings
-    ybar = ones(rows(ybar),k) .* ybar	# pd by k
-    return vec(ybar)[1:self.h]			# row-vector
+    scalar k = ceil(self.h/rows(ybar_sorted))		# No. of necessary stackings
+    ybar = ones(rows(ybar_sorted),k) .* ybar_sorted	# pd by k
+    return ybar_sorted[1:self.h]
 end function
 
 
@@ -258,7 +253,7 @@ function void initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     if self.is_seas==0
-        check_method(self.y)
+        funcerr "The method you requested is not available for annual data."
     endif
 
     if self.nboot>0
@@ -456,12 +451,12 @@ end function
 
 
 function void naivePlot (bundle *self "Bundle returned from naiveFC()")
-   /*
+/*
    string title[null],
    string ylab[null],
    string xlab[null],
    string filename[null] "'display' OR 'Path+filename'")
-   */
+    */
 
     # Plot point forecast
     string title = !inbundle(self,"title") ? "" : self.title
@@ -470,17 +465,17 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     string out = !inbundle(self,"filename") ? "display" : self.filename
     scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25 * $nobs) : self.preobs_fc # no. of pre-forecast obs. to graph
 
-    series y = self.y 
+    series y = self.y
     scalar T = $nobs	# current lenght
     dataset addobs self.h
-    
+
     /* Doesn't work
-    scalar t2 = $t2
-    string start = obslabel(t2+1)
-    string ende = obslabel($t2)
-    start
-    ende
-    smpl (t2+1) ;
+       scalar t2 = $t2
+       string start = obslabel(t2+1)
+       string ende = obslabel($t2)
+       start
+       ende
+       smpl (t2+1) ;
     */
     # workaround
     matrix zeromat = zeros(T,1)
@@ -488,22 +483,22 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     series fc = (zeromat | self.fc)
 
     /*
-    set warnings off
-    # construct matrix for plotting
-    matrix mplot = {y}
-    loop i=1..cols(self.fc) -q
-        mplot ~= NA
-    endloop
-    mplot |= (NA ~ self.fc)
-    if cols(self.fc)>1
-        cnameset(mplot, strsplit("Actuals Point-FC Low High", " "))
-    else
-        cnameset(mplot, strsplit("Actuals Point-FC", " "))
-    endif
-    set warnings on
+       set warnings off
+       # construct matrix for plotting
+       matrix mplot = {y}
+       loop i=1..cols(self.fc) -q
+       mplot ~= NA
+       endloop
+       mplot |= (NA ~ self.fc)
+       if cols(self.fc)>1
+       cnameset(mplot, strsplit("Actuals Point-FC Low High", " "))
+       else
+       cnameset(mplot, strsplit("Actuals Point-FC", " "))
+       endif
+       set warnings on
     */
-    
-    smpl ($nobs-preobs_fc) ; 
+
+    smpl ($nobs-preobs_fc) ;
     list lplot = y fc
     setinfo y --graph-name="Actuals"
     setinfo fc --graph-name="Point-Fc"
@@ -560,7 +555,7 @@ bundle b = naiveFC(close, "smedianFC")
 eval b.fc
 bundle b = naiveFC(close, "snaiveFC")		# seems buggy!
 eval b.fc
-#naivePlot(&b)			# 
+#naivePlot(&b)			#
 #stop
 
 bundle b = naiveFC(close, "ar1FC")
@@ -571,7 +566,7 @@ eval b.fc
 # Forecast combination
 bundle b = naiveFC(close, "avgFC")
 eval b.fc
-
+stop
 
 # Rolling-window forecasting
 #===========================
