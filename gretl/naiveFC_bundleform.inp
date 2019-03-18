@@ -366,29 +366,22 @@ function matrix avgf (bundle *self)
     # cross-sectional forecast-combination statistics
     FC = meanr(FC) ~ sdc(FC', rows(FC')-1)' ~ FC
 
-    # add column names
+    # Add column names
     strings cnam = strsplit("Average-FC SD Mean Median RW RW+Drift AR(1) AR(1)+Trend", " ")
     if self.is_seas
-        cnam += strsplit("Seas-Mean Seas-Median Seas-Naive")
+        cnam += strsplit("Seas-Mean Seas-Median Seas-Naive", " ")
     endif
     self.cnam = cnam
-
+    
     return FC
 end function
 
 
 function matrix meanf (bundle *self)
 /* Forecasts of all future values are equal to the mean
-    # of the historical data*/
+    of the historical data*/
     return ones(self.h, 1) .* mean(self.y)
 end function
-
-/* crashes
-   function void meanf (bundle *self)
-   self.fc = ones(self.h, 1) .* mean(self.y)
-   eval self.fc
-   end function
-*/
 
 
 function matrix medianf (bundle *self)
@@ -408,12 +401,7 @@ end function
 
 function matrix rwf (bundle *self)
 /* Naïve forecast is optimal when data follow a random-walk
-   or random-walk + drift.
-   R func:
-   https://www.rdocumentation.org/packages/forecast/versions/8.4/topics/rwf
-   rwf(y, h = 10, drift = FALSE, level = c(80, 95), fan = FALSE,
-   lambda = NULL, biasadj = FALSE, bootstrap = FALSE, npaths = 5000,
-      x = y) */
+   or random-walk + drift. */
     matrix fc = ones(self.h,1) .* self.y[$t2]
     if self.w_drift==0
         return fc
@@ -445,17 +433,12 @@ function matrix snaive (bundle *self)
     string ende = obslabel(t2+self.h)
     # Forecast
     fcast @start @ende --dynamic --quiet
-
     return $fcast #~ $fcse
 end function
 
 
 function void naivePlot (bundle *self "Bundle returned from naiveFC()")
-/*
-   string title[null],
-   string ylab[null],
-   string xlab[null],
-   string filename[null] "'display' OR 'Path+filename'")
+    /*
     */
 
     # Plot point forecast
@@ -466,9 +449,10 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25 * $nobs) : self.preobs_fc # no. of pre-forecast obs. to graph
 
     series y = self.y
-    scalar T = $nobs	# current lenght
+    scalar T = $nobs		# current lenght
+    
+    # Add future obs.
     dataset addobs self.h
-
     /* Doesn't work
        scalar t2 = $t2
        string start = obslabel(t2+1)
@@ -478,34 +462,23 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
        smpl (t2+1) ;
     */
     # workaround
-    matrix zeromat = zeros(T,1)
+    *** HIER WEITERMACHEN: in case of avgfc(), cols(self.fc)>1 and fc must be a LIST  ***
+    matrix zeromat = zeros(T,cols(self.fc))
     zeromat = (zeromat.=0) ? NA : zeromat
     series fc = (zeromat | self.fc)
 
-    /*
-       set warnings off
-       # construct matrix for plotting
-       matrix mplot = {y}
-       loop i=1..cols(self.fc) -q
-       mplot ~= NA
-       endloop
-       mplot |= (NA ~ self.fc)
-       if cols(self.fc)>1
-       cnameset(mplot, strsplit("Actuals Point-FC Low High", " "))
-       else
-       cnameset(mplot, strsplit("Actuals Point-FC", " "))
-       endif
-       set warnings on
-    */
-
     smpl ($nobs-preobs_fc) ;
-    list lplot = y fc
+    list lplot = y fc			    
     setinfo y --graph-name="Actuals"
     setinfo fc --graph-name="Point-Fc"
 
     # Setup and plot
-    ylo = xmin(min(y),min(fc))-0.05*xmin(min(y),min(fc))
-    yup = xmax(max(y),max(fc))+0.05*xmax(max(y),max(fc))
+    print lplot -o
+    eval min(lplot)
+    stop
+    scalar ylo = min(lplot)-0.05*min(lplot)
+    scalar yup = max(lplot)+0.05*max(lplot)
+    
     plot lplot
         options with-lines time-series single-yaxis
         literal set linetype 1 lc rgb "black"
@@ -539,6 +512,8 @@ open nysewk.gdt -q
 # Call methods
 #==================
 bundle b = naiveFC(close, "meanFC")
+naivePlot(&b)
+stop
 eval b.fc
 
 bundle b = naiveFC(close, "medianFC")
