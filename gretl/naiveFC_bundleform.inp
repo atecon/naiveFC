@@ -533,42 +533,53 @@ endif
 
 # Call methods
 #==================
-bundle opt = null
-scalar opt.h = 15
-bundle b = naiveFC(y, "avgFC", opt)
-
-# Plot realization and forecast(s)
-b.preobs_fc = 25				# set no. of pre.-forecast periods obs. to plot
-naivePlot(&b)
-eval b.fc
-stop
-
-bundle b = naiveFC(close, "medianFC")
-eval b.fc
-
-bundle b = naiveFC(close, "rwFC")
-eval b.fc
-bundle b = naiveFC(close, "rwdFC")
-eval b.fc
-
-bundle b = naiveFC(close, "smeanFC")
-eval b.fc
-bundle b = naiveFC(close, "smedianFC")
-eval b.fc
-bundle b = naiveFC(close, "snaiveFC")		# seems buggy!
-eval b.fc
-#naivePlot(&b)			#
-#stop
-
-bundle b = naiveFC(close, "ar1FC")
-eval b.fc
-bundle b = naiveFC(close, "ar1trendFC")
-eval b.fc
 
 # Forecast combination
-bundle b = naiveFC(close, "avgFC")
+bundle b = naiveFC(y, "avgFC")		# compute forecasts
+naivePlot(&b)						# plot results
+eval b.fc							# plot resulting bundle
+
+# Forecast combination but up to h=15 forecast periods
+bundle opt = null					# set specific options
+scalar opt.h = 15
+bundle b = naiveFC(y, "avgFC", opt)
+b.preobs_fc = 25					# set no. of pre.-forecast periods obs. to plot
+naivePlot(&b)
 eval b.fc
-stop
+
+# Separate forecast methods
+bundle b = naiveFC(y, "medianFC")
+naivePlot(&b)
+eval b.fc
+
+bundle b = naiveFC(y, "rwFC")
+naivePlot(&b)
+eval b.fc
+
+bundle b = naiveFC(y, "rwdFC")
+naivePlot(&b)
+eval b.fc
+
+bundle b = naiveFC(y, "smeanFC")
+naivePlot(&b)
+eval b.fc
+
+bundle b = naiveFC(y, "smedianFC")
+naivePlot(&b)
+eval b.fc
+
+bundle b = naiveFC(y, "snaiveFC")
+naivePlot(&b)
+eval b.fc
+
+bundle b = naiveFC(y, "ar1FC")
+naivePlot(&b)
+eval b.fc
+
+bundle b = naiveFC(y, "ar1trendFC")
+naivePlot(&b)
+eval b.fc
+
 
 # Rolling-window forecasting
 #===========================
@@ -577,7 +588,7 @@ opts.type_roll = "rolling"		# type of moving-window forecasting
 opts.wsize = 100				# window length
 opts.verbose = 0				# don't print details
 
-bundle b = naiveFC(close, "meanFC", opts)
+bundle b = naiveFC(y, "meanFC", opts)
 #eval b.fc
 
 
