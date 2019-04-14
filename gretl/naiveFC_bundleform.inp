@@ -78,12 +78,12 @@ function matrix stack_fc (bundle *self, matrix ybar)
             selmat[counter] = $i #val_obs_season[i]			# set position after $tmax
             counter = (counter==max(val_obs_season)) ? 1 : (counter+1)
         endloop
-        ybar_sorted = msortby(ybar~selmat,2)[,1]
+        ybar = msortby(ybar~selmat,2)[,1]
     endif
 
     # Construct h-step ahead forecasts
-    scalar k = ceil(self.h/rows(ybar_sorted))		# No. of necessary stackings
-    ybar = ones(rows(ybar_sorted),k) .* ybar_sorted	# pd by k
+    scalar k = ceil(self.h/rows(ybar))		# No. of necessary stackings
+    ybar = ones(rows(ybar),k) .* ybar	# pd by k
     return vec(ybar)[1:self.h]
 end function
 
@@ -153,6 +153,10 @@ function matrix ar1f (bundle *self)
     if self.type_roll=="static"
         # add new obs.
         dataset addobs self.h
+    elif self.type_roll=="rolling" || self.type_roll=="recursive"
+        # when called via NaiveThroughTime(), 'dataset' cmd
+        # is not applicable
+        t2 -= self.h
     endif
 
     # setup list of regressors
@@ -178,11 +182,54 @@ function matrix ar1f (bundle *self)
 end function
 
 
+function matrix snaive (bundle *self)
+/* Returns forecasts from an ARIMA(0,0,0)(0,1,0)
+    model where m is the seasonal period.*/
+    series y = self.y
+    t2 = $t2
+    
+    if self.type_roll=="static"
+        # add new obs.
+        dataset addobs self.h
+    elif self.type_roll=="rolling" || self.type_roll=="recursive"
+        # when called via NaiveThroughTime(), 'dataset' cmd
+        # is not applicable
+        t2 -= self.h
+    endif
+
+    # set to training set
+    smpl ; t2
+
+    # Estimate
+    arima 0 0 0 ; 0 1 0 ; y --quiet
+
+    # Set test set and forecast
+    string start = obslabel(1+t2)
+    string ende = obslabel(t2+self.h)
+    # Forecast
+    fcast @start @ende --dynamic --quiet
+    return $fcast #~ $fcse
+end function
+
+
 function void initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
+    strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdFC", \
+      "smeanFC", "smedianFC", "snaive", "ar1FC", "ar1trendFC")
+    scalar warn = 1
+    loop i=1..nelem(methods) -q
+        if methods[i]==self.which
+            warn=0
+            break
+        endif        
+    endloop
+    if warn==1
+        funcerr "The forecasting method you selected does not exist."
+    endif    
+    
     if self.is_seas==0
-        funcerr "The method you requested is not available for annual data."
+        funcerr "The method you requested is not available for non-seasonal data."
     endif
 
     if self.nboot>0
@@ -190,7 +237,7 @@ function void initial_checks (bundle *self)
     endif
 
     if (self.type_roll=="rolling" || self.type_roll=="recursive") && self.which=="avgFC"
-        printf "Error: Automatic forecast averaging ('avgfc') is currently not compatible\n"
+        printf "Automatic forecast averaging ('avgfc') is currently not compatible\n"
         printf "with moving forecasts."
         funcerr ""
     endif
@@ -240,13 +287,17 @@ function bundle naiveFC (const series y,
             cnameset(fc, self.method_names)
         endif
         rnameset(fc, gen_rownam(self.h))
-
+        
+        # attache output matrix to bundle
+        self.fc = fc
 
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         /* NaiveThroughTime */
 
-        matrix fc = NaiveThroughTime(&self)
-
+        #matrix fc = NaiveThroughTime(&self)
+        NaiveThroughTime(&self)
+        
+        /*
         # add column/ row strings
         cnameset(fc, gen_rownam(self.h))
         # attach rownames: on rows we put date strings
@@ -255,10 +306,9 @@ function bundle naiveFC (const series y,
             fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-1) )
         endloop
         rnameset(fc, fcperiods)
+        */
     endif
 
-    # attache output matrix to bundle
-    self.fc = fc
 
     return self
 end function
@@ -348,27 +398,61 @@ function matrix rwf (bundle *self)
 end function
 
 
-function matrix snaive (bundle *self)
-/* Returns forecasts from an ARIMA(0,0,0)(0,1,0)
-    model where m is the seasonal period.*/
-    series y = self.y
-    t2 = $t2
-    if self.type_roll=="static"
-        # add new obs.
-        dataset addobs self.h
+function void NaiveThroughTime (bundle *self)
+/* This function estimates the point estimates in either (i) a
+    rolling or (ii) recursive manner and stores these point estimates. */
+
+    if $nobs<self.wsize
+        funcerr "The window size you selected exceeds the no. of valid observations."
     endif
 
-    # set to training set
-    smpl ; t2
-    # Estimate
-    arima 0 0 0 ; 0 1 0 ; y --quiet
+    include CvDataSplitter.gfn 		# TODO: make a required package!
 
-    # Set test set and forecast
-    string start = obslabel(1+t2)
-    string ende = obslabel(t2+self.h)
-    # Forecast
-    fcast @start @ende --dynamic --quiet
-    return $fcast #~ $fcse
+    series y = self.y
+    list X = y
+    
+    # Set data splitter    
+    bundle cv = null
+    list cv.X = X
+    string cv.cv_type = (self.type_roll=="rolling") ? "rolwin" : "recwin"
+    scalar cv.win_size = self.wsize    
+    CvDataSplitter(&cv)							# actual call
+    
+    matrix fc = zeros(cv.n_folds, self.h)		# store forecast results
+
+    loop lwin=1..cv.n_folds -q
+        
+        mat = cv.X_train[lwin]
+        
+        smpl minc(mat[,1]) maxc(mat[,1])		# read time index
+        # 1st obs being forecasted (h=1)
+        scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
+        
+        series y = mat[,2]						# read-realization
+        
+        if self.type_roll=="rolling" || self.type_roll=="recursive"
+            smpl ; +xmin(self.h, ($tmax-maxc(mat[,1])))
+        endif
+        
+        fc[lwin,] = call_method(&self)'			# compute forecast
+    endloop
+
+    # Adjust rows to make sure that each horizon 'h' refers
+    # to the same period being forecasted
+    matrix self.fc = fc[,1]
+    loop i=1..(self.h-1) -q
+        self.fc ~= mlag(fc[,i+1],$i, NA)
+    endloop
+
+    # attach column names
+    cnameset(self.fc, rownam(self.h))
+    # attach rownames: on rows we put date strings
+    strings self.fcperiods = array(cv.n_folds)
+    loop i=1..cv.n_folds -q
+        self.fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-1) )
+    endloop
+    rnameset(self.fc, self.fcperiods)
+
 end function
 
 
@@ -455,73 +539,6 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
 end function
 
 
-function matrix NaiveThroughTime (bundle *self)
-/* This function estimates the point estimates in either (i) a
-    rolling or (ii) recursive manner and stores these point estimates. */
-
-    # Data set settings
-    #-------------------
-    # add new obs. for built-in estimation and forecast methods e.g. "ols", "arima"
-    dataset addobs self.h
-
-    scalar self.initobs = $t1
-    scalar self.obsend = self.initobs + self.wsize
-    scalar self.nsteps = $t2 - self.obsend - self.h		# no. of windows
-    smpl self.initobs self.obsend
-    if self.verbose
-        printf "\n*********************************************************************\n"
-        printf "Initial effective sample used: %s to %s (T=%d)\n", obslabel($t1), obslabel($t2), ($t2-$t1)
-        printf "Number of %s estimations = %d\n", self.type_roll, self.nsteps
-        printf "Initial 1-step ahead forecast will be computed for %s\n", obslabel($t2+1)
-    endif
-
-    matrix FC = zeros(self.nsteps, self.h)
-
-    # START ESTIMATION
-    #==================
-    loop lwin = 1..self.nsteps -q
-
-        if lwin == self.nsteps
-            scalar self.lastfc = 1+$t2	# last obs. used for forecast being forecasted
-            if self.verbose
-                printf "Last forecast will be computed for %s\n", obslabel(self.lastfc)
-                printf "*********************************************************************\n"
-                printf "\n"
-            endif
-        endif
-
-        smpl $t1 $t2
-        if lwin == 1
-            scalar self.initfc = 1+$t2			# 1st obs being forecasted (h=1)
-        endif
-
-        # COMPUTE and store FCs
-        FC[lwin,] = call_method(&self)'
-
-        # Shift in time
-        if lwin < self.nsteps
-            if self.type_roll == "recursive"
-                smpl ; +1
-            elif self.type_roll == "rolling"
-                smpl +1 +1
-            endif
-        endif
-
-    endloop		# END bwin-loop
-
-    # adjust rows to make sure that each 'h' refers to the same period being forecasted
-    matrix FCret = FC[,1]
-    loop i=1..(self.h-1) -q
-        FCret ~= mlag(FC[,i+1],$i, NA)
-    endloop
-
-    return FCret
-
-end function
-
-
-
-
 # Example
 #============
 clear
@@ -540,10 +557,11 @@ endif
 #==================
 
 # Forecast combination
-bundle b = naiveFC(y, "avgFC")		# compute forecasts
-naivePlot(&b)						# plot results
-eval b.fc							# plot resulting bundle
+#bundle b = naiveFC(y, "avgFC")		# compute forecasts
+#naivePlot(&b)						# plot results
+#eval b.fc							# plot resulting bundle
 
+/*
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
 scalar opt.h = 15
@@ -584,19 +602,20 @@ eval b.fc
 bundle b = naiveFC(y, "ar1trendFC")
 naivePlot(&b)
 eval b.fc
-
+*/
 
 # Rolling-window forecasting
 #===========================
+#include CvDataSplitter.gfn 		# TODO: make a required package!
+
 bundle opts = null				# setup additional options
-opts.type_roll = "rolling"		# type of moving-window forecasting
-opts.wsize = 100				# window length
+opts.type_roll = "recursive" 		#"rolling" / "recursive" -> type of moving-window forecasting
+opts.wsize = int(0.5*$nobs)				# window length
 opts.verbose = 0				# don't print details
 
-bundle b = naiveFC(y, "meanFC", opts)
-#eval b.fc
-
-
-
+bundle b = naiveFC(y, "smeanFC", opts)
+print b
+eval b.fc
+naivePlot(&b)
 
 
