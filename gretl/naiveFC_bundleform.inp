@@ -50,13 +50,13 @@ function void gen_season_series (bundle *self)
 end function
 
 
-function matrix get_mean_obsminor (bundle *self)
+function matrix get_mean_obsminor (bundle *self, int use_median[0])
 /* Helper function for obtaining for each periodicity
     (quarterly=4,monthly=12, weekly=52, etc.) the mean/ median value.*/
     # TODO: in principle one could get the mean for instance for
     # weekly data on the monthly, weekly or daily frequency level.
 
-    string ops = (self.use_median==1) ? "median" : "mean"
+    string ops = (use_median==1) ? "median" : "mean"
     # construct seasonal indicator series
     gen_season_series(&self)
     matrix ybar = aggregate(self.y, self.obs_season, @ops)[,3] # $pd by 1 vector
@@ -131,79 +131,13 @@ function matrix call_method (bundle *self)
     elif self.which=="smeanFC"
         return smeanf(&self)
     elif self.which=="smedianFC"
-        self.use_median = 1
-        return smeanf(&self)
+        return smedianf(&self)
     elif self.which=="snaiveFC"
-        self.use_median = 1
+#        self.use_median = 1
         return snaive(&self)
     elif self.which=="avgFC" # forecast combination
         return avgf(&self)
     endif
-
-end function
-
-
-function matrix NaiveThroughTime (bundle *self)
-/* This function estimates the point estimates in either (i) a
-    rolling or (ii) recursive manner and stores these point estimates. */
-
-    # Data set settings
-    #-------------------
-    # add new obs. for built-in estimation and forecast methods e.g. "ols", "arima"
-    dataset addobs self.h
-
-    scalar self.initobs = $t1
-    scalar self.obsend = self.initobs + self.wsize
-    scalar self.nsteps = $t2 - self.obsend - self.h		# no. of windows
-    smpl self.initobs self.obsend
-    if self.verbose
-        printf "\n*********************************************************************\n"
-        printf "Initial effective sample used: %s to %s (T=%d)\n", obslabel($t1), obslabel($t2), ($t2-$t1)
-        printf "Number of %s estimations = %d\n", self.type_roll, self.nsteps
-        printf "Initial 1-step ahead forecast will be computed for %s\n", obslabel($t2+1)
-    endif
-
-    matrix FC = zeros(self.nsteps, self.h)
-
-    # START ESTIMATION
-    #==================
-    loop lwin = 1..self.nsteps -q
-
-        if lwin == self.nsteps
-            scalar self.lastfc = 1+$t2	# last obs. used for forecast being forecasted
-            if self.verbose
-                printf "Last forecast will be computed for %s\n", obslabel(self.lastfc)
-                printf "*********************************************************************\n"
-                printf "\n"
-            endif
-        endif
-
-        smpl $t1 $t2
-        if lwin == 1
-            scalar self.initfc = 1+$t2			# 1st obs being forecasted (h=1)
-        endif
-
-        # COMPUTE and store FCs
-        FC[lwin,] = call_method(&self)'
-
-        # Shift in time
-        if lwin < self.nsteps
-            if self.type_roll == "recursive"
-                smpl ; +1
-            elif self.type_roll == "rolling"
-                smpl +1 +1
-            endif
-        endif
-
-    endloop		# END bwin-loop
-
-    # adjust rows to make sure that each 'h' refers to the same period being forecasted
-    matrix FCret = FC[,1]
-    loop i=1..(self.h-1) -q
-        FCret ~= mlag(FC[,i+1],$i, NA)
-    endloop
-
-    return FCret
 
 end function
 
@@ -348,10 +282,8 @@ function matrix avgf (bundle *self)
 
     # Models for both seasonal frequencies only
     if self.is_seas
-        self.use_median = 0
         FC ~= smeanf(&self)
-        self.use_median = 1
-        FC ~= smeanf(&self)
+        FC ~= smedianf(&self)
         FC ~= snaive(&self)
     endif
 
@@ -388,6 +320,13 @@ function matrix smeanf (bundle *self)
    the respective historical seasonal period
     where m is the seasonal period.*/
     return get_mean_obsminor(&self)
+end function
+
+function matrix smedianf (bundle *self)
+/* Forecasts of all future values are equal to the median of
+   the respective historical seasonal period
+    where m is the seasonal period.*/
+    return get_mean_obsminor(&self,1)
 end function
 
 
@@ -516,6 +455,72 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
 end function
 
 
+function matrix NaiveThroughTime (bundle *self)
+/* This function estimates the point estimates in either (i) a
+    rolling or (ii) recursive manner and stores these point estimates. */
+
+    # Data set settings
+    #-------------------
+    # add new obs. for built-in estimation and forecast methods e.g. "ols", "arima"
+    dataset addobs self.h
+
+    scalar self.initobs = $t1
+    scalar self.obsend = self.initobs + self.wsize
+    scalar self.nsteps = $t2 - self.obsend - self.h		# no. of windows
+    smpl self.initobs self.obsend
+    if self.verbose
+        printf "\n*********************************************************************\n"
+        printf "Initial effective sample used: %s to %s (T=%d)\n", obslabel($t1), obslabel($t2), ($t2-$t1)
+        printf "Number of %s estimations = %d\n", self.type_roll, self.nsteps
+        printf "Initial 1-step ahead forecast will be computed for %s\n", obslabel($t2+1)
+    endif
+
+    matrix FC = zeros(self.nsteps, self.h)
+
+    # START ESTIMATION
+    #==================
+    loop lwin = 1..self.nsteps -q
+
+        if lwin == self.nsteps
+            scalar self.lastfc = 1+$t2	# last obs. used for forecast being forecasted
+            if self.verbose
+                printf "Last forecast will be computed for %s\n", obslabel(self.lastfc)
+                printf "*********************************************************************\n"
+                printf "\n"
+            endif
+        endif
+
+        smpl $t1 $t2
+        if lwin == 1
+            scalar self.initfc = 1+$t2			# 1st obs being forecasted (h=1)
+        endif
+
+        # COMPUTE and store FCs
+        FC[lwin,] = call_method(&self)'
+
+        # Shift in time
+        if lwin < self.nsteps
+            if self.type_roll == "recursive"
+                smpl ; +1
+            elif self.type_roll == "rolling"
+                smpl +1 +1
+            endif
+        endif
+
+    endloop		# END bwin-loop
+
+    # adjust rows to make sure that each 'h' refers to the same period being forecasted
+    matrix FCret = FC[,1]
+    loop i=1..(self.h-1) -q
+        FCret ~= mlag(FC[,i+1],$i, NA)
+    endloop
+
+    return FCret
+
+end function
+
+
+
 
 # Example
 #============
@@ -590,8 +595,6 @@ opts.verbose = 0				# don't print details
 
 bundle b = naiveFC(y, "meanFC", opts)
 #eval b.fc
-
-
 
 
 
