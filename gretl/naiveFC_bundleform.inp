@@ -133,7 +133,7 @@ function matrix call_method (bundle *self)
     elif self.which=="smedianFC"
         return smedianf(&self)
     elif self.which=="snaiveFC"
-#        self.use_median = 1
+        #        self.use_median = 1
         return snaive(&self)
     elif self.which=="avgFC" # forecast combination
         return avgf(&self)
@@ -172,7 +172,7 @@ function matrix ar1f (bundle *self)
     smpl ; t2
     # Estimate
     ols y L --quiet
-    
+
     # Set test set and forecast
     string start = obslabel(1+t2)
     string ende = obslabel(t2+self.h)
@@ -187,7 +187,7 @@ function matrix snaive (bundle *self)
     model where m is the seasonal period.*/
     series y = self.y
     t2 = $t2
-    
+
     if self.type_roll=="static"
         # add new obs.
         dataset addobs self.h
@@ -216,18 +216,18 @@ function void initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdFC", \
-      "smeanFC", "smedianFC", "snaive", "ar1FC", "ar1trendFC")
+      "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
     scalar warn = 1
     loop i=1..nelem(methods) -q
         if methods[i]==self.which
             warn=0
             break
-        endif        
+        endif
     endloop
     if warn==1
         funcerr "The forecasting method you selected does not exist."
-    endif    
-    
+    endif
+
     if self.is_seas==0
         funcerr "The method you requested is not available for non-seasonal data."
     endif
@@ -287,7 +287,7 @@ function bundle naiveFC (const series y,
             cnameset(fc, self.method_names)
         endif
         rnameset(fc, gen_rownam(self.h))
-        
+
         # attache output matrix to bundle
         self.fc = fc
 
@@ -296,16 +296,16 @@ function bundle naiveFC (const series y,
 
         #matrix fc = NaiveThroughTime(&self)
         NaiveThroughTime(&self)
-        
+
         /*
-        # add column/ row strings
-        cnameset(fc, gen_rownam(self.h))
-        # attach rownames: on rows we put date strings
-        strings fcperiods = array(self.nsteps)
-        loop i=1..self.nsteps -q
-            fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-1) )
-        endloop
-        rnameset(fc, fcperiods)
+           # add column/ row strings
+           cnameset(fc, gen_rownam(self.h))
+           # attach rownames: on rows we put date strings
+           strings fcperiods = array(self.nsteps)
+           loop i=1..self.nsteps -q
+           fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-1) )
+           endloop
+           rnameset(fc, fcperiods)
         */
     endif
 
@@ -410,30 +410,30 @@ function void NaiveThroughTime (bundle *self)
 
     series y = self.y
     list X = y
-    
-    # Set data splitter    
+
+    # Set data splitter
     bundle cv = null
     list cv.X = X
     string cv.cv_type = (self.type_roll=="rolling") ? "rolwin" : "recwin"
-    scalar cv.win_size = self.wsize    
+    scalar cv.win_size = self.wsize
     CvDataSplitter(&cv)							# actual call
-    
+
     matrix fc = zeros(cv.n_folds, self.h)		# store forecast results
 
     loop lwin=1..cv.n_folds -q
-        
+
         mat = cv.X_train[lwin]
-        
+
         smpl minc(mat[,1]) maxc(mat[,1])		# read time index
         # 1st obs being forecasted (h=1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-        
+
         series y = mat[,2]						# read-realization
-        
+
         if self.type_roll=="rolling" || self.type_roll=="recursive"
             smpl ; +xmin(self.h, ($tmax-maxc(mat[,1])))
         endif
-        
+
         fc[lwin,] = call_method(&self)'			# compute forecast
     endloop
 
@@ -471,43 +471,58 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     series y = self.y
 
     # Add future obs.
-    dataset addobs self.h		# automatically increases $t2
-    /* Doesn't work
-       scalar t2 = $t2
-       string start = obslabel(t2+1)
-       string ende = obslabel($t2)
-       start
-       ende
-       smpl (t2+1) ;
-    */
-    # workaround
-    matrix zeromat = zeros(T,cols(self.fc))
-    zeromat = (zeromat.=0) ? NA : zeromat
-    matrix mfc = (zeromat | self.fc)
-    scalar init_date = xmax(($nobs-preobs_fc-self.h),1)
-    smpl init_date ; #($nobs-preobs_fc-self.h) ;
+    if self.type_roll=="static"
+        matrix fcmat = zeros(T,cols(self.fc))
+        fcmat = (fcmat.=0) ? NA : fcmat
+        dataset addobs self.h		# automatically increases $t2
+        /* Doesn't work
+           scalar t2 = $t2
+           string start = obslabel(t2+1)
+           string ende = obslabel($t2)
+           start
+           ende
+           smpl (t2+1) ;
+         */
+        # workaround
+        matrix fcmat |= self.fc
+        smpl xmax(($nobs-preobs_fc-self.h),1);   
+    else
+        #smpl xmax((self.initfc-preobs_fc-self.h),1) ;
+        #smpl xmax((self.initfc-preobs_fc-self.h),1) ; 
+        smpl self.initfc ;
+        matrix fcmat = self.fc
+    endif
 
     # Prepare lists for plotting
     setinfo y --graph-name="Actuals"
     list lplot = y
     loop i=1..cols(self.fc) -q
         if i!=2			#i==2 refers to S.D.
-            series fc_$i = mfc[,i]
+            series fc_$i = fcmat[,i]
             if self.which=="avgFC"
                 str = sprintf("%s", self.method_names[i])
                 setinfo fc_$i --graph-name="@str"
             else
-                setinfo fc_$i --graph-name="Point-Fc"
+                if self.type_roll=="static"
+                    setinfo fc_$i --graph-name="Point-Fc"
+                else
+                    str = sprintf("h=%d", $i)
+                    setinfo fc_$i --graph-name="@str"
+                endif                
             endif
             lplot += fc_$i
         endif
     endloop
-
+    
+#    print lplot -o
+#    stop
+    
     # Setup and plot
-    mini = min(min(lplot))
-    maxi = max(max(lplot))
+    scalar mini = min(min(lplot))
+    scalar maxi = max(max(lplot))
     scalar ylo = mini-0.05*mini
     scalar yup = maxi+0.05*maxi
+    smpl (-preobs_fc) ; 
     plot lplot
         options with-lp time-series single-yaxis
         literal set linetype 1 lc rgb "black" lw 1 pt -1
@@ -562,46 +577,46 @@ endif
 #eval b.fc							# plot resulting bundle
 
 /*
-# Forecast combination but up to h=15 forecast periods
-bundle opt = null					# set specific options
-scalar opt.h = 15
-bundle b = naiveFC(y, "avgFC", opt)
-b.preobs_fc = 25					# set no. of pre.-forecast periods obs. to plot
-naivePlot(&b)
-eval b.fc
+   # Forecast combination but up to h=15 forecast periods
+   bundle opt = null					# set specific options
+   scalar opt.h = 15
+   bundle b = naiveFC(y, "avgFC", opt)
+   b.preobs_fc = 25					# set no. of pre.-forecast periods obs. to plot
+   naivePlot(&b)
+   eval b.fc
 
-# Separate forecast methods
-bundle b = naiveFC(y, "medianFC")
-naivePlot(&b)
-eval b.fc
+   # Separate forecast methods
+   bundle b = naiveFC(y, "medianFC")
+   naivePlot(&b)
+   eval b.fc
 
-bundle b = naiveFC(y, "rwFC")
-naivePlot(&b)
-eval b.fc
+   bundle b = naiveFC(y, "rwFC")
+   naivePlot(&b)
+   eval b.fc
 
-bundle b = naiveFC(y, "rwdFC")
-naivePlot(&b)
-eval b.fc
+   bundle b = naiveFC(y, "rwdFC")
+   naivePlot(&b)
+   eval b.fc
 
-bundle b = naiveFC(y, "smeanFC")
-naivePlot(&b)
-eval b.fc
+   bundle b = naiveFC(y, "smeanFC")
+   naivePlot(&b)
+   eval b.fc
 
-bundle b = naiveFC(y, "smedianFC")
-naivePlot(&b)
-eval b.fc
+   bundle b = naiveFC(y, "smedianFC")
+   naivePlot(&b)
+   eval b.fc
 
-bundle b = naiveFC(y, "snaiveFC")
-naivePlot(&b)
-eval b.fc
+   bundle b = naiveFC(y, "snaiveFC")
+   naivePlot(&b)
+   eval b.fc
 
-bundle b = naiveFC(y, "ar1FC")
-naivePlot(&b)
-eval b.fc
+   bundle b = naiveFC(y, "ar1FC")
+   naivePlot(&b)
+   eval b.fc
 
-bundle b = naiveFC(y, "ar1trendFC")
-naivePlot(&b)
-eval b.fc
+   bundle b = naiveFC(y, "ar1trendFC")
+   naivePlot(&b)
+   eval b.fc
 */
 
 # Rolling-window forecasting
@@ -610,12 +625,12 @@ eval b.fc
 
 bundle opts = null				# setup additional options
 opts.type_roll = "recursive" 		#"rolling" / "recursive" -> type of moving-window forecasting
-opts.wsize = int(0.5*$nobs)				# window length
+opts.wsize = int(0.75*$nobs)				# window length
 opts.verbose = 0				# don't print details
 
-bundle b = naiveFC(y, "smeanFC", opts)
-print b
-eval b.fc
+bundle b = naiveFC(y, "snaiveFC", opts)
+#print b
+#eval b.fc
 naivePlot(&b)
 
 
