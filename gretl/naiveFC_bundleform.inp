@@ -409,7 +409,7 @@ function void NaiveThroughTime (bundle *self)
     include CvDataSplitter.gfn 		# TODO: make a required package!
 
     series y = self.y
-    list X = y
+    list X = y						# a list must be passed to data splitter
 
     # Set data splitter
     bundle cv = null
@@ -417,32 +417,54 @@ function void NaiveThroughTime (bundle *self)
     string cv.cv_type = (self.type_roll=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.wsize
     CvDataSplitter(&cv)							# actual call
+    /*
+    print cv
+    matrices X_train = cv.X_train
+    loop i=1..cv.n_folds -q
+        eval X_train[i]
+    endloop
+    */
 
     matrix fc = zeros(cv.n_folds, self.h)		# store forecast results
 
+    smpl full
+    dataset addobs self.h
+    scalar tmax = $t2
+    self.y = y
+    
     loop lwin=1..cv.n_folds -q
 
         mat = cv.X_train[lwin]
-
         smpl minc(mat[,1]) maxc(mat[,1])		# read time index
+        #printf "Start: %d \t End: %d\n", $t1, $t2
+        #flush
+        
         # 1st obs being forecasted (h=1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-
-        series y = mat[,2]						# read-realization
-
+        
         if self.type_roll=="rolling" || self.type_roll=="recursive"
-            smpl ; +xmin(self.h, ($tmax-maxc(mat[,1])))
+            smpl full
+                eval $t2		***HIER WEITERMACHEN: extended t2 get's lost!!!
+        stop
+            smpl ; +xmin(self.h, (tmax-maxc(mat[,1])))
+            printf "FC-Start: %d \t FC-End: %d\n", $t1, $t2
+            flush
         endif
-
         fc[lwin,] = call_method(&self)'			# compute forecast
-    endloop
+        #    eval fc[lwin,]'
 
+    endloop
+    
+    stop
+    
     # Adjust rows to make sure that each horizon 'h' refers
     # to the same period being forecasted
     matrix self.fc = fc[,1]
     loop i=1..(self.h-1) -q
         self.fc ~= mlag(fc[,i+1],$i, NA)
     endloop
+    eval self.fc
+    stop
 
     # attach column names
     cnameset(self.fc, gen_rownam(self.h))
@@ -629,7 +651,7 @@ opts.wsize = int(0.75*$nobs)				# window length
 opts.verbose = 0				# don't print details
 
 bundle b = null
-bundle b = naiveFC(y, "snaiveFC", opts)
+bundle b = naiveFC(y, "meanFC", opts)
 print b
 #eval b.fc
 naivePlot(&b)
