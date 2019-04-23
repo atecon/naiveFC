@@ -445,7 +445,7 @@ function void NaiveThroughTime (bundle *self)
     endloop
 
     # attach column names
-    cnameset(self.fc, rownam(self.h))
+    cnameset(self.fc, gen_rownam(self.h))
     # attach rownames: on rows we put date strings
     strings self.fcperiods = array(cv.n_folds)
     loop i=1..cv.n_folds -q
@@ -466,7 +466,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     string out = !inbundle(self,"filename") ? "display" : self.filename
     scalar T = $nobs
     # no. of pre-forecast obs. to plot
-    scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25 * T) : self.preobs_fc
+    scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*T) : self.preobs_fc
 
     series y = self.y
 
@@ -485,7 +485,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
          */
         # workaround
         matrix fcmat |= self.fc
-        smpl xmax(($nobs-preobs_fc-self.h),1);   
+        smpl xmax(($nobs-preobs_fc-self.h),1) ;
     else
         #smpl xmax((self.initfc-preobs_fc-self.h),1) ;
         #smpl xmax((self.initfc-preobs_fc-self.h),1) ; 
@@ -628,8 +628,9 @@ opts.type_roll = "recursive" 		#"rolling" / "recursive" -> type of moving-window
 opts.wsize = int(0.75*$nobs)				# window length
 opts.verbose = 0				# don't print details
 
+bundle b = null
 bundle b = naiveFC(y, "snaiveFC", opts)
-#print b
+print b
 #eval b.fc
 naivePlot(&b)
 
