@@ -436,26 +436,24 @@ function void NaiveThroughTime (bundle *self)
 
         mat = cv.X_train[lwin]
         smpl minc(mat[,1]) maxc(mat[,1])		# read time index
-        #printf "Start: %d \t End: %d\n", $t1, $t2
-        #flush
+#printf "Start: %d \t End: %d\n", $t1, $t2
+#flush
         
         # 1st obs being forecasted (h=1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
         
         if self.type_roll=="rolling" || self.type_roll=="recursive"
-            smpl full
-                eval $t2		***HIER WEITERMACHEN: extended t2 get's lost!!!
-        stop
-            smpl ; +xmin(self.h, (tmax-maxc(mat[,1])))
-            printf "FC-Start: %d \t FC-End: %d\n", $t1, $t2
-            flush
+            #smpl full
+            #eval $t2		#***HIER WEITERMACHEN: extended t2 get's lost!!!
+
+            #smpl ; +xmin(self.h, (tmax-maxc(mat[,1])))
+            #printf "FC-Start: %d \t FC-End: %d\n", $t1, $t2
+            #flush
         endif
         fc[lwin,] = call_method(&self)'			# compute forecast
-        #    eval fc[lwin,]'
+#  eval fc[lwin,]'
 
     endloop
-    
-    stop
     
     # Adjust rows to make sure that each horizon 'h' refers
     # to the same period being forecasted
@@ -463,8 +461,6 @@ function void NaiveThroughTime (bundle *self)
     loop i=1..(self.h-1) -q
         self.fc ~= mlag(fc[,i+1],$i, NA)
     endloop
-    eval self.fc
-    stop
 
     # attach column names
     cnameset(self.fc, gen_rownam(self.h))
@@ -474,6 +470,7 @@ function void NaiveThroughTime (bundle *self)
         self.fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-1) )
     endloop
     rnameset(self.fc, self.fcperiods)
+#    eval self.fc
 
 end function
 
@@ -490,11 +487,18 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     # no. of pre-forecast obs. to plot
     scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*T) : self.preobs_fc
 
+
+    if typeof(self.y)==3 && rows(self.y)>$nobs
+        dataset addobs self.h		# necessary when called via NaiveThroughTime()
+    endif
     series y = self.y
 
+    print self
+#    stop
+    
     # Add future obs.
     if self.type_roll=="static"
-        matrix fcmat = zeros(T,cols(self.fc))
+        matrix fcmat = zeros(T, cols(self.fc))
         fcmat = (fcmat.=0) ? NA : fcmat
         dataset addobs self.h		# automatically increases $t2
         /* Doesn't work
@@ -511,15 +515,17 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     else
         #smpl xmax((self.initfc-preobs_fc-self.h),1) ;
         #smpl xmax((self.initfc-preobs_fc-self.h),1) ; 
+        
         smpl self.initfc ;
-        matrix fcmat = self.fc
+        matrix fcmat = self.fc        
     endif
-
+    
     # Prepare lists for plotting
     setinfo y --graph-name="Actuals"
     list lplot = y
+    eval self.fc
     loop i=1..cols(self.fc) -q
-        if i!=2			#i==2 refers to S.D.
+        if i!=2 && self.type_roll=="static"			#i==2 refers to S.D.
             series fc_$i = fcmat[,i]
             if self.which=="avgFC"
                 str = sprintf("%s", self.method_names[i])
@@ -536,15 +542,15 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
         endif
     endloop
     
-#    print lplot -o
+    print lplot -o
 #    stop
     
     # Setup and plot
     scalar mini = min(min(lplot))
     scalar maxi = max(max(lplot))
-    scalar ylo = mini-0.05*mini
-    scalar yup = maxi+0.05*maxi
-    smpl (-preobs_fc) ; 
+    scalar ylo = mini-0.3*abs(mini)
+    scalar yup = maxi+0.3*abs(maxi)
+    smpl (-preobs_fc) ;
     plot lplot
         options with-lp time-series single-yaxis
         literal set linetype 1 lc rgb "black" lw 1 pt -1
@@ -598,15 +604,17 @@ endif
 #naivePlot(&b)						# plot results
 #eval b.fc							# plot resulting bundle
 
-/*
+
    # Forecast combination but up to h=15 forecast periods
    bundle opt = null					# set specific options
    scalar opt.h = 15
-   bundle b = naiveFC(y, "avgFC", opt)
+   #bundle b = naiveFC(y, "avgFC", opt)
+   bundle b = naiveFC(y, "meanFC", opt)
    b.preobs_fc = 25					# set no. of pre.-forecast periods obs. to plot
    naivePlot(&b)
    eval b.fc
-
+   stop
+/*
    # Separate forecast methods
    bundle b = naiveFC(y, "medianFC")
    naivePlot(&b)
