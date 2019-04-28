@@ -103,7 +103,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.4
+Version 0.5
 \end_layout
 
 \begin_layout Standard
@@ -131,6 +131,24 @@ status open
 Changelog
 \end_layout
 
+\begin_layout Itemize
+Version 0.5 (Apr, 2019)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+fully revamped framework exploiting bundles
+\end_layout
+
+\begin_layout Itemize
+Fix a bug related to some seasonal frequencies
+\end_layout
+
+\begin_layout Itemize
+add further sample datasets
+\end_layout
+
+\end_deeper
 \begin_layout Itemize
 Version 0.4 (Jan, 2019)
 \end_layout

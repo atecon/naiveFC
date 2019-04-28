@@ -103,7 +103,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.4
+Version 0.5
 \end_layout
 
 \begin_layout Standard
@@ -131,6 +131,20 @@ status open
 Changelog
 \end_layout
 
+\begin_layout Itemize
+Version 0.5 (Apr, 2019)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+fully revamped framework exploiting bundles
+\end_layout
+
+\begin_layout Itemize
+Fix a bug related to some seasonal frequencies
+\end_layout
+
+\end_deeper
 \begin_layout Itemize
 Version 0.4 (Jan, 2019)
 \end_layout
@@ -1325,8 +1339,11 @@ snaive
 \end_layout
 
 \begin_layout Standard
-A similar method compared to naïve forecasts using rwf() is useful for seasonal
- data.
+A similar method compared to naïve forecasts using 
+\family typewriter
+rwf()
+\family default
+ is useful for seasonal data.
  Each forecast is equal to the last observed value from the same season
  of the year (e.g., the same month of the previous year).
  
