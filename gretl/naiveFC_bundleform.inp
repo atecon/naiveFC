@@ -36,9 +36,10 @@ end function
 function void gen_season_series (bundle *self)
 /* Generates a series indicating the separate seasonal
     periods. */
-    list s = seasonals() 	# returns e.g. S1...S52 for weekly data
+    list s = seasonals() 	# returns e.g. S1...S52/53 for weekly data
     series obs_season = NA
-    if nelem(s)==$pd
+
+    if nelem(s)>=$pd
         loop i=1..$pd -q
             obs_season = (S$i == 1) ? i : obs_season
         endloop
@@ -97,7 +98,7 @@ function bundle default_naiveFC_opts (const series y)
     self.fan = 0						# plot fan chart  (not supported yet)
     self.nboot = 0						# no. of bootstrap replications  (not supported yet)
     self.blength = 4					# Block length bootstrap  (not supported yet)
-    self.is_seas = isseas()
+    self.is_seas = isseas()				# check for seasonality
     self.verbose = 1					# print details (default: True)
 
     # For NaiveThroughTime()
@@ -154,13 +155,13 @@ function matrix ar1f (bundle *self)
         # add new obs.
         dataset addobs self.h
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
-        # when called via NaiveThroughTime(), 'dataset' cmd
+        # When called via NaiveThroughTime(), 'dataset' cmd
         # is not applicable
         t2 -= self.h
     endif
 
     # setup list of regressors
-    list L = 0 y(-1)
+    list L = const y(-1)
     if inbundle(self, "w_trend")
         if self.w_trend
             genr time
@@ -215,21 +216,34 @@ end function
 function void initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
+
     strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdFC", \
-      "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
-    scalar warn = 1
+      "ar1FC", "ar1trendFC")
+    strings seas_methods = defarray("smeanFC", "smedianFC", "snaiveFC")
+    methods += seas_methods
+    # Check whether called method exists
+    scalar err = 1
     loop i=1..nelem(methods) -q
         if methods[i]==self.which
-            warn=0
+            err=0
             break
         endif
     endloop
-    if warn==1
+    if err==1
         funcerr "The forecasting method you selected does not exist."
     endif
 
     if self.is_seas==0
-        funcerr "The method you requested is not available for non-seasonal data."
+        scalar err = 0
+        loop i=1..nelem(seas_methods) -q
+            if seas_methods[i]==self.which
+                err=1
+                break
+            endif
+        endloop
+        if err==1
+            funcerr "The method you requested is not available for non-seasonal data."
+        endif
     endif
 
     if self.nboot>0
@@ -237,9 +251,9 @@ function void initial_checks (bundle *self)
     endif
 
     if (self.type_roll=="rolling" || self.type_roll=="recursive") && self.which=="avgFC"
-        printf "Automatic forecast averaging ('avgfc') is currently not compatible\n"
-        printf "with moving forecasts."
-        funcerr ""
+        printf "Error: Automatic forecast averaging ('avgfc') is currently not compatible\n"
+        printf "with moving forecasts.\n"
+        funcerr "Re-specify."
     endif
 end function
 
@@ -255,16 +269,14 @@ function bundle naiveFC (const series y,
     # Set up the bundle
     bundle self = default_naiveFC_opts(y)
     if exists(opts)
-        # override defaults
-        self = opts + self
+        self = opts + self			# override defaults
     endif
-
     self.which = which
 
     # Check whether method is applicable
     initial_checks(&self)
 
-    # drop missings
+    # Drop missings
     T = $nobs
     smpl y --contiguous
     if $nobs<T && self.verbose
@@ -272,43 +284,24 @@ function bundle naiveFC (const series y,
         printf "due to %d missing values in the original dataset.\n", (T-$nobs)
         printf "\n"
     endif
-
     series self.y = y
 
-    # call method
+    # Call method
     #==============
     if self.type_roll=="static"
+        matrix self.fc = call_method(&self)
 
-        matrix fc = call_method(&self)
-        # add column/ row strings
+        # Add column/ row strings
         if which != "avgFC"
-            cnameset(fc, gen_colnam(fc))
+            cnameset(self.fc, gen_colnam(self.fc))
         else
-            cnameset(fc, self.method_names)
+            cnameset(self.fc, self.method_names)
         endif
-        rnameset(fc, gen_rownam(self.h))
-
-        # attache output matrix to bundle
-        self.fc = fc
+        rnameset(self.fc, gen_rownam(self.h))
 
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
-        /* NaiveThroughTime */
-
-        #matrix fc = NaiveThroughTime(&self)
         NaiveThroughTime(&self)
-
-        /*
-           # add column/ row strings
-           cnameset(fc, gen_rownam(self.h))
-           # attach rownames: on rows we put date strings
-           strings fcperiods = array(self.nsteps)
-           loop i=1..self.nsteps -q
-           fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-1) )
-           endloop
-           rnameset(fc, fcperiods)
-        */
     endif
-
 
     return self
 end function
@@ -322,22 +315,18 @@ function matrix avgf (bundle *self)
 
     # Models for both seasonal and non-seasonal frequencies
     matrix FC = meanf(&self)
-    FC ~= medianf(&self)
-    FC ~= rwf(&self)
+    FC ~= medianf(&self) ~ rwf(&self)
     self.w_drift = 1
-    FC ~= rwf(&self)
-    FC ~= ar1f(&self)
+    FC ~= rwf(&self) ~ ar1f(&self)
     self.w_trend = 1
     FC ~= ar1f(&self)
 
-    # Models for both seasonal frequencies only
+    # Models for seasonal frequencies only
     if self.is_seas
-        FC ~= smeanf(&self)
-        FC ~= smedianf(&self)
-        FC ~= snaive(&self)
+        FC ~= smeanf(&self) ~ smedianf(&self) ~ snaive(&self)
     endif
 
-    # cross-sectional forecast-combination statistics
+    # Cross-sectional forecast-combination statistics
     FC = meanr(FC) ~ sdc(FC', rows(FC')-1)' ~ FC
 
     # Add column names
@@ -384,7 +373,7 @@ function matrix rwf (bundle *self)
 /* Naïve forecast is optimal when data follow a random-walk
     or random-walk + drift. */
     matrix fc = ones(self.h,1) .* self.y[$t2]
-    if inbundle(self,"w_drift")
+    if inbundle(self, "w_drift")
         if self.w_drift
             # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
             scalar avg = (self.y[$t2]-self.y[$t1])/(nobs(self.y)-1)	# average growth rate
@@ -403,7 +392,9 @@ function void NaiveThroughTime (bundle *self)
     rolling or (ii) recursive manner and stores these point estimates. */
 
     if $nobs<self.wsize
-        funcerr "The window size you selected exceeds the no. of valid observations."
+        printf "\nError: The window size you selected (=%d) exceeds the\n\
+          no. of valid observations.\n", self.wsize
+        funcerr "Re-specify."
     endif
 
     include CvDataSplitter.gfn 		# TODO: make a required package!
@@ -417,61 +408,46 @@ function void NaiveThroughTime (bundle *self)
     string cv.cv_type = (self.type_roll=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.wsize
     CvDataSplitter(&cv)							# actual call
-    /*
-    print cv
-    matrices X_train = cv.X_train
-    loop i=1..cv.n_folds -q
-        eval X_train[i]
-    endloop
+
+    /* Needed as CvDataSplitter() doesn't consider the very last obs in
+    the final training set for 'rolwin' and 'recwin'. */
+    cv.X_train += cv.X_train[cv.n_folds] | ({$tmax}~{y[$tmax]})
+    cv.n_folds++
+
+    /*	For debugging only
+       matrices X_train = cv.X_train
+       loop i=1..cv.n_folds -q
+       eval X_train[i]
+       if i==cv.n_folds
+       stop
+       endif
+       endloop
     */
 
-    matrix fc = zeros(cv.n_folds, self.h)		# store forecast results
-
-    smpl full
-    dataset addobs self.h
-    scalar tmax = $t2
-    self.y = y
-    
+    # Loop over training sets
+    matrix self.fc = zeros(cv.n_folds, self.h)
     loop lwin=1..cv.n_folds -q
-
         mat = cv.X_train[lwin]
-        smpl minc(mat[,1]) maxc(mat[,1])		# read time index
-#printf "Start: %d \t End: %d\n", $t1, $t2
-#flush
-        
-        # 1st obs being forecasted (h=1)
+        smpl minc(mat[,1]) maxc(mat[,1])		# read time index of the training set
+
+        # 1st obs being forecasted (h=1) based on information up to (self.initfc-1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-        
-        if self.type_roll=="rolling" || self.type_roll=="recursive"
-            #smpl full
-            #eval $t2		#***HIER WEITERMACHEN: extended t2 get's lost!!!
 
-            #smpl ; +xmin(self.h, (tmax-maxc(mat[,1])))
-            #printf "FC-Start: %d \t FC-End: %d\n", $t1, $t2
-            #flush
-        endif
-        fc[lwin,] = call_method(&self)'			# compute forecast
-#  eval fc[lwin,]'
-
-    endloop
-    
-    # Adjust rows to make sure that each horizon 'h' refers
-    # to the same period being forecasted
-    matrix self.fc = fc[,1]
-    loop i=1..(self.h-1) -q
-        self.fc ~= mlag(fc[,i+1],$i, NA)
+        self.fc[lwin,] = call_method(&self)'	# compute forecast
     endloop
 
-    # attach column names
+    # Attach column names
     cnameset(self.fc, gen_rownam(self.h))
-    # attach rownames: on rows we put date strings
+    # Attach rownames: on rows we put date strings referring to
+    # the information set (time/ date) based on which the h-step
+    # ahead forecast is computed for.
     strings self.fcperiods = array(cv.n_folds)
     loop i=1..cv.n_folds -q
-        self.fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-1) )
+        # NOTE: obslabel(self.initfc+$i-2): for i==1 the data refers to the 1st day
+        # based on which the first h=1,...,H OoS-forecasts are made!
+        self.fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-2) )
     endloop
     rnameset(self.fc, self.fcperiods)
-#    eval self.fc
-
 end function
 
 
@@ -484,86 +460,88 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     string xlab = !inbundle(self,"xlab") ? "" : self.xlab
     string out = !inbundle(self,"filename") ? "display" : self.filename
     scalar T = $nobs
-    # no. of pre-forecast obs. to plot
+    # No. of pre-forecast obs. to plot - default 25pct. of total obs.
     scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*T) : self.preobs_fc
 
-
-    if typeof(self.y)==3 && rows(self.y)>$nobs
-        dataset addobs self.h		# necessary when called via NaiveThroughTime()
-    endif
+    # Augment the dataset
+    dataset addobs self.h
     series y = self.y
 
-    print self
-#    stop
-    
-    # Add future obs.
+    # Set up the fcmat matrix holding results
     if self.type_roll=="static"
-        matrix fcmat = zeros(T, cols(self.fc))
+        matrix fcmat = zeros(T, cols(self.fc))		# length equal to no, of obs. of the non-augmented sample
         fcmat = (fcmat.=0) ? NA : fcmat
-        dataset addobs self.h		# automatically increases $t2
-        /* Doesn't work
-           scalar t2 = $t2
-           string start = obslabel(t2+1)
-           string ende = obslabel($t2)
-           start
-           ende
-           smpl (t2+1) ;
-         */
-        # workaround
-        matrix fcmat |= self.fc
-        smpl xmax(($nobs-preobs_fc-self.h),1) ;
+        fcmat |= self.fc							# concatenate forecasts
     else
-        #smpl xmax((self.initfc-preobs_fc-self.h),1) ;
-        #smpl xmax((self.initfc-preobs_fc-self.h),1) ; 
-        
-        smpl self.initfc ;
-        matrix fcmat = self.fc        
+        matrix fcmat = self.fc
     endif
-    
+
     # Prepare lists for plotting
     setinfo y --graph-name="Actuals"
     list lplot = y
-    eval self.fc
-    loop i=1..cols(self.fc) -q
-        if i!=2 && self.type_roll=="static"			#i==2 refers to S.D.
-            series fc_$i = fcmat[,i]
-            if self.which=="avgFC"
-                str = sprintf("%s", self.method_names[i])
+
+    if self.type_roll!="static"						# rolling/ recursive window
+        # Initialization
+        scalar start = self.initfc-1
+        smpl start start
+        # Loop over diff. training sets; each produces h-step ahead forecasts
+        loop i=1..rows(self.fc) -q
+            if self.type_roll != "static"
+                start++
+                smpl start (start+self.h-1)
+                series fc_$i = fcmat[i,]
+                str = sprintf("TrainSet=%d", $i)
                 setinfo fc_$i --graph-name="@str"
-            else
-                if self.type_roll=="static"
-                    setinfo fc_$i --graph-name="Point-Fc"
-                else
-                    str = sprintf("h=%d", $i)
-                    setinfo fc_$i --graph-name="@str"
-                endif                
+                lplot += fc_$i
             endif
-            lplot += fc_$i
-        endif
-    endloop
-    
-    print lplot -o
-#    stop
-    
+        endloop
+
+    elif self.type_roll=="static"
+        self.initfc = T+1								# no yet defined for this case
+
+        loop i=1..cols(self.fc) -q
+            if i!=2 && self.type_roll=="static"			#i==2 refers to S.D.
+                series fc_$i = fcmat[,i]
+                if self.which=="avgFC"
+                    str = sprintf("%s", self.method_names[i])
+                    setinfo fc_$i --graph-name="@str"
+                else
+                    if self.type_roll=="static"
+                        setinfo fc_$i --graph-name="Point-Fc"
+                    else
+                        str = sprintf("h=%d", $i)
+                        setinfo fc_$i --graph-name="@str"
+                    endif
+                endif
+                lplot += fc_$i
+            endif
+        endloop
+    endif
+
     # Setup and plot
+    #===============
+    # incl. some pre-forecast periods obs. for plotting
+    smpl xmax((self.initfc-preobs_fc),1) $tmax
+    # y-range
     scalar mini = min(min(lplot))
     scalar maxi = max(max(lplot))
-    scalar ylo = mini-0.3*abs(mini)
-    scalar yup = maxi+0.3*abs(maxi)
-    smpl (-preobs_fc) ;
+    scalar ylo = mini-0.05*abs(mini)
+    scalar yup = maxi+0.05*abs(maxi)
+    # TODO: lplot may become A VERY long list -- think about a restriction showing
+    # only the k last forecasts
     plot lplot
         options with-lp time-series single-yaxis
         literal set linetype 1 lc rgb "black" lw 1 pt -1
-        literal set linetype 2 lc rgb "red" lw 1.25 #pt 2 ps 0.5
-        literal set linetype 3 lc rgb "blue" lw 1.25
-        literal set linetype 4 lc rgb "black" lw 1.25
-        literal set linetype 5 lc rgb "grey" lw 1.25
-        literal set linetype 6 lc rgb "violet" lw 1.25 #pt 3 ps 0.5
-        literal set linetype 7 lc rgb "brown" lw 1.25 #pt 4 ps 0.5
-        literal set linetype 8 lc rgb "yellow" lw 1.25 #pt 5 ps 0.5
-        literal set linetype 9 lc rgb "red" lw 1.25 #pt 1 ps 0.5
-        literal set linetype 10 lc rgb "green" lw 1.25
-        literal set linetype 10 lc rgb "black" lw 1.25
+        literal set linetype 2 lc rgb "red" lw 1.25 pt 2 ps 0.5
+        literal set linetype 3 lc rgb "blue" lw 1#.25
+        literal set linetype 4 lc rgb "black" lw 1#.25
+        literal set linetype 5 lc rgb "grey" lw 1#.25
+        literal set linetype 6 lc rgb "violet" lw 1#.25 #pt 3 ps 0.5
+        literal set linetype 7 lc rgb "brown" lw 1#.25 #pt 4 ps 0.5
+        literal set linetype 8 lc rgb "yellow" lw 1#.25 #pt 5 ps 0.5
+        literal set linetype 9 lc rgb "red" lw 1#.25 #pt 1 ps 0.5
+        literal set linetype 10 lc rgb "green" lw 1#.25
+        literal set linetype 10 lc rgb "black" lw 1#.25
         literal set key left bottom below
         #literal set key inside left bottom
         #put the border more to the background by applying it
@@ -586,14 +564,21 @@ end function
 #============
 clear
 
-scalar runEX = 2
+scalar runEX = 4
 
 if runEX==1
-    open nysewk.gdt -q
+    open nysewk.gdt -q		# daily, 7d
     series y = close
 elif runEX==2
-    open denmark.gdt -q
+    open denmark.gdt -q		# quarterly
     series y = diff(LRM)
+elif runEX==3
+    open hendry_jae.gdt -q	# annual
+    series y = diff(gdp)
+elif runEX==4
+    open hall.gdt -q		# monthly
+    series y = ewr
+
 endif
 
 # Call methods
@@ -604,17 +589,16 @@ endif
 #naivePlot(&b)						# plot results
 #eval b.fc							# plot resulting bundle
 
-
    # Forecast combination but up to h=15 forecast periods
    bundle opt = null					# set specific options
    scalar opt.h = 15
    #bundle b = naiveFC(y, "avgFC", opt)
-   bundle b = naiveFC(y, "meanFC", opt)
+   bundle b = naiveFC(y, "snaiveFC", opt)
    b.preobs_fc = 25					# set no. of pre.-forecast periods obs. to plot
    naivePlot(&b)
-   eval b.fc
    stop
 /*
+
    # Separate forecast methods
    bundle b = naiveFC(y, "medianFC")
    naivePlot(&b)
@@ -651,17 +635,14 @@ endif
 
 # Rolling-window forecasting
 #===========================
-#include CvDataSplitter.gfn 		# TODO: make a required package!
-
-bundle opts = null				# setup additional options
-opts.type_roll = "recursive" 		#"rolling" / "recursive" -> type of moving-window forecasting
-opts.wsize = int(0.75*$nobs)				# window length
-opts.verbose = 0				# don't print details
+bundle opts = null					# setup additional options
+opts.type_roll = "recursive" 		# "rolling" / "recursive" -> type of moving-window forecasting
+opts.wsize = int(0.75*$nobs)		# window length
+opts.verbose = 0					# don't print details
 
 bundle b = null
-bundle b = naiveFC(y, "meanFC", opts)
+bundle b = naiveFC(y, "ar1FC", opts)
 print b
-#eval b.fc
-naivePlot(&b)
-
-
+eval b.fc
+b.preobs_fc = 5					# set no. of pre.-forecast periods obs. to plot
+#naivePlot(&b)
