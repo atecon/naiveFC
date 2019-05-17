@@ -103,7 +103,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.5
+Version 0.6
 \end_layout
 
 \begin_layout Standard
@@ -132,12 +132,12 @@ Changelog
 \end_layout
 
 \begin_layout Itemize
-Version 0.5 (Apr, 2019)
+Version 0.6 (May, 2019)
 \end_layout
 
 \begin_deeper
 \begin_layout Itemize
-fully revamped framework exploiting bundles
+Fully revamped framework heavily exploiting the idea of bundles
 \end_layout
 
 \begin_layout Itemize
@@ -145,7 +145,28 @@ Fix a bug related to some seasonal frequencies
 \end_layout
 
 \begin_layout Itemize
-add further sample datasets
+Ad the the 'seasonal median' forecasting method
+\end_layout
+
+\begin_layout Itemize
+Add the option to run further sample datasets of different frequencies
+\end_layout
+
+\begin_layout Itemize
+Make use the user-contributed gretl package 
+\emph on
+CvDataSplitter
+\emph default
+ for computing rolling or recursive forecasts.
+\end_layout
+
+\begin_layout Itemize
+Eventual missing values of the series passed to naiveFC() will be handled
+ internally.
+\end_layout
+
+\begin_layout Itemize
+Further minor changes
 \end_layout
 
 \end_deeper
@@ -298,7 +319,7 @@ naiveFC
 \end_layout
 
 \begin_layout Itemize
-Point estimates for eight simple forecasting methods, namely the 'Average'
+Point estimates for nine simple forecasting methods, namely the 'Average'
  (mean & median), 'Seasonal Average' (seasonal mean & median), 'Naive' (Random-W
 alk), the 'Seasonal Naive', the 
 \begin_inset Quotes eld
@@ -352,10 +373,9 @@ The
 \family typewriter
 naiveFC
 \family default
- package is publicly available on the Gretl server.
- The package must be downloaded once, and loaded into memory each time Gretl
+ package is publicly available on the gretl server.
+ The package must be downloaded once, and loaded into memory each time gretl
  is started.
- 
 \end_layout
 
 \begin_layout Standard

@@ -1,7 +1,7 @@
 clear
 set verbose off
 
-include "/home/at/git/naiveFC/gretl/naiveFC_bundleform.inp"
+include "/home/at/git/naiveFC/gretl/naiveFC.inp"
 
 # Select an example
 scalar runEX = 2
@@ -10,8 +10,8 @@ if runEX==1
     open nysewk.gdt -q		# daily, 7d
     series y = close
 elif runEX==2
-    open denmark.gdt -q		# quarterly
-    series y = diff(LRM)
+    open AWM.gdt -q			# quarterly
+    series y = diff(YGA)
 elif runEX==3
     open hendry_jae.gdt -q	# annual
     series y = diff(gdp)
@@ -20,10 +20,17 @@ elif runEX==4
     series y = ewr
 endif
 
-
 #=======================
 # Static naive forecasts
 #=======================
+
+bundle b = null
+# AR(1)
+b = null
+bundle b = naiveFC(y, "ar1FC")
+naivePlot(&b)
+eval b.fc
+stop
 
 # Forecast combination
 bundle b = null
@@ -74,6 +81,7 @@ naivePlot(&b)
 eval b.fc
 
 # AR(1)
+b = null
 bundle b = naiveFC(y, "ar1FC")
 naivePlot(&b)
 eval b.fc
@@ -87,7 +95,7 @@ eval b.fc
 # Rolling-window forecasts
 #=========================
 bundle opts = null					# setup additional options
-opts.type_roll = "recursive" 		# "rolling" / "recursive" -> type of moving-window forecasting
+opts.type_roll = "recursive" 			# "rolling" / "recursive" -> type of moving-window forecasting
 opts.wsize = int(0.75*$nobs)		# window length
 opts.verbose = 0					# don't print details
 

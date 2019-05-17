@@ -1,5 +1,3 @@
-set verbose off
-
 function scalar isseas (void)
     # flag seasonality
     return ($pd>1) ? 1 : 0
@@ -44,7 +42,6 @@ function void gen_season_series (bundle *self)
             obs_season = (S$i == 1) ? i : obs_season
         endloop
         self.obs_season = obs_season
-        #return self
     else
         funcerr "Periodicity ($pd) does not correspond to what seasonals() in fact returns."
     endif
@@ -126,17 +123,17 @@ function matrix call_method (bundle *self)
     elif self.which=="rwdFC"
         self.w_drift = 1
         return rwf(&self)
-
-        # For seasonal series only
-        #------------------------
-    elif self.which=="smeanFC"
+    endif
+    
+    # For seasonal series only
+    #-------------------------
+    if self.which=="smeanFC"
         return smeanf(&self)
     elif self.which=="smedianFC"
         return smedianf(&self)
     elif self.which=="snaiveFC"
-        #        self.use_median = 1
         return snaive(&self)
-    elif self.which=="avgFC" # forecast combination
+    elif self.which=="avgFC"
         return avgf(&self)
     endif
 
@@ -144,16 +141,43 @@ end function
 
 
 function matrix ar1f (bundle *self)
-/* Returns forecasts from an AR(1) model
-    either with or without linear trend. */
+/* Returns forecasts from an AR(1) model either with or without linear trend. */
 
     scalar h = self.h
     series y = self.y
     t2 = $t2
 
+    # Grab the number of obs. for the valid sample (contiguous set)
+    smpl obsnum(self.t1_label) obsnum(self.t2_label)
+    scalar T = $nobs
+    T
+    stop
+    
+*** HIER WEITERMACHEN ***
+
     if self.type_roll=="static"
-        # add new obs.
+        # Augment the dataset
+/*
+        smpl full
+        eval obslabel($t1)
+        eval obslabel($t2)
+        stop        
+
+        t2_new = $t2				# unconsider eventual missings in the data passed to naiveFC()
+        eval obslabel(t2_new)
+        eval self.t2_label
+        stop
+        t2_diff = t2_new-obsnum(self.t2_label)
+        nadd = self.h-t2_diff
+        nadd
+        stop
+        dataset addobs nadd
+        # Note, we unconsider eventual missings at the beginning of the data passed to naiveFC()
+        smpl obsnum(self.t1_label) $t2				# restrict back
+        */
+        smpl full
         dataset addobs self.h
+        
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         # When called via NaiveThroughTime(), 'dataset' cmd
         # is not applicable
@@ -173,7 +197,6 @@ function matrix ar1f (bundle *self)
     smpl ; t2
     # Estimate
     ols y L --quiet
-
     # Set test set and forecast
     string start = obslabel(1+t2)
     string ende = obslabel(t2+self.h)
@@ -209,13 +232,13 @@ function matrix snaive (bundle *self)
     string ende = obslabel(t2+self.h)
     # Forecast
     fcast @start @ende --dynamic --quiet
+    
     return $fcast #~ $fcse
 end function
 
 
 function void initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
-
 
     strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdFC", \
       "ar1FC", "ar1trendFC")
@@ -279,9 +302,14 @@ function bundle naiveFC (const series y,
     # Drop missings
     T = $nobs
     smpl y --contiguous
+    self.t1_label = obslabel($t1)
+    self.t2_label = obslabel($t2)
     if $nobs<T && self.verbose
-        printf "\nThe contiguous time-series sample has been restricted\n"
+        printf "\nWarning: The contiguous time-series sample has been restricted\n"
         printf "due to %d missing values in the original dataset.\n", (T-$nobs)
+        printf "Information on the contiguous set:\n"
+        printf "Start date: %s\n", obslabel($t1)
+        printf "End date: %s\n", obslabel($t2)
         printf "\n"
     endif
     series self.y = y
@@ -311,7 +339,7 @@ function matrix avgf (bundle *self)
 /* Computes the mean (average) and cross-sectional
    (across forecast methods) standard deviation at
    each horizon using all simple forecast methods
-    available.*/
+    available. */
 
     # Models for both seasonal and non-seasonal frequencies
     matrix FC = meanf(&self)
@@ -389,7 +417,7 @@ end function
 
 function void NaiveThroughTime (bundle *self)
 /* This function estimates the point estimates in either (i) a
-    rolling or (ii) recursive manner and stores these point estimates. */
+    rolling or (ii) a recursive manner and stores point estimates. */
 
     if $nobs<self.wsize
         printf "\nError: The window size you selected (=%d) exceeds the\n\
@@ -459,14 +487,24 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     string ylab = !inbundle(self,"ylab") ? "" : self.ylab
     string xlab = !inbundle(self,"xlab") ? "" : self.xlab
     string out = !inbundle(self,"filename") ? "display" : self.filename
+    # Grab the number of obs. for the valid sample (contiguous set)
+    smpl obsnum(self.t1_label) obsnum(self.t2_label)
     scalar T = $nobs
     # No. of pre-forecast obs. to plot - default 25pct. of total obs.
     scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*T) : self.preobs_fc
 
     # Augment the dataset
-    dataset addobs self.h
-    series y = self.y
+    smpl full
+    t2_new = $t2				# unconsider eventual missings in the data passed to naiveFC()
+    t2_diff = t2_new-obsnum(self.t2_label)
+    nadd = self.h-t2_diff
+    dataset addobs nadd
+    # Note, we unconsider eventual missings at the beginning of the data passed to naiveFC()
+    smpl obsnum(self.t1_label) $t2				# restrict back
 
+    # Grab target series
+    series y = self.y
+    
     # Set up the fcmat matrix holding results
     if self.type_roll=="static"
         matrix fcmat = zeros(T, cols(self.fc))		# length equal to no, of obs. of the non-augmented sample
@@ -475,7 +513,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     else
         matrix fcmat = self.fc
     endif
-
+    
     # Prepare lists for plotting
     setinfo y --graph-name="Actuals"
     list lplot = y
