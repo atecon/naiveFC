@@ -50,7 +50,7 @@ end function
 
 function matrix get_mean_obsminor (bundle *self, int use_median[0])
 /* Helper function for obtaining for each periodicity
-    (quarterly=4,monthly=12, weekly=52, etc.) the mean/ median value.*/
+    (quarterly=4,monthly=12, weekly=52/53, etc.) the mean/ median value. */
     # TODO: in principle one could get the mean for instance for
     # weekly data on the monthly, weekly or daily frequency level.
 
@@ -124,7 +124,7 @@ function matrix call_method (bundle *self)
         self.w_drift = 1
         return rwf(&self)
     endif
-    
+
     # For seasonal series only
     #-------------------------
     if self.which=="smeanFC"
@@ -141,48 +141,10 @@ end function
 
 
 function matrix ar1f (bundle *self)
-/* Returns forecasts from an AR(1) model either with or without linear trend. */
+    /* Returns forecasts from an AR(1) model either with or without linear trend. */
 
     scalar h = self.h
     series y = self.y
-    t2 = $t2
-
-    # Grab the number of obs. for the valid sample (contiguous set)
-    smpl obsnum(self.t1_label) obsnum(self.t2_label)
-    scalar T = $nobs
-    T
-    stop
-    
-*** HIER WEITERMACHEN ***
-
-    if self.type_roll=="static"
-        # Augment the dataset
-/*
-        smpl full
-        eval obslabel($t1)
-        eval obslabel($t2)
-        stop        
-
-        t2_new = $t2				# unconsider eventual missings in the data passed to naiveFC()
-        eval obslabel(t2_new)
-        eval self.t2_label
-        stop
-        t2_diff = t2_new-obsnum(self.t2_label)
-        nadd = self.h-t2_diff
-        nadd
-        stop
-        dataset addobs nadd
-        # Note, we unconsider eventual missings at the beginning of the data passed to naiveFC()
-        smpl obsnum(self.t1_label) $t2				# restrict back
-        */
-        smpl full
-        dataset addobs self.h
-        
-    elif self.type_roll=="rolling" || self.type_roll=="recursive"
-        # When called via NaiveThroughTime(), 'dataset' cmd
-        # is not applicable
-        t2 -= self.h
-    endif
 
     # setup list of regressors
     list L = const y(-1)
@@ -194,12 +156,17 @@ function matrix ar1f (bundle *self)
     endif
 
     # set training set
-    smpl ; t2
+    if self.type_roll=="rolling" || self.type_roll=="recursive"
+        smpl ; $t2
+    else
+        smpl obsnum(self.t1_label) obsnum(self.t2_label)
+    endif
+
     # Estimate
     ols y L --quiet
     # Set test set and forecast
-    string start = obslabel(1+t2)
-    string ende = obslabel(t2+self.h)
+    string start = obslabel(1+$t2)
+    string ende = obslabel($t2+self.h)
     fcast @start @ende --dynamic --quiet
 
     return $fcast #~ $fcse
@@ -210,29 +177,23 @@ function matrix snaive (bundle *self)
 /* Returns forecasts from an ARIMA(0,0,0)(0,1,0)
     model where m is the seasonal period.*/
     series y = self.y
-    t2 = $t2
 
     if self.type_roll=="static"
-        # add new obs.
-        dataset addobs self.h
-    elif self.type_roll=="rolling" || self.type_roll=="recursive"
-        # when called via NaiveThroughTime(), 'dataset' cmd
-        # is not applicable
-        t2 -= self.h
-    endif
+        smpl obsnum(self.t1_label) obsnum(self.t2_label)
 
-    # set to training set
-    smpl ; t2
+    elif self.type_roll=="rolling" || self.type_roll=="recursive"
+        # set to training set
+        catch smpl ; ($t2-self.h)
+        if $error
+            funcerr "Check your sample and window size."
+        endif        
+    endif
 
     # Estimate
     arima 0 0 0 ; 0 1 0 ; y --quiet
-
-    # Set test set and forecast
-    string start = obslabel(1+t2)
-    string ende = obslabel(t2+self.h)
     # Forecast
-    fcast @start @ende --dynamic --quiet
-    
+    fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+
     return $fcast #~ $fcse
 end function
 
@@ -299,19 +260,14 @@ function bundle naiveFC (const series y,
     # Check whether method is applicable
     initial_checks(&self)
 
-    # Drop missings
-    T = $nobs
-    smpl y --contiguous
-    self.t1_label = obslabel($t1)
-    self.t2_label = obslabel($t2)
-    if $nobs<T && self.verbose
-        printf "\nWarning: The contiguous time-series sample has been restricted\n"
-        printf "due to %d missing values in the original dataset.\n", (T-$nobs)
-        printf "Information on the contiguous set:\n"
-        printf "Start date: %s\n", obslabel($t1)
-        printf "End date: %s\n", obslabel($t2)
-        printf "\n"
-    endif
+    # Drop missings + determine number of obs.
+    drop_missings(y, &self)
+    # smpl obsnum(self.t1_label) obsnum(self.t2_label) # restrict to valid set
+
+    # Add obs for forecasting
+    self.obs_added = nobs_to_add(y, &self)
+    dataset addobs self.obs_added
+    # update
     series self.y = y
 
     # Call method
@@ -332,6 +288,35 @@ function bundle naiveFC (const series y,
     endif
 
     return self
+end function
+
+
+
+function scalar nobs_to_add (const series y, bundle *self)
+    /* Determine the number of additional observations to add to the dataset. */
+
+    smpl y --contiguous
+    t2_new = $t2				# unconsider eventual missings in the data passed to naiveFC()
+    return self.h - ($tmax-t2_new)
+end function
+
+
+function void drop_missings (const series y, bundle *self)
+    /* Drop missing values + construct a contiguous data set. */
+
+    self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
+    smpl y --contiguous
+    self.t1_label = obslabel($t1)
+    self.t2_label = obslabel($t2)
+    self.T = $nobs		# no. of valid obs before adding obs. for forecasting purpose
+    if self.T<self.T_all && self.verbose
+        printf "\nWarning: The time-series sample has been restricted\n"
+        printf "due to %d missing values in the original dataset.\n", (self.T_all-$nobs)
+        printf "Information on the new contiguous set:\n"
+        printf "Start date: %s\n", obslabel($t1)
+        printf "End date: %s\n", obslabel($t2)
+        printf "\n"
+    endif
 end function
 
 
@@ -393,14 +378,21 @@ function matrix smedianf (bundle *self)
 /* Forecasts of all future values are equal to the median of
    the respective historical seasonal period
     where m is the seasonal period.*/
-    return get_mean_obsminor(&self,1)
+    return get_mean_obsminor(&self, 1)
 end function
 
 
 function matrix rwf (bundle *self)
 /* Naïve forecast is optimal when data follow a random-walk
     or random-walk + drift. */
-    matrix fc = ones(self.h,1) .* self.y[$t2]
+
+    if self.type_roll=="rolling" || self.type_roll=="recursive"
+        smpl ; $t2# - self.h)
+    else
+        smpl obsnum(self.t1_label) obsnum(self.t2_label)
+    endif
+
+    matrix fc = ones(self.h, 1) .* self.y[$t2]
     if inbundle(self, "w_drift")
         if self.w_drift
             # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
@@ -420,7 +412,7 @@ function void NaiveThroughTime (bundle *self)
     rolling or (ii) a recursive manner and stores point estimates. */
 
     if $nobs<self.wsize
-        printf "\nError: The window size you selected (=%d) exceeds the\n\
+        printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
           no. of valid observations.\n", self.wsize
         funcerr "Re-specify."
     endif
@@ -430,16 +422,17 @@ function void NaiveThroughTime (bundle *self)
     series y = self.y
     list X = y						# a list must be passed to data splitter
 
-    # Set data splitter
+    # Set data splitter using the valid observation set w.o. obs. addiotnally added for forecasting
+    smpl obsnum(self.t1_label) obsnum(self.t2_label)
     bundle cv = null
     list cv.X = X
     string cv.cv_type = (self.type_roll=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.wsize
-    CvDataSplitter(&cv)							# actual call
+    CvDataSplitter(&cv)
 
-    /* Needed as CvDataSplitter() doesn't consider the very last obs in
+    /* Required seto, as CvDataSplitter() doesn't consider the very last obs in
     the final training set for 'rolwin' and 'recwin'. */
-    cv.X_train += cv.X_train[cv.n_folds] | ({$tmax}~{y[$tmax]})
+    cv.X_train += cv.X_train[cv.n_folds] | ({$t2}~{y[$t2]})
     cv.n_folds++
 
     /*	For debugging only
@@ -460,7 +453,6 @@ function void NaiveThroughTime (bundle *self)
 
         # 1st obs being forecasted (h=1) based on information up to (self.initfc-1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-
         self.fc[lwin,] = call_method(&self)'	# compute forecast
     endloop
 
@@ -472,7 +464,7 @@ function void NaiveThroughTime (bundle *self)
     strings self.fcperiods = array(cv.n_folds)
     loop i=1..cv.n_folds -q
         # NOTE: obslabel(self.initfc+$i-2): for i==1 the data refers to the 1st day
-        # based on which the first h=1,...,H OoS-forecasts are made!
+        # based on which the first h=1,...,H OoS-forecasts are made.
         self.fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-2) )
     endloop
     rnameset(self.fc, self.fcperiods)
@@ -487,33 +479,24 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     string ylab = !inbundle(self,"ylab") ? "" : self.ylab
     string xlab = !inbundle(self,"xlab") ? "" : self.xlab
     string out = !inbundle(self,"filename") ? "display" : self.filename
-    # Grab the number of obs. for the valid sample (contiguous set)
-    smpl obsnum(self.t1_label) obsnum(self.t2_label)
-    scalar T = $nobs
     # No. of pre-forecast obs. to plot - default 25pct. of total obs.
-    scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*T) : self.preobs_fc
+    scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*self.T) : self.preobs_fc
 
     # Augment the dataset
-    smpl full
-    t2_new = $t2				# unconsider eventual missings in the data passed to naiveFC()
-    t2_diff = t2_new-obsnum(self.t2_label)
-    nadd = self.h-t2_diff
-    dataset addobs nadd
-    # Note, we unconsider eventual missings at the beginning of the data passed to naiveFC()
+    dataset addobs self.obs_added
+    # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
     smpl obsnum(self.t1_label) $t2				# restrict back
-
-    # Grab target series
     series y = self.y
-    
+
     # Set up the fcmat matrix holding results
     if self.type_roll=="static"
-        matrix fcmat = zeros(T, cols(self.fc))		# length equal to no, of obs. of the non-augmented sample
+        matrix fcmat = zeros(self.T, cols(self.fc))		# length equal to no, of obs. of the non-augmented sample
         fcmat = (fcmat.=0) ? NA : fcmat
         fcmat |= self.fc							# concatenate forecasts
     else
         matrix fcmat = self.fc
     endif
-    
+
     # Prepare lists for plotting
     setinfo y --graph-name="Actuals"
     list lplot = y
@@ -535,10 +518,10 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
         endloop
 
     elif self.type_roll=="static"
-        self.initfc = T+1								# no yet defined for this case
+        self.initfc = self.T+1							# no yet defined for this case
 
         loop i=1..cols(self.fc) -q
-            if i!=2 && self.type_roll=="static"			#i==2 refers to S.D.
+            if i!=2 && self.type_roll=="static"			# i==2 refers to standard deviation stats
                 series fc_$i = fcmat[,i]
                 if self.which=="avgFC"
                     str = sprintf("%s", self.method_names[i])

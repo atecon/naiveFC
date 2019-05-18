@@ -4,14 +4,16 @@ set verbose off
 include "/home/at/git/naiveFC/gretl/naiveFC.inp"
 
 # Select an example
+#==================
 scalar runEX = 2
 
+# Load data
 if runEX==1
     open nysewk.gdt -q		# daily, 7d
     series y = close
 elif runEX==2
     open AWM.gdt -q			# quarterly
-    series y = diff(YGA)
+    series y = YGA
 elif runEX==3
     open hendry_jae.gdt -q	# annual
     series y = diff(gdp)
@@ -23,15 +25,7 @@ endif
 #=======================
 # Static naive forecasts
 #=======================
-
-bundle b = null
-# AR(1)
-b = null
-bundle b = naiveFC(y, "ar1FC")
-naivePlot(&b)
-eval b.fc
-stop
-
+/*
 # Forecast combination
 bundle b = null
 b = naiveFC(y, "avgFC")		# compute forecasts
@@ -90,19 +84,24 @@ eval b.fc
 bundle b = naiveFC(y, "ar1trendFC")
 naivePlot(&b)
 eval b.fc
+*/
 
 #=========================
 # Rolling-window forecasts
 #=========================
 bundle opts = null					# setup additional options
-opts.type_roll = "recursive" 			# "rolling" / "recursive" -> type of moving-window forecasting
-opts.wsize = int(0.75*$nobs)		# window length
+opts.type_roll = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting
+opts.wsize = 11 #int(0.75*$nobs)		# window length
 opts.verbose = 0					# don't print details
 
-bundle b = null
-bundle b = naiveFC(y, "ar1FC", opts)
-#print b
-eval b.fc
-b.preobs_fc = 5					# set no. of pre.-forecast periods obs. to plot
-# Plot
-naivePlot(&b)
+methods = defarray("meanFC", "medianFC", "rwFC", "rwdFC", "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
+loop i=1..nelem(methods) -q
+    bundle b = null
+    bundle b = naiveFC(y, methods[i], opts)
+    #print b
+#    eval b.fc
+    b.preobs_fc = 10					# set no. of pre.-forecast periods obs. to plot
+    # Plot
+    naivePlot(&b)
+endloop
+
