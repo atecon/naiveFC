@@ -57,7 +57,7 @@ function matrix get_mean_obsminor (bundle *self, int use_median[0])
     string ops = (use_median==1) ? "median" : "mean"
     # construct seasonal indicator series
     gen_season_series(&self)
-    matrix ybar = aggregate(self.y, self.obs_season, @ops)[,3] # $pd by 1 vector
+    matrix ybar = aggregate(self.y, self.obs_season, @ops)[,3] # at maximum $pd by 1 vector
     return stack_fc(&self, ybar)
 end function
 
@@ -66,14 +66,14 @@ function matrix stack_fc (bundle *self, matrix ybar)
 /* Check which value $obsminor takes for the last obs.
     Do some re-ordering. */
     matrix val_obs_season = values(self.obs_season)
-
+    
     # Re-order fc to make sure that 1st forecast
     # corresponds to the right month, quarter etc.
     if self.obs_season[$tmax] < max(val_obs_season)		# last quarter/month/day-of-week
         matrix selmat = 0 * vec(seq(min(val_obs_season), max(val_obs_season)) )
-        scalar counter = self.obs_season[$tmax] + 1
+        scalar counter = self.obs_season[$tmax] + 1		# identify the following month or week
         loop i=1..rows(selmat) -q
-            selmat[counter] = $i #val_obs_season[i]			# set position after $tmax
+            selmat[counter] = $i 	# val_obs_season[i]			# set position after $tmax
             counter = (counter==max(val_obs_season)) ? 1 : (counter+1)
         endloop
         ybar = msortby(ybar~selmat,2)[,1]
@@ -229,6 +229,13 @@ function void initial_checks (bundle *self)
             funcerr "The method you requested is not available for non-seasonal data."
         endif
     endif
+
+    if self.wsize < $pd
+        printf "\nError:\n"
+        printf "Window size = %d\n", self.wsize
+        printf "Periodicity = %d\n", $pd
+        funcerr "The size of the moving window cannot be smaller than the underlying periodicity."
+    endif    
 
     if self.nboot>0
         print_noboot()

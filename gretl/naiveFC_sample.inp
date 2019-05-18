@@ -5,7 +5,7 @@ include "/home/at/git/naiveFC/gretl/naiveFC.inp"
 
 # Select an example
 #==================
-scalar runEX = 2
+scalar runEX = 4
 
 # Load data
 if runEX==1
@@ -86,22 +86,31 @@ naivePlot(&b)
 eval b.fc
 */
 
+
+# TODO
+#=====
+1) Return in der Zeile das Datum, das prognostiziert wird, anstelle von 'h=*'
+2) Bei plotten von moving-window forecast, begrenze plotting output, das sonst sinnlos
+3) Checke welche Meldungen, der user bekommen sollte (Methode, Information set, 1. u. letztes Datum der Prognose(n))
+
 #=========================
 # Rolling-window forecasts
 #=========================
 bundle opts = null					# setup additional options
 opts.type_roll = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting
-opts.wsize = 11 #int(0.75*$nobs)		# window length
+opts.wsize = 13 #int(0.75*$nobs)		# window length
 opts.verbose = 0					# don't print details
 
 methods = defarray("meanFC", "medianFC", "rwFC", "rwdFC", "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
-loop i=1..nelem(methods) -q
+loop i=5..nelem(methods) -q
     bundle b = null
+    eval methods[i]
     bundle b = naiveFC(y, methods[i], opts)
     #print b
 #    eval b.fc
     b.preobs_fc = 10					# set no. of pre.-forecast periods obs. to plot
     # Plot
     naivePlot(&b)
+    stop
 endloop
 
