@@ -479,7 +479,7 @@ YGA
 \end_inset
 
  is for 1998Q2.
- Hence, the 1-step ahead forecast will be computed for period 1998Q3!
+ Hence, the 1-step ahead forecast will be computed for period 1998Q3.
 \end_layout
 
 \begin_layout Standard
@@ -524,7 +524,7 @@ open AWM.gdt --quiet
 
 \begin_layout Plain Layout
 
-series x = YGA		# output gap
+series y = YGA		# output gap
 \end_layout
 
 \begin_layout Plain Layout
@@ -539,22 +539,27 @@ scalar h = 11		# set max.
 
 \begin_layout Plain Layout
 
-# SMEANF
+# Mean forecast
 \end_layout
 
 \begin_layout Plain Layout
 
-smean = smeanf(x, h) 
+bundle b = null			# initialize an empty bundle
 \end_layout
 
 \begin_layout Plain Layout
 
-print smean
+b = naiveFC(y, "meanFC")	# compute forecasts
 \end_layout
 
 \begin_layout Plain Layout
 
-fcplot(x, smean, "Seasonal Mean Forecast")
+naivePlot(&b)				# plot forecast values
+\end_layout
+
+\begin_layout Plain Layout
+
+eval b.fc					# print matrix hodling forecast values
 \end_layout
 
 \begin_layout Plain Layout
@@ -568,17 +573,17 @@ fcplot(x, smean, "Seasonal Mean Forecast")
 
 \begin_layout Plain Layout
 
-rwd = rwf(x, h, 1)
+bundle b = naiveFC(y, "rwdFC")
 \end_layout
 
 \begin_layout Plain Layout
 
-print rwd
+naivePlot(&b)
 \end_layout
 
 \begin_layout Plain Layout
 
-fcplot(x, rwd, "Random-Walk + Drift Forecast")
+eval b.fc
 \end_layout
 
 \begin_layout Plain Layout
@@ -592,19 +597,23 @@ fcplot(x, rwd, "Random-Walk + Drift Forecast")
 
 \begin_layout Plain Layout
 
-avg_fc = avgfc(x, h)
+bundle b = null
 \end_layout
 
 \begin_layout Plain Layout
 
-print avg_fc		# 1st col: point forecast, 2nd col: std.
+b = naiveFC(y, "avgFC")
+\end_layout
+
+\begin_layout Plain Layout
+
+naivePlot(&b)		
+\end_layout
+
+\begin_layout Plain Layout
+
+eval b.fc			# 1st col: point forecast, 2nd col: std.
  deviation
-\end_layout
-
-\begin_layout Plain Layout
-
-fcplot(x, avg_fc[,1], "Avg.
- of Forecasts")
 \end_layout
 
 \end_inset
@@ -622,8 +631,8 @@ The estimated
 \begin_inset Formula $h$
 \end_inset
 
--step ahead average of forecasts (named 'average-fc') and the cross-sectional
- standard deviation ('sd') as well as the point forecasts of the separate
+-step ahead average of forecasts (named 'Average-FC') and the cross-sectional
+ standard deviation ('SD') as well as the point forecasts of the separate
  methods are reported in the output below for the first three horizons:
 \end_layout
 
@@ -654,26 +663,68 @@ status open
 
 \begin_layout Plain Layout
 
-     average-fc    sd     meanf   medianf    rwf   rwf+drift  AR(1)    smean
-   smedian   snaive
+****************************************************
 \end_layout
 
 \begin_layout Plain Layout
 
-h=1     0.993    0.001    0.994    0.992    0.992    0.992    0.992    0.995   
- 0.994    0.992
+		Naive Forecasting Method
 \end_layout
 
 \begin_layout Plain Layout
 
-h=2     0.992    0.001    0.994    0.992    0.992    0.991    0.992    0.995   
- 0.992    0.992
+Forecasting method: 			avgFC
 \end_layout
 
 \begin_layout Plain Layout
 
-h=3     0.992    0.002    0.994    0.992    0.992    0.991    0.992    0.994   
- 0.991    0.987
+Start valid data set:		1971:4
+\end_layout
+
+\begin_layout Plain Layout
+
+End valid data set: 		1998:2
+\end_layout
+
+\begin_layout Plain Layout
+
+Number of observations: 106
+\end_layout
+
+\begin_layout Plain Layout
+
+Forecast horizon: 			10
+\end_layout
+
+\begin_layout Plain Layout
+
+First observation forecasted: 1998:3
+\end_layout
+
+\begin_layout Plain Layout
+
+****************************************************
+\end_layout
+
+\begin_layout Plain Layout
+
+Average-FC SD Mean Median RW RW+Drift AR(1) AR(1)+Trend Seas-Mean Seas-Median
+ Seas-Naive
+\end_layout
+
+\begin_layout Plain Layout
+
+1998:07  0.99  0.002   0.99   0.99   0.99   0.99   0.99   0.99   0.99  0.99  0.98
+\end_layout
+
+\begin_layout Plain Layout
+
+1998:10  0.99  0.002   0.99   0.99   0.99   0.99   0.99   0.98   0.99  0.99  0.98
+\end_layout
+
+\begin_layout Plain Layout
+
+1999:01  0.99  0.001   0.99   0.99   0.99   0.99   0.99   0.98   0.99  0.99  0.99
 \end_layout
 
 \end_inset
@@ -690,11 +741,11 @@ h=3     0.992    0.002    0.994    0.992    0.992    0.991    0.992    0.994
 The NaiveThroughTime() function allows the user to easily compute rolling
  (fixed window length) or recursive (expanding window length) forecasts
  for a specific naive forecast type.
- The following sample script computes the 1- to 4-steps ahead seasonal mean
- (
-\family typewriter
-smeanf
-\family default
+ The following sample script computes the 1- to 10-steps ahead random-walk
+ plus drift (
+\emph on
+rwdFC
+\emph default
 ) forecasts over time.
 \end_layout
 
@@ -725,43 +776,62 @@ status open
 
 \begin_layout Plain Layout
 
-bundle b = null      # generate an empty bundle
+bundle b = null             # generate an empty bundle
 \end_layout
 
 \begin_layout Plain Layout
 
-b.y = x              # put objetcs into the bundle
+bundle opts = null          # additional bundle holding options
 \end_layout
 
 \begin_layout Plain Layout
 
-b.h = 4              # max.
- horizon
+opts.type_roll = "rolling"  # "rolling"/"recursive": type of moving-window
+ forecasting
 \end_layout
 
 \begin_layout Plain Layout
 
-b.wsize = 33         # window size
+opts.wsize = 100	           # moving window length (optional)
 \end_layout
 
 \begin_layout Plain Layout
 
-string which = "smeanf"   # choose a method
 \end_layout
 
 \begin_layout Plain Layout
 
-NaiveThroughTime(&b, which) # Call the function
+bundle b = naiveFC(y, 
+\begin_inset Quotes eld
+\end_inset
+
+rwdFC
+\begin_inset Quotes erd
+\end_inset
+
+, opts)
 \end_layout
 
 \begin_layout Plain Layout
 
-matrix FC = b.FC     # grab matrix of forecasts
+eval b.fc
 \end_layout
 
 \begin_layout Plain Layout
 
-print FC             # rows: period being forecasted, cols: fc-horizon
+# Plot outcome
+\end_layout
+
+\begin_layout Plain Layout
+
+b.preobs_fc = 10  # set no.
+ of pre.-forecast periods obs.
+ to plot (optional)
+\end_layout
+
+\begin_layout Plain Layout
+
+naivePlot(&b)              # call plotting function
 \end_layout
 
 \end_inset
@@ -775,16 +845,27 @@ print FC             # rows: period being forecasted, cols: fc-horizon
 \end_layout
 
 \begin_layout Standard
-The results are stored in matrix 
+The chosen length of the moving window results in eight 10-steps ahead forecasts.
+ The results are stored in matrix 
 \family typewriter
-FC
+fc
 \family default
 .
- Thus, the 1-step ahead forecast for series 
-\begin_inset Formula $x$
+ The first 1-step ahead forecast for series 
+\begin_inset Formula $y$
 \end_inset
 
- made in 1980Q1 for 1980Q2 is 1.0059.
+ is made in 1996Q3 for period 1996Q4 is 0.995.
+ The 
+\family typewriter
+naivePlot()
+\family default
+ function, grabs all relevant information from bundle b
+\emph on
+ 
+\emph default
+and allows for an easy illustration of the moving forecast exercise, as
+ depicted below.
 \end_layout
 
 \begin_layout Standard
@@ -814,36 +895,121 @@ status open
 
 \begin_layout Plain Layout
 
-                h=1          h=2          h=3          h=4
+****************************************************
 \end_layout
 
 \begin_layout Plain Layout
 
-1980:2       1.0059          nan          nan          nan
+               Naive Forecasting Method
 \end_layout
 
 \begin_layout Plain Layout
 
-1980:3       1.0059       1.0045          nan          nan
+Forecasting method:                 rwdFC
 \end_layout
 
 \begin_layout Plain Layout
 
-1980:4       1.0058       1.0051       1.0060          nan
+Start valid data set:               1971:4
 \end_layout
 
 \begin_layout Plain Layout
 
-1981:1       1.0058       1.0051       1.0060       1.0062
+End valid data set:                 1998:2
 \end_layout
 
 \begin_layout Plain Layout
 
-1981:2       1.0043       1.0053       1.0058       1.0073 
+Number of observations:             106
+\end_layout
+
+\begin_layout Plain Layout
+
+Forecast horizon: 	            10
+\end_layout
+
+\begin_layout Plain Layout
+
+Moving window length:               100
+\end_layout
+
+\begin_layout Plain Layout
+
+Number of rolling forecasts:        8
+\end_layout
+
+\begin_layout Plain Layout
+
+First observation forecasted (h=1): 1996:4
+\end_layout
+
+\begin_layout Plain Layout
+
+****************************************************
+\end_layout
+
+\begin_layout Plain Layout
+
+          h=1   h=2     h=3   h=4     h=5   h=6     h=7   h=8     h=9  
+ h=10
+\end_layout
+
+\begin_layout Plain Layout
+
+1996:3  0.982 0.981  0.981  0.981  0.981  0.981  0.981  0.980  0.980  0.980
+\end_layout
+
+\begin_layout Plain Layout
+
+1996:4  0.980 0.980  0.979  0.979  0.979  0.978  0.971  0.978  0.978  0.977
+\end_layout
+
+\begin_layout Plain Layout
+
+1997:1  0.978  0.978  0.977  0.977  0.977  0.977  0.976  0.976  0.976  0.976
 \end_layout
 
 \end_inset
 
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename roll_rwdFC.png
+	scale 80
+	rotateOrigin center
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Rolling-window 10-steps ahead random-walk plus drift forecasts.
+ Forecasts are made for 8 different training sets.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
 
 \end_layout
 

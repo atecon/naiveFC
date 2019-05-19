@@ -5,7 +5,7 @@ include "/home/at/git/naiveFC/gretl/naiveFC.inp"
 
 # Select an example
 #==================
-scalar runEX = 3
+scalar runEX = 2
 
 # Load data
 if runEX==1
@@ -25,7 +25,7 @@ endif
 #=======================
 # Static naive forecasts
 #=======================
-#/*
+/*
 # Forecast combination
 bundle b = null
 b = naiveFC(y, "avgFC")		# compute forecasts
@@ -85,7 +85,7 @@ eval b.fc
 bundle b = naiveFC(y, "snaiveFC")
 naivePlot(&b)
 eval b.fc
-#*/
+*/
 
 
 #=========================
@@ -93,10 +93,10 @@ eval b.fc
 #=========================
 bundle opts = null					# setup additional options
 opts.type_roll = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
-opts.wsize = xmax($pd,30) 			# moving window length (optional)
+opts.wsize = xmax($pd,100) 			# moving window length (optional)
 #opts.verbose = 0					# Don't print details (optional)
 
-methods = defarray("meanFC")#, "medianFC", "rwFC", "rwdFC", "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
+methods = defarray("rwdFC")#, "medianFC", "rwFC", "rwdFC", "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
 loop i=1..nelem(methods) -q
     bundle b = null
     eval methods[i]
@@ -104,7 +104,7 @@ loop i=1..nelem(methods) -q
     eval b.fc
     
     # Plot (optional)
-    b.preobs_fc = 10					# set no. of pre.-forecast periods obs. to plot
-    # naivePlot(&b)
+    b.preobs_fc = 15					# set no. of pre.-forecast periods obs. to plot
+    naivePlot(&b)
 endloop
 
