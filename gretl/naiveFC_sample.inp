@@ -5,7 +5,7 @@ include "/home/at/git/naiveFC/gretl/naiveFC.inp"
 
 # Select an example
 #==================
-scalar runEX = 4
+scalar runEX = 3
 
 # Load data
 if runEX==1
@@ -25,12 +25,13 @@ endif
 #=======================
 # Static naive forecasts
 #=======================
-/*
+#/*
 # Forecast combination
 bundle b = null
 b = naiveFC(y, "avgFC")		# compute forecasts
 naivePlot(&b)				# plot forecast results
 eval b.fc					# print forecast results
+
 
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
@@ -59,6 +60,17 @@ bundle b = naiveFC(y, "rwdFC")
 naivePlot(&b)
 eval b.fc
 
+# AR(1)
+b = null
+bundle b = naiveFC(y, "ar1FC")
+naivePlot(&b)
+eval b.fc
+
+# AR(1) + Trend
+bundle b = naiveFC(y, "ar1trendFC")
+naivePlot(&b)
+eval b.fc
+
 # Seasonal mean
 bundle b = naiveFC(y, "smeanFC")
 naivePlot(&b)
@@ -73,44 +85,26 @@ eval b.fc
 bundle b = naiveFC(y, "snaiveFC")
 naivePlot(&b)
 eval b.fc
+#*/
 
-# AR(1)
-b = null
-bundle b = naiveFC(y, "ar1FC")
-naivePlot(&b)
-eval b.fc
-
-# AR(1) + Trend
-bundle b = naiveFC(y, "ar1trendFC")
-naivePlot(&b)
-eval b.fc
-*/
-
-
-# TODO
-#=====
-1) Return in der Zeile das Datum, das prognostiziert wird, anstelle von 'h=*'
-2) Bei plotten von moving-window forecast, begrenze plotting output, das sonst sinnlos
-3) Checke welche Meldungen, der user bekommen sollte (Methode, Information set, 1. u. letztes Datum der Prognose(n))
 
 #=========================
 # Rolling-window forecasts
 #=========================
 bundle opts = null					# setup additional options
-opts.type_roll = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting
-opts.wsize = 13 #int(0.75*$nobs)		# window length
-opts.verbose = 0					# don't print details
+opts.type_roll = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+opts.wsize = xmax($pd,30) 			# moving window length (optional)
+#opts.verbose = 0					# Don't print details (optional)
 
-methods = defarray("meanFC", "medianFC", "rwFC", "rwdFC", "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
-loop i=5..nelem(methods) -q
+methods = defarray("meanFC")#, "medianFC", "rwFC", "rwdFC", "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
+loop i=1..nelem(methods) -q
     bundle b = null
     eval methods[i]
     bundle b = naiveFC(y, methods[i], opts)
-    #print b
-#    eval b.fc
+    eval b.fc
+    
+    # Plot (optional)
     b.preobs_fc = 10					# set no. of pre.-forecast periods obs. to plot
-    # Plot
-    naivePlot(&b)
-    stop
+    # naivePlot(&b)
 endloop
 

@@ -16,6 +16,27 @@ function strings gen_colnam (matrix ci)
 end function
 
 
+function strings gen_fcdates (bundle *self)
+    # construct date strings for forecasts 
+    strings r = array(self.h)
+    # Here we explicitly consider the case when the last obs are missings
+    matrix date = {$obsdate}[1+obsnum(self.t2_label):]
+    loop i=1..self.h -q
+        string sdate = sprintf("%d", date[i])
+        if $pd==1
+            r[i] = sprintf("%s", substr(sdate,1,4))
+        elif $pd==4
+            r[i] = sprintf("%s:%s", substr(sdate,1,4),
+              substr(sdate,5,6))
+        else            
+            r[i] = sprintf("%s-%s-%s", substr(sdate,1,4),
+              substr(sdate,5,6), substr(sdate,7,8))
+        endif        
+    endloop
+    return r
+end function
+
+
 function strings gen_rownam (scalar h)
     # construct row names (horizons)
     strings r = array(h)
@@ -288,13 +309,38 @@ function bundle naiveFC (const series y,
         else
             cnameset(self.fc, self.method_names)
         endif
-        rnameset(self.fc, gen_rownam(self.h))
+        rnameset(self.fc, gen_fcdates(&self)) #gen_rownam(self.h))
 
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         NaiveThroughTime(&self)
     endif
 
+    if self.verbose
+        summarize_naive_fc(&self)
+    endif    
+
     return self
+end function
+
+
+function void summarize_naive_fc (bundle *self)
+    /* Print summarizing information. */
+    printf "****************************************************\n"
+    printf "\t\tNaive Forecasting Method\n"
+    printf "\nForecasting method: \t\t\t%s\n", self.which
+    printf "Start valid data set: \t\t\t%s\n", self.t1_label
+    printf "End valid data set: \t\t\t%s\n", self.t2_label
+    printf "Number of observations: \t\t%d\n", obsnum(self.t2_label)-obsnum(self.t1_label)
+    printf "Forecast horizon: \t\t\t%d\n", self.h    
+    if self.type_roll=="static"
+        printf "First observation forecasted: \t%s\n", obslabel(obsnum(self.t2_label)+1)
+    else
+        printf "Moving window length: \t\t\t%d\n", self.wsize
+        printf "Number of %s forecasts: \t\t%d\n", self.type_roll, rows(self.fc)
+        printf "First observation forecasted (h=1): \t%s\n", obslabel(self.initfc)
+    endif
+    printf "****************************************************\n"
+    printf "\n"
 end function
 
 
