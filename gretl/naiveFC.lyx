@@ -485,7 +485,7 @@ YGA
 \begin_layout Standard
 The sample script opens the data set, computes and plots some forecasts.
  Lastly, an average of forecasts is computed which is an average of the
- (currently) eight forecast methods implemented (for details see below).
+ (currently) nine forecasting methods implemented (for details see below).
 \end_layout
 
 \begin_layout Standard
@@ -631,9 +631,10 @@ The estimated
 \begin_inset Formula $h$
 \end_inset
 
--step ahead average of forecasts (named 'Average-FC') and the cross-sectional
+-step ahead average of forecasts, named 'Average-FC', and the cross-sectional
  standard deviation ('SD') as well as the point forecasts of the separate
- methods are reported in the output below for the first three horizons:
+ methods are reported in the output below for the first three horizons (only
+ 2 digits are shown here):
 \end_layout
 
 \begin_layout Standard
@@ -673,7 +674,7 @@ status open
 
 \begin_layout Plain Layout
 
-Forecasting method: 			avgFC
+Forecasting method: 		avgFC
 \end_layout
 
 \begin_layout Plain Layout
@@ -688,17 +689,17 @@ End valid data set: 		1998:2
 
 \begin_layout Plain Layout
 
-Number of observations: 106
+Number of observations: 	106
 \end_layout
 
 \begin_layout Plain Layout
 
-Forecast horizon: 			10
+Forecast horizon: 		10
 \end_layout
 
 \begin_layout Plain Layout
 
-First observation forecasted: 1998:3
+First observation forecasted: 	1998:3
 \end_layout
 
 \begin_layout Plain Layout
@@ -738,15 +739,36 @@ Average-FC SD Mean Median RW RW+Drift AR(1) AR(1)+Trend Seas-Mean Seas-Median
 \end_layout
 
 \begin_layout Standard
-The NaiveThroughTime() function allows the user to easily compute rolling
- (fixed window length) or recursive (expanding window length) forecasts
- for a specific naive forecast type.
+The 
+\emph on
+private
+\emph default
+ 
+\family typewriter
+NaiveThroughTime()
+\family default
+ function implements the easy computation of either (i) rolling (fixed window
+ length) or (ii) recursive (expanding window length) forecasts for a specific
+ naive forecast type.
+ The user just needs to set the string variable 
+\family typewriter
+type_roll
+\family default
+ which actually triggers the 
+\family typewriter
+NaiveThroughTime()
+\family default
+ function.
  The following sample script computes the 1- to 10-steps ahead random-walk
  plus drift (
 \emph on
 rwdFC
 \emph default
-) forecasts over time.
+) forecasts based on a rolling window of length 
+\family typewriter
+wsize=100
+\family default
+.
 \end_layout
 
 \begin_layout Standard
@@ -792,7 +814,7 @@ opts.type_roll = "rolling"  # "rolling"/"recursive": type of moving-window
 
 \begin_layout Plain Layout
 
-opts.wsize = 100	           # moving window length (optional)
+opts.wsize = 100	    # moving window length (optional)
 \end_layout
 
 \begin_layout Plain Layout
@@ -824,7 +846,7 @@ eval b.fc
 
 \begin_layout Plain Layout
 
-b.preobs_fc = 10  # set no.
+b.preobs_fc = 10  	    # set no.
  of pre.-forecast periods obs.
  to plot (optional)
 \end_layout
@@ -845,27 +867,44 @@ naivePlot(&b)              # call plotting function
 \end_layout
 
 \begin_layout Standard
-The chosen length of the moving window results in eight 10-steps ahead forecasts.
- The results are stored in matrix 
+Given the length of the current data set and the chosen window length, eight
+ training sets (moving window samples) on which separate forecasts are made,
+ are internally defined.
+ For each of these eight sets, a 10-steps ahead forecast is computed resulting
+ in a sequence of 
+\emph on
+h
+\emph default
+-step ahead forecasts which are stored in matrix 
 \family typewriter
 fc
+\family default
+ in bundle 
+\family typewriter
+b
 \family default
 .
  The first 1-step ahead forecast for series 
 \begin_inset Formula $y$
 \end_inset
 
- is made in 1996Q3 for period 1996Q4 is 0.995.
- The 
+ is made conditional on information up to 1996Q3 for period 1996Q4 and is
+ 0.995, and so on (see output below).
+\end_layout
+
+\begin_layout Standard
+The public 
 \family typewriter
 naivePlot()
 \family default
- function, grabs all relevant information from bundle b
-\emph on
- 
-\emph default
-and allows for an easy illustration of the moving forecast exercise, as
+ function grabs all relevant information from bundle 
+\family typewriter
+b
+\family default
+, and allows for an easy illustration of the moving forecast exercise, as
  depicted below.
+ The plot nicely illustrates the 10-steaph ahead forecasts for each of the
+ eight training sets.
 \end_layout
 
 \begin_layout Standard
@@ -950,8 +989,7 @@ First observation forecasted (h=1): 1996:4
 
 \begin_layout Plain Layout
 
-          h=1   h=2     h=3   h=4     h=5   h=6     h=7   h=8     h=9  
- h=10
+         h=1   h=2     h=3   h=4     h=5   h=6     h=7   h=8     h=9   h=10
 \end_layout
 
 \begin_layout Plain Layout
@@ -966,7 +1004,7 @@ First observation forecasted (h=1): 1996:4
 
 \begin_layout Plain Layout
 
-1997:1  0.978  0.978  0.977  0.977  0.977  0.977  0.976  0.976  0.976  0.976
+1997:1  0.978 0.978  0.977  0.977  0.977  0.977  0.976  0.976  0.976  0.976
 \end_layout
 
 \end_inset
@@ -1001,7 +1039,6 @@ status open
 
 \begin_layout Plain Layout
 Rolling-window 10-steps ahead random-walk plus drift forecasts.
- Forecasts are made for 8 different training sets.
 \end_layout
 
 \end_inset
@@ -1019,12 +1056,127 @@ Rolling-window 10-steps ahead random-walk plus drift forecasts.
 \end_layout
 
 \begin_layout Section
+Forecasting methods
+\end_layout
+
+\begin_layout Standard
+Here a brief description of the implemented forecasting methods follows.
+ The user calls the respective method, by passing a string variable (
+\family typewriter
+which
+\family default
+) with the respective name, e.g.
+ 
+\begin_inset Quotes eld
+\end_inset
+
+meanFC
+\begin_inset Quotes erd
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection
+meanFC
+\end_layout
+
+\begin_layout Standard
+Forecasts of all future values are equal to the “mean” of the historical
+ data.
+\end_layout
+
+\begin_layout Subsection
+medianFC
+\end_layout
+
+\begin_layout Standard
+Forecasts of all future values are equal to the 
+\begin_inset Quotes eld
+\end_inset
+
+median
+\begin_inset Quotes erd
+\end_inset
+
+ of the historical data.
+\end_layout
+
+\begin_layout Subsection
+smeanFC
+\end_layout
+
+\begin_layout Standard
+Forecasts of all future values are equal to the 
+\begin_inset Quotes eld
+\end_inset
+
+mean
+\begin_inset Quotes erd
+\end_inset
+
+ of the historical data for each specific seasonality (e.g.
+ daily, monthly, or quarterly).
+ For example, with monthly data, the forecast for all future February values
+ is equal to mean value of all past February values.
+ With quarterly data, the forecast of all future 2nd quarter values is equal
+ to mean of all past Q2 values.
+ Similar rules apply for other months and quarters, and for other seasonal
+ periods.
+\end_layout
+
+\begin_layout Subsection
+smedianFC
+\end_layout
+
+\begin_layout Standard
+Works as the 
+\begin_inset Quotes eld
+\end_inset
+
+smeanFC
+\begin_inset Quotes erd
+\end_inset
+
+ method but uses the median instead of the mean statistics.
+\end_layout
+
+\begin_layout Subsection
+ar1FC
+\end_layout
+
+\begin_layout Standard
+For are based on an AR(1) model incl.
+ an intercept where parameters are estimated by standard OLS.
+ The out-of-sample forecasts are recursively (also known as 
+\emph on
+the iterated forecasting method
+\emph default
+) constructed.
+ The 1-step ahead forecast is based on realized values from the previous
+ period.
+ The 
+\begin_inset Formula $h$
+\end_inset
+
+-step ahead (for 
+\begin_inset Formula $h>1$
+\end_inset
+
+) forecast is based on the forecast value from horizon 
+\begin_inset Formula $h-1$
+\end_inset
+
+, respectively.
+\end_layout
+
+\begin_layout Section
 List of public functions
 \end_layout
 
 \begin_layout Standard
-The following public functions are only intended to be used for scripting
- purposes only.
+The following public functions are intended to be used for scripting purposes
+ only.
  Hence, calling these functions through the GUI will not return any printout.
  Instead, the user can access the function 
 \family typewriter
@@ -1043,6 +1195,104 @@ Model –> Time series –> naive forecast(s)
 point and click
 \emph default
 .
+\end_layout
+
+\begin_layout Subsection
+naiveFC
+\end_layout
+
+\begin_layout Standard
+Main function for setting up the forecasting method and conducting the computati
+on.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+naiveFc(const series y "Historic data
+\begin_inset Quotes erd
+\end_inset
+
+, string which "Select method", bundle opts[null])
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+bundle
+\end_layout
+
+\begin_layout Subsection
+naivePlot
+\end_layout
+
+\begin_layout Standard
+Function for plotting results obtained from calling the 
+\family typewriter
+naiveFC()
+\family default
+ function.
+ The user passes a bundle in pointer form.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+naivePlot(bundle *self)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+void
 \end_layout
 
 \begin_layout Subsection
@@ -1187,99 +1437,6 @@ nboot
  
 \color red
 NOT supported yet!
-\end_layout
-
-\begin_layout Standard
-An 
-\begin_inset Formula $h\times1$
-\end_inset
-
- matrix holding the h-step ahead point forecasts will be returned.
-\end_layout
-
-\begin_layout Subsection
-smeanf
-\end_layout
-
-\begin_layout Standard
-Forecasts of all future values are equal to the 
-\begin_inset Quotes eld
-\end_inset
-
-mean
-\begin_inset Quotes erd
-\end_inset
-
- or 
-\begin_inset Quotes eld
-\end_inset
-
-median
-\begin_inset Quotes erd
-\end_inset
-
- of the historical data for each specific seasonality (e.g.
- daily, monthly, or quarterly).
- For example, with monthly data, the forecast for all future February values
- is equal to the last observed February value.
- With quarterly data, the forecast of all future Q2 values is equal to the
- last observed Q2 value (where Q2 means the second quarter).
- Similar rules apply for other months and quarters, and for other seasonal
- periods.
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-smeanf(const series y "Actuals", int h[1::10] "Forecast horizon", bool use_media
-n[0] 
-\begin_inset Quotes eld
-\end_inset
-
-compute median
-\begin_inset Quotes erd
-\end_inset
-
-, scalar level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0],
- int blength[2::4] "Block length bootstrap")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-matrix
-\end_layout
-
-\begin_layout Standard
-The function arguments are the same as for 
-\family typewriter
-meanf()
-\family default
-.
 \end_layout
 
 \begin_layout Standard

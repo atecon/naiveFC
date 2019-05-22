@@ -25,6 +25,9 @@ endif
 #=======================
 # Static naive forecasts
 #=======================
+b = naiveFC(y)		# compute forecasts
+stop
+
 /*
 # Forecast combination
 bundle b = null
