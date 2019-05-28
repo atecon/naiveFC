@@ -311,17 +311,13 @@ R
 \end_layout
 
 \begin_layout Standard
-The 
-\family typewriter
-naiveFC
-\family default
- function package comprises currently the following features:
+The package currently comprises the following features:
 \end_layout
 
 \begin_layout Itemize
-Point estimates for nine simple forecasting methods, namely the 'Average'
- (mean & median), 'Seasonal Average' (seasonal mean & median), 'Naive' (Random-W
-alk), the 'Seasonal Naive', the 
+Point estimates for 9 simple forecasting methods, namely the 'Average' (mean
+ & median), 'Seasonal Average' (seasonal mean & median), 'Naive' (Random-Walk),
+ the 'Seasonal Naive', the 
 \begin_inset Quotes eld
 \end_inset
 
@@ -335,15 +331,16 @@ Easy computation of an average of forecasts by taking the mean point forecasts
 \end_layout
 
 \begin_layout Itemize
-Plotting of the 
-\begin_inset Formula $h$
-\end_inset
-
--step ahead forecasts.
+Computation of either moving.window based sequences of forecasts (using either
+ the rolling or recursive method).
 \end_layout
 
 \begin_layout Itemize
-Computation of either rolling or recursive forecasts.
+Simple plotting of the 
+\begin_inset Formula $h$
+\end_inset
+
+-step ahead forecasts as well as moving window-based sequences of forecasts.
 \end_layout
 
 \begin_layout Itemize
@@ -462,22 +459,14 @@ For illustration we use the AWM-macroeconomic data set comprising various
  series observed at a quarterly frequency over 28 years.
  The data set ends in 1998Q4.
  The objective is to forecast the output gap (series named 
-\begin_inset Quotes eld
-\end_inset
-
+\family typewriter
 YGA
-\begin_inset Quotes erd
-\end_inset
-
+\family default
 ).
  Note, the last valid observation for 
-\begin_inset Quotes eld
-\end_inset
-
+\family typewriter
 YGA
-\begin_inset Quotes erd
-\end_inset
-
+\family default
  is for 1998Q2.
  Hence, the 1-step ahead forecast will be computed for period 1998Q3.
 \end_layout
@@ -1067,13 +1056,17 @@ which
 \family default
 ) with the respective name, e.g.
  
-\begin_inset Quotes eld
+\family typewriter
+string which=
+\begin_inset Quotes erd
 \end_inset
 
 meanFC
 \begin_inset Quotes erd
 \end_inset
 
+
+\family default
 .
 \end_layout
 
@@ -1084,6 +1077,15 @@ meanFC
 \begin_layout Standard
 Forecasts of all future values are equal to the “mean” of the historical
  data.
+ The forecast is computed by
+\begin_inset Formula 
+\[
+\hat{y}_{T+h|T}=\frac{1}{T}\sum_{i=1}^{T}y_{i}
+\]
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Subsection
@@ -1138,7 +1140,7 @@ smeanFC
 \begin_inset Quotes erd
 \end_inset
 
- method but uses the median instead of the mean statistics.
+ method but computes the seasonal median instead of the mean statistics.
 \end_layout
 
 \begin_layout Subsection
@@ -1146,9 +1148,9 @@ ar1FC
 \end_layout
 
 \begin_layout Standard
-For are based on an AR(1) model incl.
- an intercept where parameters are estimated by standard OLS.
- The out-of-sample forecasts are recursively (also known as 
+Forecasts are based on an AR(1) model including an intercept where parameters
+ are estimated by standard OLS.
+ Out-of-sample forecasts are recursively (also known as 
 \emph on
 the iterated forecasting method
 \emph default
@@ -1168,10 +1170,256 @@ the iterated forecasting method
 \end_inset
 
 , respectively.
+ We rely on gretl's built-in 
+\family typewriter
+ols 
+\family default
+and 
+\family typewriter
+fcast 
+\family default
+commands for estimating the parameters of the model:
+\begin_inset Formula 
+\[
+y_{t}=\beta_{\text{0}}+\beta_{1}y_{t-1}+u_{t}\quad u_{t}\sim N(0,\sigma²)
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+ar1trendFC
+\end_layout
+
+\begin_layout Standard
+Works similar as the 
+\emph on
+ar1FC
+\emph default
+ forecasting method but adds a linear trend to the specification.
+ We rely on gretl's built-in 
+\family typewriter
+ols 
+\family default
+and 
+\family typewriter
+fcast 
+\family default
+commands for estimating the parameters of the model:
+\begin_inset Formula 
+\[
+y_{t}=\beta_{\text{0}}+\beta_{1}y_{t-1}+\beta_{2}T+u_{t}\quad u_{t}\sim N(0,\sigma²)
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+rwFC
+\end_layout
+
+\begin_layout Standard
+The random-walk forecast for period 
+\emph on
+
+\begin_inset Formula $T+h$
+\end_inset
+
+
+\emph default
+ equals the value of the last valid observation:
+\begin_inset Formula 
+\[
+\hat{y}_{T+h|T}=y_{T}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+rwdFC
+\end_layout
+
+\begin_layout Standard
+A variation of the 
+\emph on
+rwFC
+\emph default
+ method is to allow the forecasts to increase or decrease over time, where
+ the amount of change over time (called the drift) is set to be the average
+ change seen in the historical data.
+ Thus the forecast for period 
+\begin_inset Formula $T+h$
+\end_inset
+
+ is given by:
+\begin_inset Formula 
+\[
+\hat{y}_{T+h|T}=y_{T}+h\left(\frac{y_{T}-y_{1}}{T-1}\right)
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+snaiveFC
+\end_layout
+
+\begin_layout Standard
+A similar method as the random-walk forecast but especially useful for seasonal
+ data.
+ Forecasts are based on an ARIMA(0,0,0)(0,1,0)[
+\begin_inset Formula $m$
+\end_inset
+
+] model where 
+\begin_inset Formula $m$
+\end_inset
+
+ is the seasonal period.
+ We rely on gretl's built-in 
+\family typewriter
+arima
+\family default
+ and 
+\family typewriter
+fcast
+\family default
+ commands.
+\end_layout
+
+\begin_layout Subsection
+avgFC
+\end_layout
+
+\begin_layout Standard
+This function computes the mean and cross-sectional (across forecast methods)
+ standard deviation of the respective point forecasts at each forecast horizon
+ using all 
+\begin_inset Formula $k$
+\end_inset
+
+ forecasting methods available.
+ For annual data the 
+\series bold
+(i)
+\series default
+ mean-forecast (
+\family typewriter
+meanFC
+\family default
+), the 
+\series bold
+(ii)
+\series default
+ median-forecast (
+\family typewriter
+medianFC
+\family default
+),
+\series bold
+ (iii)
+\series default
+ random-walk without drift (
+\family typewriter
+rw
+\family default
+FC), 
+\series bold
+(iv)
+\series default
+ random-walk with drift (
+\family typewriter
+rwdFC
+\family default
+), (
+\series bold
+v
+\series default
+) the AR(1)-forecast without linear trend (
+\family typewriter
+ar1FC
+\family default
+) and (
+\series bold
+vi
+\series default
+) with linear trend (
+\family typewriter
+ar1trendFC
+\family default
+) will be computed.
+ For data with seasonality (e.g., monthly, quarterly etc.) we also add the
+ 
+\series bold
+(vii)
+\series default
+ the seasonal-mean (
+\family typewriter
+smeanFC
+\family default
+), 
+\series bold
+(viii)
+\series default
+ the seasonal-median (
+\family typewriter
+smedianFC
+\family default
+) and the 
+\series bold
+(ix)
+\series default
+ seasonal-naive forecast (
+\family typewriter
+snaiveFC
+\family default
+) to the collection of forecasts.
+\end_layout
+
+\begin_layout Standard
+The resulting matrix 
+\family typewriter
+fc 
+\family default
+stored in the bundle will be of dimension 
+\begin_inset Formula $h\times(2+k)$
+\end_inset
+
+ comprising the 
+\begin_inset Formula $h$
+\end_inset
+
+-step ahead combined cross-sectional mean forecasts in the 1st column and
+ the cross-sectional standard-deviations across all (
+\begin_inset Formula $k$
+\end_inset
+
+) separate forecasting methods.
+\end_layout
+
+\begin_layout Standard
+The avgFC method will not be computed when combined with either the 
+\emph on
+rolling
+\emph default
+ or 
+\emph on
+recursive
+\emph default
+ moving-window method.
 \end_layout
 
 \begin_layout Section
-List of public functions
+Public functions and parameter values
 \end_layout
 
 \begin_layout Standard
@@ -1198,12 +1446,16 @@ point and click
 \end_layout
 
 \begin_layout Subsection
-naiveFC
+The 
+\family typewriter
+naiveFC()
+\family default
+ function
 \end_layout
 
 \begin_layout Standard
-Main function for setting up the forecasting method and conducting the computati
-on.
+The naiveFC() function marks the main function.
+ The function arguments are:
 \end_layout
 
 \begin_layout Standard
@@ -1228,11 +1480,9 @@ status open
 \begin_layout Plain Layout
 
 \family typewriter
-naiveFc(const series y "Historic data
-\begin_inset Quotes erd
-\end_inset
-
-, string which "Select method", bundle opts[null])
+naiveFc(const series y, string which "Select forecasting method", bundle
+ opts[null] "Bundle incl.
+ optional parameters"))
 \end_layout
 
 \end_inset
@@ -1246,752 +1496,154 @@ Return type:
 bundle
 \end_layout
 
-\begin_layout Subsection
-naivePlot
+\begin_layout Standard
+The user must pass a time-series and a string selecting one of the supported
+ forecasting methods.
+ Optionally, the user pass another bundle element including further parameter.
+ In case the function is successfully called, a bundle including various
+ items will be returned.
 \end_layout
 
 \begin_layout Standard
-Function for plotting results obtained from calling the 
+These additional parameters passed by means of the 
 \family typewriter
-naiveFC()
+opts
 \family default
- function.
- The user passes a bundle in pointer form.
+ bundle are:
 \end_layout
 
 \begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
+\begin_inset Float table
+placement h
+wide false
+sideways false
 status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="13" columns="4">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="left" valignment="top">
+<column alignment="left" valignment="top">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Parameter
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Data type
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Description
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Default value
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
 
 \begin_layout Plain Layout
 
 \family typewriter
-naivePlot(bundle *self)
+h
 \end_layout
 
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Forecast horizon: Must be 
+\begin_inset Formula $>0$
 \end_inset
 
 
 \end_layout
 
-\begin_layout Standard
-Return type: 
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+10
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
 \family typewriter
-void
+type_roll
 \end_layout
 
-\begin_layout Subsection
-meanf
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
 \end_layout
 
-\begin_layout Standard
-Forecasts of all future values are equal to the “mean” or 
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Moving-window type: 
 \begin_inset Quotes eld
 \end_inset
 
-median
+static
 \begin_inset Quotes erd
 \end_inset
 
- of the historical data.
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-meanf(const series y "Actuals", int h[1::10] "Forecast horizon", bool use_median
-[0] 
-\begin_inset Quotes eld
-\end_inset
-
-compute median
-\begin_inset Quotes erd
-\end_inset
-
-, scalar level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0],
- int blength[2::4] "Block length bootstrap")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-matrix
-\end_layout
-
-\begin_layout Standard
-The function arguments are:
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-series y
-\family default
-: series of actual historical outcomes
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int 
-\family default
-h[1::10]: Max.
- forecast horizon to compute (default 10)
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-bool use_median[0]
-\family default
-: Compute the median of the historical data instead (default no)
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-scalar level[64:90:90]
-\family default
-: Set the confidence level for prediction intervals (default 90).
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-bool fan[0]
-\family default
-: If 1, level is set to seq(51,99,3).
- This is suitable for fan plots (default no).
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int nboot[0::0]
-\family default
-: If >0 , use a bootstrap method with 
-\begin_inset Formula $nboot$
-\end_inset
-
- iterations to compute prediction intervals.
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int blength[2::4]
-\family default
-: If 
-\family typewriter
-nboot
-\family default
->0, set the block-length of the stationary block-bootstrap (default 4).
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Standard
-An 
-\begin_inset Formula $h\times1$
-\end_inset
-
- matrix holding the h-step ahead point forecasts will be returned.
-\end_layout
-
-\begin_layout Subsection
-ar1f
-\end_layout
-
-\begin_layout Standard
-This function simply estimates an AR(1) model incl.
- an intercept using standard OLS.
- The out-of-sample forecasts are recursively (also known as 
-\emph on
-iterated forecast
-\emph default
-) constructed.
- The 1-step ahead forecast is based on realized values from the previous
- period.
- The 
-\begin_inset Formula $h$
-\end_inset
-
--step ahead (for 
-\begin_inset Formula $h>1$
-\end_inset
-
-) forecast is based on the forecast value from horizon 
-\begin_inset Formula $h-1$
-\end_inset
-
-, respectively.
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-ar1f(const series y "Actuals", int h[1::10] "Forecast horizon", scalar level[64:
-99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2::4]
- "Block length bootstrap")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-matrix
-\end_layout
-
-\begin_layout Standard
-The function arguments are the same as for 
-\family typewriter
-meanf()
-\family default
-, apart from the 3rd option:
-\end_layout
-
-\begin_layout Standard
-An 
-\begin_inset Formula $h\times1$
-\end_inset
-
- matrix holding the h-step ahead point forecasts will be returned.
-\end_layout
-
-\begin_layout Subsection
-rwf
-\end_layout
-
-\begin_layout Standard
-For naïve forecasts, we simply set all forecasts to be the value of the
- last observation.
- A variation on the naïve method is to allow the forecasts to increase or
- decrease over time, where the amount of change over time (called the drift)
- is set to be the average change seen in the historical data.
- Thus the forecast for time 
-\begin_inset Formula $T+h$
-\end_inset
-
- is given by:
-\begin_inset Formula 
-\[
-\hat{y}_{T+h|T}=y_{T}+h\left(\frac{y_{T}-y_{1}}{T-1}\right)
-\]
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-rwf(const series y "Actuals", int h[1::10] "Forecast horizon", bool drift[0]
- "0=Random-Walk wo drift, 1=w drift", scalar level[64:99:90] "Confidence
- level", bool fan[0], int nboot[0::0], int blength[2::4] "Block length bootstrap
-")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-matrix
-\end_layout
-
-\begin_layout Standard
-The function arguments are the same as for 
-\family typewriter
-meanf()
-\family default
-, apart from the 3rd option::
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-series y
-\family default
-: series of actual historical outcomes
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int 
-\family default
-h[1::10]: Max.
- forecast horizon to compute (default 10)
-\end_layout
-
-\begin_layout Enumerate
-bool drift[0]: If '1', fits a random walk with drift term (default '0':
- no drift)
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-scalar level[64:90:90]
-\family default
-: Set the confidence level for prediction intervals (default 90).
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-bool fan[0]
-\family default
-: If 1, level is set to seq(51,99,3).
- This is suitable for fan plots (default no).
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int nboot[0::0]
-\family default
-: If >0 , use a bootstrap method to compute prediction intervals.
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int blength[2::4]
-\family default
-: If 
-\family typewriter
-nboot
-\family default
->0, set the block-length of the stationary block-bootstrap (default 4).
- 
-\color red
-NOT supported yet!
-\end_layout
-
-\begin_layout Standard
-An 
-\begin_inset Formula $h\times1$
-\end_inset
-
- matrix holding the h-step ahead point forecasts will be returned.
-\end_layout
-
-\begin_layout Subsection
-snaive
-\end_layout
-
-\begin_layout Standard
-A similar method compared to naïve forecasts using 
-\family typewriter
-rwf()
-\family default
- is useful for seasonal data.
- Each forecast is equal to the last observed value from the same season
- of the year (e.g., the same month of the previous year).
- 
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-snaive(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
- level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
-::4] "Block length bootstrap")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-matrix
-\end_layout
-
-\begin_layout Standard
-The function arguments are the same as for 
-\family typewriter
-meanf()
-\family default
-, apart from the 3rd option:
-\end_layout
-
-\begin_layout Standard
-An 
-\begin_inset Formula $h\times1$
-\end_inset
-
- matrix holding the h-step ahead point forecasts will be returned.
-\end_layout
-
-\begin_layout Subsection
-fcplot
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-fcplot(const series y, matrix fc, string title[null], string ylab[null],
- string xlab[null], string filename[null] "'display' OR 'Path+filename'")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-void
-\end_layout
-
-\begin_layout Standard
-The function arguments are:
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-series y: 
-\family default
-series of actual historical outcomes
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-matrix fc
-\family default
-: 
-\begin_inset Formula $h\times1$
-\end_inset
-
- matrix holding the h-step ahead forecasts
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string title
-\family default
-[null]: provide a string for the title.
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string ylab
-\family default
-[null]: provide a string for the y-label.
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string xlab
-\family default
-[null]: provide a string for the x-label.
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string filename
-\family default
-[null]: provide a string for the x-label (default 'display' which plots
- the forecast directly on the screen).
-\end_layout
-
-\begin_layout Subsection
-avgfc
-\end_layout
-
-\begin_layout Standard
-This function computes the mean and cross-sectional (across forecast methods)
- standard deviation of the respective point forecasts at each forecast horizon
- using all 
-\begin_inset Formula $k$
-\end_inset
-
- simple forecasting methods available.
- For annual data only the 
-\series bold
-(i)
-\series default
- mean-forecast (
-\family typewriter
-meanf
-\family default
-), the 
-\series bold
-(ii)
-\series default
- median-forecast (
-\family typewriter
-meanf
-\family default
-),
-\series bold
- (iii)
-\series default
- Random-Walk without drift (
-\family typewriter
-rwf
-\family default
-), 
-\series bold
-(iv)
-\series default
- Random-Walk with drift (
-\family typewriter
-rwf
-\family default
-) and (
-\series bold
-v
-\series default
-) the AR(1)-forecast will be computed.
- For data with seasonality (e.g., monthly, quarterly etc.) we also add the
- 
-\series bold
-(vi)
-\series default
- the seasonal-mean (
-\family typewriter
-smean
-\family default
-), 
-\series bold
-(vii)
-\series default
- the seasonal-median (
-\family typewriter
-smean
-\family default
-) and the 
-\series bold
-(viii)
-\series default
- seasonal-naive forecast (
-\family typewriter
-snaive
-\family default
-) to collection of forecasts.
-\end_layout
-
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
-
-\begin_layout Plain Layout
-
-\family typewriter
-avgfc(const series y "Actuals", int h[1::10] "Forecast horizon", scalar
- level[64:99:90] "Confidence level", bool fan[0], int nboot[0::0], int blength[2
-::4] "Block length bootstrap")
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: 
-\family typewriter
-matrix
-\end_layout
-
-\begin_layout Standard
-The function arguments are the same as for 
-\family typewriter
-meanf()
-\family default
-, apart from the 3rd option.
-\end_layout
-
-\begin_layout Standard
-An 
-\begin_inset Formula $h\times(2+k)$
-\end_inset
-
- matrix holding the h-step ahead point forecasts in the 1st column and the
- cross-sectional standard-deviation across all (
-\begin_inset Formula $k$
-\end_inset
-
-) forecasts will be returned.
-\end_layout
-
-\begin_layout Subsection
-NaiveThroughTime
-\end_layout
-
-\begin_layout Standard
-This function computes a selected naive forecast method through time for
- specific forecast horizons.
- Either 
+, 
 \begin_inset Quotes eld
 \end_inset
 
@@ -1999,7 +1651,7 @@ rolling
 \begin_inset Quotes erd
 \end_inset
 
- (fixed window length shifting through time) or 
+, 
 \begin_inset Quotes eld
 \end_inset
 
@@ -2007,202 +1659,94 @@ recursive
 \begin_inset Quotes erd
 \end_inset
 
- (expanding window through time) are supported.
- This allows you to analyze the 
-\begin_inset Formula $h$
-\end_inset
 
--step ahead forecast made at specific observations.
 \end_layout
 
-\begin_layout Standard
-\begin_inset Box Boxed
-position "t"
-hor_pos "c"
-has_inner_box 1
-inner_pos "t"
-use_parbox 0
-use_makebox 0
-width "100col%"
-special "none"
-height "1in"
-height_special "totalheight"
-thickness "0.4pt"
-separation "3pt"
-shadowsize "4pt"
-framecolor "black"
-backgroundcolor "none"
-status open
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
 
 \begin_layout Plain Layout
-NaiveThroughTime
-\family typewriter
-(
-\family default
-bundle *b, string which, bool verbose[1]
-\family typewriter
-)
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Standard
-Return type: adds matrix FC which is of dimension 
-\begin_inset Formula $R\times h$
-\end_inset
-
- where R refers to the no.
- of rolling/ recursive forecasts and 
-\begin_inset Formula $h$
-\end_inset
-
- to the max.
- forecast horizon.
-\end_layout
-
-\begin_layout Standard
-The function arguments are:
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-bundle b:
-\family default
- provide some at least required information in a bundle
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string which
-\family default
-: provide a string for selecting the underlying forecast method (
 \begin_inset Quotes eld
 \end_inset
 
-meanf
+static
 \begin_inset Quotes erd
 \end_inset
 
-, 
-\begin_inset Quotes eld
-\end_inset
 
-medianf
-\begin_inset Quotes erd
-\end_inset
-
-, 
-\begin_inset Quotes eld
-\end_inset
-
-smean
-\begin_inset Quotes erd
-\end_inset
-
-, 
-\begin_inset Quotes eld
-\end_inset
-
-smedianf
-\begin_inset Quotes erd
-\end_inset
-
-, 
-\begin_inset Quotes eld
-\end_inset
-
-snaive
-\begin_inset Quotes erd
-\end_inset
-
-, 
-\begin_inset Quotes eld
-\end_inset
-
-rwf
-\begin_inset Quotes erd
-\end_inset
-
-, 
-\begin_inset Quotes eld
-\end_inset
-
-rwfd
-\begin_inset Quotes erd
-\end_inset
-
- (random-walk with drift), 
-\begin_inset Quotes eld
-\end_inset
-
-avgfc
-\begin_inset Quotes erd
-\end_inset
-
-)
 \end_layout
 
-\begin_layout Enumerate
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
 
 \family typewriter
-bool verbose
-\family default
-[1]: print some information (default: print)
+wsize
 \end_layout
 
-\begin_layout Standard
-The user needs to pass at least the following information into the bundle:
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-series b.y
-\family default
-: series to be forecasted
-\end_layout
-
-\begin_layout Standard
-Furthermore, the user can set the following additional parameters:
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-int b.wsize
-\family default
-: length of the (initial) window (default 
-\begin_inset Formula $0.25\times T$
 \end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
 
- where 
-\begin_inset Formula $T$
+\begin_layout Plain Layout
+int
+\end_layout
+
 \end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
 
- is the total no.
- of observations of series y)
+\begin_layout Plain Layout
+Length of the moving window in case 
+\family typewriter
+type_roll
 \end_layout
 
-\begin_layout Enumerate
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
 
-\family typewriter
-int h
-\family default
-: max.
- forecast horizon (default 12)
+\begin_layout Plain Layout
+25% of the total sample
 \end_layout
 
-\begin_layout Enumerate
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
 
-\family typewriter
-string type_roll
-\family default
-: Choose between "rolling" or "recursive" window forecasts (default 
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+takes either 
 \begin_inset Quotes eld
 \end_inset
 
@@ -2210,53 +1754,1188 @@ rolling
 \begin_inset Quotes erd
 \end_inset
 
-)
+ or
+\begin_inset Quotes eld
+\end_inset
+
+recursive
+\begin_inset Quotes erd
+\end_inset
+
+.
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+verbose
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bool
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Print details or not: either 0 or 1
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1 (True)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+preobs_fc
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+No.
+ of pre-forecast observations to plot when
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+25% of the total sample
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+calling the 
+\family typewriter
+naivePlot()
+\family default
+ function
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+title
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Title string for 
+\family typewriter
+naivePlot()
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+empty
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+ylab
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String of the y-label for 
+\family typewriter
+naivePlot()
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+empty
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+xlab
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String of the x-label for 
+\family typewriter
+naivePlot()
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+empty
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+filename
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String of the path+filename+file extension
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset Quotes eld
+\end_inset
+
+display
+\begin_inset Quotes erd
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+(png, pdf, eps) for storing the plot
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Parameters which can be passed to function 
+\family typewriter
+naiveFC()
+\family default
+.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Standard
-After having called 
+In case the user sets 
+\family typewriter
+type_roll
+\family default
+ to either 
+\begin_inset Quotes eld
+\end_inset
+
+rolling
+\begin_inset Quotes erd
+\end_inset
+
+ or 
+\begin_inset Quotes eld
+\end_inset
+
+recursive
+\begin_inset Quotes erd
+\end_inset
+
+, the internal private function 
 \family typewriter
 NaiveThroughTime()
 \family default
-, the bundle will contain a matrix named 
-\begin_inset Quotes eld
+ is called.
+ This function computes point forecasts for some method either in 
+\emph on
+(i)
+\emph default
+ a rolling or 
+\emph on
+(ii)
+\emph default
+ a recursive manner.
+\end_layout
+
+\begin_layout Standard
+The bundle returned by 
+\family typewriter
+naiveFC()
+\family default
+ includes the following items:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+placement h
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="21" columns="3">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="left" valignment="top">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Item
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Data type
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Description
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+T_all
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+No.
+ of observation of series 
+\begin_inset Formula $y$
 \end_inset
 
-FC
-\begin_inset Quotes eld
+ originally
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+passed by the user.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+T
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+No.
+ of obs.
+ after omitting eventual missing
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+values in series 
+\begin_inset Formula $y$
 \end_inset
 
- of dimension 
-\begin_inset Formula $R\times h$
+.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+t1_label
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Date string of the 1st valid obs.
+ of the training set.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+t2_label
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Date string of the last valid obs.
+ of the (last) training set.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+fc
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+matrix
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+If type_roll=
+\begin_inset Quotes erd
 \end_inset
 
- where 
-\begin_inset Formula $R$
+static
+\begin_inset Quotes erd
 \end_inset
 
- denotes the total number of forecasts made and 
+: 
+\begin_inset Formula $h\times m$
+\end_inset
+
+ matrix holding h-step
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+ahead forecasts made by 
+\begin_inset Formula $m$
+\end_inset
+
+ methods.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+For type_roll=
+\begin_inset Quotes erd
+\end_inset
+
+rolling/ recursive
+\begin_inset Quotes erd
+\end_inset
+
+: 
+\begin_inset Formula $tr\times h$
+\end_inset
+
+ matrix holding
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
 \begin_inset Formula $h$
 \end_inset
 
- to the max.
- forecast horizon selected.
+-step ahead forecasts for 
+\begin_inset Formula $tr$
+\end_inset
+
+ training sets.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+h
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+No., of max.
+ forecast horizon
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+wsize
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Length of the moving-window scheme
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+type_roll
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String of the chosen moving-window scheme
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+verbose
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bool
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Flag for printing details or not
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+w_drift
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bool
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Flag whether a drift-term is incl.
+ or not.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+w_trend
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bool
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Flag whether a linear trend is incl.
+ or nor
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+is_seas
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bool
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Flag whether the data set has seasonal frequency or not
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+which
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String of the selected forecasting method
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+fcperiods
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+string array
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Array of date strings referring the last date on which
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+each of the moving-window forecasts is based on.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Parameters which can be passed to function 
+\family typewriter
+naiveFC()
+\family default
+.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Subsection
-nttplot
+The naivePlot()
 \end_layout
 
 \begin_layout Standard
-This function plots the rolling/ recursive 
-\begin_inset Formula $h$
-\end_inset
-
--step ahead forecasts computed by function 
+The 
 \family typewriter
-NaiveThroughTime()
+naivePlot()
 \family default
- before.
- 
+ function is a convenience function for plotting the results initially compiled
+ by calling 
+\family typewriter
+naiveFC()
+\family default
+.
+ The user function accepts a bundle argument in pointer form as returned
+ by 
+\family typewriter
+naiveFC()
+\family default
+:
 \end_layout
 
 \begin_layout Standard
@@ -2281,8 +2960,7 @@ status open
 \begin_layout Plain Layout
 
 \family typewriter
-nttplot(bundle *b, string title[null], string ylab[null], string xlab[null],
- string filename[null] "'display' OR 'Path+filename'")
+naivePlot(bundle *self "Bundle returned from naiveFC()")
 \end_layout
 
 \end_inset
@@ -2297,52 +2975,7 @@ void
 \end_layout
 
 \begin_layout Standard
-The function arguments are:
-\end_layout
 
-\begin_layout Enumerate
-
-\family typewriter
-bundle b:
-\family default
- provide bundle after having called 
-\family typewriter
-NaiveThroughTime()
-\family default
- before.
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string title
-\family default
-[null]: provide a string for the title.
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string ylab
-\family default
-[null]: provide a string for the y-label.
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string xlab
-\family default
-[null]: provide a string for the x-label.
-\end_layout
-
-\begin_layout Enumerate
-
-\family typewriter
-string filename
-\family default
-[null]: provide a string for the x-label (default 'display' which plots
- the forecast directly on the screen).
 \end_layout
 
 \end_body

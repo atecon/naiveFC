@@ -79,6 +79,7 @@ function matrix get_mean_obsminor (bundle *self, int use_median[0])
     # construct seasonal indicator series
     gen_season_series(&self)
     matrix ybar = aggregate(self.y, self.obs_season, @ops)[,3] # at maximum $pd by 1 vector
+
     return stack_fc(&self, ybar)
 end function
 
@@ -123,6 +124,12 @@ function bundle default_naiveFC_opts (const series y)
     self.type_roll = "static" 			# "static", "rolling" or "recursive"
     self.wsize = ceil(0.25*nobs(y))		# default window length
 
+    # For naivePlot()
+    string self.title = ""
+    string self.ylab = ""
+    string self.xlab = ""
+    string self.filename = "display"
+    
     return self
 end function
 
@@ -271,8 +278,8 @@ end function
 
 
 function bundle naiveFC (const series y,
-                         string which "Select method",
-                         bundle opts[null])
+                         string which "Select forecasting method",
+                         bundle opts[null] "Bundle incl. optional parameters")
 
     /*=======================*/
     /* Main package function */
@@ -317,6 +324,16 @@ function bundle naiveFC (const series y,
 
     if self.verbose
         summarize_naive_fc(&self)
+    endif
+
+
+    # Drop some elements from self
+    delete self.level
+    delete self.fan
+    delete self.blength
+    delete self.nboot
+    if inbundle(self,"obs_season")
+        delete self.obs_season
     endif
 
     return self
@@ -461,8 +478,8 @@ end function
 
 
 function void NaiveThroughTime (bundle *self)
-/* This function estimates the point estimates in either (i) a
-    rolling or (ii) a recursive manner and stores point estimates. */
+    /* This function estimates the point forecasts either in (i) a rolling or
+    (ii) a recursive manner and stores a sequence of point forecasts */
 
     if $nobs<self.wsize
         printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
@@ -470,7 +487,7 @@ function void NaiveThroughTime (bundle *self)
         funcerr "Re-specify."
     endif
 
-    include CvDataSplitter.gfn 		# TODO: make a required package!
+    include CvDataSplitter.gfn		# load another external package
 
     series y = self.y
     list X = y						# a list must be passed to data splitter
@@ -528,10 +545,8 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     /* Function for plotting actual and forecast values over time. */
 
     # Plot point forecast
-    string title = !inbundle(self,"title") ? "" : self.title
-    string ylab = !inbundle(self,"ylab") ? "" : self.ylab
-    string xlab = !inbundle(self,"xlab") ? "" : self.xlab
-    string out = !inbundle(self,"filename") ? "display" : self.filename
+    string out = self.filename #!inbundle(self,"filename") ? "display" : self.filename
+    
     # No. of pre-forecast obs. to plot - default 25pct. of total obs.
     scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*self.T) : self.preobs_fc
 
@@ -540,6 +555,8 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
     smpl obsnum(self.t1_label) $t2				# restrict back
     series y = self.y
+    delete self.y
+    
 
     # Set up the fcmat matrix holding results
     if self.type_roll=="static"
@@ -603,6 +620,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     scalar yup = maxi+0.05*abs(maxi)
     # TODO: lplot may become A VERY long list -- think about a restriction showing
     # only the k last forecasts
+
     plot lplot
         options with-lp time-series single-yaxis
         literal set linetype 1 lc rgb "black" lw 1 pt -1
@@ -627,9 +645,9 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
         literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
         literal set grid back ls 12
         printf "set yrange[%g:%g]", ylo, yup
-        printf "set ylabel \"%s\"", ylab
-        printf "set xlabel \"%s\"", xlab
-        printf "set title \"%s\"", title
+        printf "set ylabel \"%s\"", self.ylab
+        printf "set xlabel \"%s\"", self.xlab
+        printf "set title \"%s\"", self.title
     end plot --output="@out"
 end function
 
