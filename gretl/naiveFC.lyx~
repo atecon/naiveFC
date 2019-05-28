@@ -145,24 +145,24 @@ Fix a bug related to some seasonal frequencies
 \end_layout
 
 \begin_layout Itemize
-Ad the the 'seasonal median' forecasting method
+Add the the 'seasonal median' forecasting method
 \end_layout
 
 \begin_layout Itemize
-Add the option to run further sample datasets of different frequencies
+Add further sample datasets of different frequencies to the sample script
 \end_layout
 
 \begin_layout Itemize
-Make use the user-contributed gretl package 
+Make use of the user-contributed gretl package 
 \emph on
 CvDataSplitter
 \emph default
- for computing rolling or recursive forecasts.
+ for computing rolling or recursive forecasts
 \end_layout
 
 \begin_layout Itemize
 Eventual missing values of the series passed to naiveFC() will be handled
- internally.
+ internally now
 \end_layout
 
 \begin_layout Itemize
@@ -543,12 +543,12 @@ b = naiveFC(y, "meanFC")	# compute forecasts
 
 \begin_layout Plain Layout
 
-naivePlot(&b)				# plot forecast values
+naivePlot(&b)			# plot forecast values
 \end_layout
 
 \begin_layout Plain Layout
 
-eval b.fc					# print matrix hodling forecast values
+eval b.fc			# print matrix hodling forecast values
 \end_layout
 
 \begin_layout Plain Layout
@@ -616,6 +616,9 @@ eval b.fc			# 1st col: point forecast, 2nd col: std.
 \end_layout
 
 \begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
 The estimated 
 \begin_inset Formula $h$
 \end_inset
@@ -728,6 +731,9 @@ Average-FC SD Mean Median RW RW+Drift AR(1) AR(1)+Trend Seas-Mean Seas-Median
 \end_layout
 
 \begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
 The 
 \emph on
 private
@@ -1446,11 +1452,7 @@ point and click
 \end_layout
 
 \begin_layout Subsection
-The 
-\family typewriter
-naiveFC()
-\family default
- function
+The naiveFC() function
 \end_layout
 
 \begin_layout Standard
@@ -2916,7 +2918,7 @@ naiveFC()
 \end_layout
 
 \begin_layout Subsection
-The naivePlot()
+The naivePlot() function
 \end_layout
 
 \begin_layout Standard
