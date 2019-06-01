@@ -145,7 +145,7 @@ Fix a bug related to some seasonal frequencies
 \end_layout
 
 \begin_layout Itemize
-Add the the 'seasonal median' forecasting method
+Add the 'seasonal median' forecasting method
 \end_layout
 
 \begin_layout Itemize
@@ -157,7 +157,7 @@ Make use of the user-contributed gretl package
 \emph on
 CvDataSplitter
 \emph default
- for computing rolling or recursive forecasts
+ for computing rolling and recursive forecasts
 \end_layout
 
 \begin_layout Itemize
@@ -272,9 +272,9 @@ The
 naiveFC
 \family default
  package is a collection of gretl scripts for computing forecasts using
- very simple forecasting methods.
+ simple forecasting methods.
  These may yield surprisingly good (in terms of forecast accuracy) results,
- and may serve as benchmarks for more sophisticated methods.
+ and may serve as benchmarks for more sophisticated approaches.
  For details on the methods read Rob J Hyndman and George Athanasopoulos'
  book 
 \begin_inset Quotes eld
@@ -317,11 +317,11 @@ The package currently comprises the following features:
 \begin_layout Itemize
 Point estimates for 9 simple forecasting methods, namely the 'Average' (mean
  & median), 'Seasonal Average' (seasonal mean & median), 'Naive' (Random-Walk),
- the 'Seasonal Naive', the 
+ the 
 \begin_inset Quotes eld
 \end_inset
 
-Naive plus drift' and the AR(1) model, are implemented.
+Naive plus drift' the 'Seasonal Naive' and the AR(1) model, are implemented.
 \end_layout
 
 \begin_layout Itemize
@@ -331,8 +331,8 @@ Easy computation of an average of forecasts by taking the mean point forecasts
 \end_layout
 
 \begin_layout Itemize
-Computation of either moving.window based sequences of forecasts (using either
- the rolling or recursive method).
+Computation of moving-window based sequences of forecasts using either the
+ rolling or recursive method.
 \end_layout
 
 \begin_layout Itemize
@@ -340,7 +340,8 @@ Simple plotting of the
 \begin_inset Formula $h$
 \end_inset
 
--step ahead forecasts as well as moving window-based sequences of forecasts.
+-step ahead forecast results as well as moving-window based sequences of
+ forecasts.
 \end_layout
 
 \begin_layout Itemize
@@ -352,7 +353,7 @@ Model –> Time series –> naive forecast(s)
 \begin_inset Quotes erd
 \end_inset
 
-
+.
 \end_layout
 
 \begin_layout Standard
@@ -467,7 +468,7 @@ YGA
 \family typewriter
 YGA
 \family default
- is for 1998Q2.
+ is 1998Q2.
  Hence, the 1-step ahead forecast will be computed for period 1998Q3.
 \end_layout
 
@@ -742,9 +743,23 @@ private
 \family typewriter
 NaiveThroughTime()
 \family default
- function implements the easy computation of either (i) rolling (fixed window
- length) or (ii) recursive (expanding window length) forecasts for a specific
- naive forecast type.
+ function implements the easy computation of either (i) 
+\begin_inset Quotes eld
+\end_inset
+
+rolling
+\begin_inset Quotes erd
+\end_inset
+
+ (fixed window length) or (ii) 
+\begin_inset Quotes eld
+\end_inset
+
+recursive
+\begin_inset Quotes erd
+\end_inset
+
+ (expanding window length) forecasts for a specific naive forecast type.
  The user just needs to set the string variable 
 \family typewriter
 type_roll
@@ -793,7 +808,7 @@ status open
 
 \begin_layout Plain Layout
 
-bundle b = null             # generate an empty bundle
+bundle b = null
 \end_layout
 
 \begin_layout Plain Layout
@@ -804,12 +819,12 @@ bundle opts = null          # additional bundle holding options
 \begin_layout Plain Layout
 
 opts.type_roll = "rolling"  # "rolling"/"recursive": type of moving-window
- forecasting
+ (optional)
 \end_layout
 
 \begin_layout Plain Layout
 
-opts.wsize = 100	    # moving window length (optional)
+opts.wsize = 100	    # moving-window length (optional)
 \end_layout
 
 \begin_layout Plain Layout
@@ -841,14 +856,14 @@ eval b.fc
 
 \begin_layout Plain Layout
 
-b.preobs_fc = 10  	    # set no.
+b.preobs_fc = 10  	# set no.
  of pre.-forecast periods obs.
  to plot (optional)
 \end_layout
 
 \begin_layout Plain Layout
 
-naivePlot(&b)              # call plotting function
+naivePlot(&b)         	# call plotting function
 \end_layout
 
 \end_inset
@@ -887,7 +902,7 @@ b
 \end_inset
 
  is made conditional on information up to 1996Q3 for period 1996Q4 and is
- 0.995, and so on (see output below).
+ 0.982, and so on (see output below).
 \end_layout
 
 \begin_layout Standard
@@ -900,8 +915,18 @@ naivePlot()
 b
 \family default
 , and allows for an easy illustration of the moving forecast exercise, as
- depicted below.
- The plot nicely illustrates the 10-steaph ahead forecasts for each of the
+ depicted below in Plot 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Rolling-window-10-steps-ahead"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+.
+ The plot nicely illustrates the 10-step ahead forecasts for each of the
  eight training sets.
 \end_layout
 
@@ -1022,9 +1047,10 @@ sideways false
 status open
 
 \begin_layout Plain Layout
+\align center
 \begin_inset Graphics
 	filename roll_rwdFC.png
-	scale 80
+	scale 60
 	rotateOrigin center
 
 \end_inset
@@ -1036,6 +1062,12 @@ status open
 \begin_inset Caption Standard
 
 \begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Rolling-window-10-steps-ahead"
+
+\end_inset
+
 Rolling-window 10-steps ahead random-walk plus drift forecasts.
 \end_layout
 
@@ -1058,12 +1090,10 @@ Forecasting methods
 \end_layout
 
 \begin_layout Standard
-Here a brief description of the implemented forecasting methods follows.
- The user calls the respective method, by passing a string variable (
-\family typewriter
-which
-\family default
-) with the respective name, e.g.
+A brief description of the implemented forecasting methods follows in this
+ section.
+ The user calls the respective method, by passing a string variable with
+ the respective name, e.g.
  
 \family typewriter
 string which=
@@ -1076,7 +1106,21 @@ meanFC
 
 
 \family default
-.
+ to the main function 
+\family typewriter
+naiveFC()
+\family default
+ as the 2nd function argument (see subsection 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "subsec:The-naiveFC()-function"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+ for details).
 \end_layout
 
 \begin_layout Subsection
@@ -1086,7 +1130,15 @@ meanFC
 \begin_layout Standard
 Forecasts of all future values are equal to the “mean” of the historical
  data.
- The forecast is computed by
+ The 
+\begin_inset Formula $h$
+\end_inset
+
+-step ahead forecast conditional on using data up to period 
+\begin_inset Formula $T$
+\end_inset
+
+ is computed by the historical mean of the time-series:
 \begin_inset Formula 
 \[
 \hat{y}_{T+h|T}=\frac{1}{T}\sum_{i=1}^{T}y_{i}
@@ -1102,7 +1154,8 @@ medianFC
 \end_layout
 
 \begin_layout Standard
-Forecasts of all future values are equal to the 
+This method works similar as the meanFC approach, but instead forecasts
+ of all future values are equal to the 
 \begin_inset Quotes eld
 \end_inset
 
@@ -1128,12 +1181,14 @@ mean
 
  of the historical data for each specific seasonality (e.g.
  daily, monthly, or quarterly).
- For example, with monthly data, the forecast for all future February values
+ For example, with monthly data, the forecast for all future for February
  is equal to mean value of all past February values.
  With quarterly data, the forecast of all future 2nd quarter values is equal
  to mean of all past Q2 values.
  Similar rules apply for other months and quarters, and for other seasonal
  periods.
+ For daily frequency data one can either have a 7d (standard week) or 5d
+ (business week) season.
 \end_layout
 
 \begin_layout Subsection
@@ -1187,10 +1242,11 @@ and
 \family typewriter
 fcast 
 \family default
-commands for estimating the parameters of the model:
+commands for estimating the parameters of the model and computing the dynamic
+ forecast, respectively, based on the following time-series model:
 \begin_inset Formula 
 \[
-y_{t}=\beta_{\text{0}}+\beta_{1}y_{t-1}+u_{t}\quad u_{t}\sim N(0,\sigma²)
+y_{t}=\beta_{\text{0}}+\beta_{1}y_{t-1}+u_{t}\quad u_{t}\sim iid(0,\sigma²)
 \]
 
 \end_inset
@@ -1216,10 +1272,11 @@ and
 \family typewriter
 fcast 
 \family default
-commands for estimating the parameters of the model:
+commands for estimating the parameters of the model and computing the dynamic
+ forecast, respectively, based on the following time-series model:
 \begin_inset Formula 
 \[
-y_{t}=\beta_{\text{0}}+\beta_{1}y_{t-1}+\beta_{2}T+u_{t}\quad u_{t}\sim N(0,\sigma²)
+y_{t}=\beta_{\text{0}}+\beta_{1}y_{t-1}+\beta_{2}T+u_{t}\quad u_{t}\sim iid(0,\sigma²)
 \]
 
 \end_inset
@@ -1283,8 +1340,8 @@ snaiveFC
 \end_layout
 
 \begin_layout Standard
-A similar method as the random-walk forecast but especially useful for seasonal
- data.
+This is a similar method as the random-walk forecast but especially useful
+ for seasonal data.
  Forecasts are based on an ARIMA(0,0,0)(0,1,0)[
 \begin_inset Formula $m$
 \end_inset
@@ -1302,7 +1359,7 @@ arima
 \family typewriter
 fcast
 \family default
- commands.
+ commands for computation.
 \end_layout
 
 \begin_layout Subsection
@@ -1310,7 +1367,8 @@ avgFC
 \end_layout
 
 \begin_layout Standard
-This function computes the mean and cross-sectional (across forecast methods)
+This is meant to be a convenience function.
+ This function computes the mean and cross-sectional (across forecast methods)
  standard deviation of the respective point forecasts at each forecast horizon
  using all 
 \begin_inset Formula $k$
@@ -1416,7 +1474,11 @@ stored in the bundle will be of dimension
 \end_layout
 
 \begin_layout Standard
-The avgFC method will not be computed when combined with either the 
+Note, the 
+\family typewriter
+avgFC
+\family default
+ method will not be computed when combined with either the 
 \emph on
 rolling
 \emph default
@@ -1456,6 +1518,13 @@ point and click
 
 \begin_layout Subsection
 The naiveFC() function
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:The-naiveFC()-function"
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Standard
@@ -1502,19 +1571,24 @@ bundle
 \end_layout
 
 \begin_layout Standard
-The user must pass a time-series and a string selecting one of the supported
- forecasting methods.
- Optionally, the user pass another bundle element including further parameter.
+The user must pass a time-series (potentially with missing values) and a
+ string variable selecting one of the supported forecasting methods.
+ Optionally, the user pass another bundle element including further parameters
+ which are described below.
  In case the function is successfully called, a bundle including various
- items will be returned.
+ items will be returned to the user.
 \end_layout
 
 \begin_layout Standard
-These additional parameters passed by means of the 
+The additional parameters which can be passed by means of the 
 \family typewriter
 opts
 \family default
- bundle are:
+ bundle to 
+\family typewriter
+naiveFC()
+\family default
+ are:
 \end_layout
 
 \begin_layout Standard
@@ -1538,6 +1612,8 @@ status open
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\series bold
 Parameter
 \end_layout
 
@@ -1547,6 +1623,8 @@ Parameter
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\series bold
 Data type
 \end_layout
 
@@ -1556,6 +1634,8 @@ Data type
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\series bold
 Description
 \end_layout
 
@@ -1565,6 +1645,8 @@ Description
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\series bold
 Default value
 \end_layout
 
@@ -1759,7 +1841,7 @@ rolling
 \begin_inset Quotes erd
 \end_inset
 
- or
+ or 
 \begin_inset Quotes eld
 \end_inset
 
@@ -1776,6 +1858,10 @@ recursive
 \begin_inset Text
 
 \begin_layout Plain Layout
+of series 
+\begin_inset Formula $y$
+\end_inset
+
 
 \end_layout
 
@@ -1899,6 +1985,10 @@ naivePlot()
 \begin_inset Text
 
 \begin_layout Plain Layout
+of series 
+\begin_inset Formula $y$
+\end_inset
+
 
 \end_layout
 
@@ -1930,7 +2020,7 @@ str
 \begin_inset Text
 
 \begin_layout Plain Layout
-Title string for 
+Title string for the plot when calling 
 \family typewriter
 naivePlot()
 \end_layout
@@ -1972,9 +2062,7 @@ str
 \begin_inset Text
 
 \begin_layout Plain Layout
-String of the y-label for 
-\family typewriter
-naivePlot()
+String of the y-label of the plot
 \end_layout
 
 \end_inset
@@ -2014,9 +2102,7 @@ str
 \begin_inset Text
 
 \begin_layout Plain Layout
-String of the x-label for 
-\family typewriter
-naivePlot()
+String of the x-label of the plot
 \end_layout
 
 \end_inset
@@ -2056,7 +2142,7 @@ str
 \begin_inset Text
 
 \begin_layout Plain Layout
-String of the path+filename+file extension
+String of the path+filename+file-extension
 \end_layout
 
 \end_inset
@@ -2101,7 +2187,7 @@ display
 \begin_inset Text
 
 \begin_layout Plain Layout
-(png, pdf, eps) for storing the plot
+(either png, pdf or eps) for storing the plot
 \end_layout
 
 \end_inset
@@ -2127,9 +2213,9 @@ display
 \begin_inset Caption Standard
 
 \begin_layout Plain Layout
-Parameters which can be passed to function 
+Parameters which can be set through the optional bundle 
 \family typewriter
-naiveFC()
+opts
 \family default
 .
 \end_layout
@@ -2179,6 +2265,21 @@ NaiveThroughTime()
 (ii)
 \emph default
  a recursive manner.
+ For details see the user-contributed package 
+\emph on
+CvDataSplitter
+\emph default
+ written by this author (URL: 
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+Add URL
+\end_layout
+
+\end_inset
+
+).
 \end_layout
 
 \begin_layout Standard
@@ -2209,6 +2310,8 @@ status open
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\series bold
 Item
 \end_layout
 
@@ -2218,6 +2321,8 @@ Item
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\series bold
 Data type
 \end_layout
 
@@ -2227,6 +2332,8 @@ Data type
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\series bold
 Description
 \end_layout
 
@@ -2292,7 +2399,11 @@ No.
 \begin_inset Text
 
 \begin_layout Plain Layout
-passed by the user.
+passed to 
+\family typewriter
+naiveFC()
+\family default
+ by the user.
 \end_layout
 
 \end_inset
@@ -2324,8 +2435,7 @@ int
 
 \begin_layout Plain Layout
 No.
- of obs.
- after omitting eventual missing
+ of effective observations after omitting eventual
 \end_layout
 
 \end_inset
@@ -2354,7 +2464,7 @@ No.
 \begin_inset Text
 
 \begin_layout Plain Layout
-values in series 
+missing values in series 
 \begin_inset Formula $y$
 \end_inset
 
@@ -2453,7 +2563,11 @@ matrix
 \begin_inset Text
 
 \begin_layout Plain Layout
-If type_roll=
+If 
+\family typewriter
+type_roll
+\family default
+=
 \begin_inset Quotes erd
 \end_inset
 
@@ -2465,7 +2579,11 @@ static
 \begin_inset Formula $h\times m$
 \end_inset
 
- matrix holding h-step
+ matrix holding 
+\begin_inset Formula $h$
+\end_inset
+
+-step
 \end_layout
 
 \end_inset
@@ -2527,7 +2645,11 @@ ahead forecasts made by
 \begin_inset Text
 
 \begin_layout Plain Layout
-For type_roll=
+For 
+\family typewriter
+type_roll
+\family default
+=
 \begin_inset Quotes erd
 \end_inset
 
@@ -2575,7 +2697,7 @@ rolling/ recursive
 \begin_inset Formula $tr$
 \end_inset
 
- training sets.
+ training sets using a single method.
 \end_layout
 
 \end_inset
@@ -2606,8 +2728,8 @@ int
 \begin_inset Text
 
 \begin_layout Plain Layout
-No., of max.
- forecast horizon
+No.
+ of maximum forecast horizon
 \end_layout
 
 \end_inset
@@ -2638,7 +2760,7 @@ int
 \begin_inset Text
 
 \begin_layout Plain Layout
-Length of the moving-window scheme
+Length of the moving-window scheme.
 \end_layout
 
 \end_inset
@@ -2857,7 +2979,7 @@ string array
 \begin_inset Text
 
 \begin_layout Plain Layout
-Array of date strings referring the last date on which
+Array of date strings referring the last training date on which
 \end_layout
 
 \end_inset
@@ -2903,7 +3025,7 @@ each of the moving-window forecasts is based on.
 \begin_inset Caption Standard
 
 \begin_layout Plain Layout
-Parameters which can be passed to function 
+Parameters which are returned by the function 
 \family typewriter
 naiveFC()
 \family default
@@ -2930,12 +3052,12 @@ The
 naivePlot()
 \family default
  function is a convenience function for plotting the results initially compiled
- by calling 
+ by having successfully called 
 \family typewriter
 naiveFC()
 \family default
 .
- The user function accepts a bundle argument in pointer form as returned
+ This user function accepts a bundle argument in pointer form as returned
  by 
 \family typewriter
 naiveFC()
