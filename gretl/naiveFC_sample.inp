@@ -1,7 +1,7 @@
 clear
 set verbose off
 
-include "/home/at/git/naiveFC/gretl/naiveFC.inp"
+include naiveFC.gfn --force
 
 # Select an example
 #==================
@@ -26,14 +26,12 @@ endif
 # Static naive forecasts
 #=======================
 
-/*
 # Forecast combination
 bundle b = null
 b = naiveFC(y, "avgFC")		# compute forecasts
 naivePlot(&b)				# plot forecast results
 print b
 eval b.fc					# print forecast results
-
 
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
@@ -82,13 +80,11 @@ eval b.fc
 bundle b = naiveFC(y, "smedianFC")
 naivePlot(&b)
 eval b.fc
-*/
 
 # Seasonal naive
 bundle b = naiveFC(y, "snaiveFC")
 naivePlot(&b)
 eval b.fc
-*/
 
 
 #=========================
