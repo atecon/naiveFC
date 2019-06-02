@@ -103,7 +103,7 @@ function matrix do_forecast (bundle *self, string method)
         if $error 
             period = $obsminor
         endif
-        list L = dummify(period)
+        list L = 0 dummify(period)
     endif
     if self.which=="ar1trendFC" && inbundle(self, "w_trend") && self.w_trend
         genr time
@@ -128,46 +128,48 @@ function matrix do_forecast (bundle *self, string method)
 
     if method=="meanFC"
         ols y 0 --quiet
-        string fc_option = "--static"
+        fcast ($t2+1) ($t2+self.h) --static --quiet
 
     elif method=="medianFC"
         quantreg 0.5 y const --quiet
-        string fc_option = "--static"
+        fcast ($t2+1) ($t2+self.h) --static --quiet
 
     elif method=="smeanFC"
-        ols y 0 L --quiet
-        string fc_option = "--static"
+        quantreg 0.5 y L --quiet
+        fcast ($t2+1) ($t2+self.h) --static --quiet        
         
     elif method=="smedianFC"
         lad y 0 L --quiet
-        string fc_option = "--static"
+        fcast ($t2+1) ($t2+self.h) --static --quiet
 
     elif method=="snaiveFC" || method=="snaivedriftFC"
         string arima_opt = (method=="snaiveFC") ? "--nc" : ""
         arima 0 0 0 ; 0 1 0 ; y @arima_opt --quiet
-        string fc_option = "--dynamic"
-
+        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+        
     elif method=="ar1FC" || self.which=="ar1trendFC"
         # setup list of regressors
         list L = const y(-1)
-        string fc_option = "--dynamic"        
         if inbundle(self, "w_trend")
             L += trend
         endif
         ols y L --quiet
-
+        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+        
     elif method=="rwFC" || method=="rwdriftFC"
         string arima_opt = (method=="rwFC") ? "--nc" : ""
         arima 0 1 0 ; y @arima_opt --quiet
-        string fc_option = "--dynamic"
+        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
     endif
 
+    /*
     # Compute forecast
     if self.which!="ar1trendFC"
         fcast ($t2+1) ($t2+self.h) @fc_option --quiet
     else
         fcast ($t2+1) ($t2+self.h) --dynamic --quiet
     endif    
+    */
 
     return $fcast ~ $fcse
 end function

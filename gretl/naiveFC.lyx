@@ -145,7 +145,12 @@ Fix a bug related to some seasonal frequencies
 \end_layout
 
 \begin_layout Itemize
-Add the 'seasonal median' forecasting method
+Add the seasonal median, seasonal naive with and without drift forecasting
+ methods
+\end_layout
+
+\begin_layout Itemize
+Add computation of (asymptotic) forecast intervals
 \end_layout
 
 \begin_layout Itemize
@@ -161,8 +166,12 @@ CvDataSplitter
 \end_layout
 
 \begin_layout Itemize
-Eventual missing values of the series passed to naiveFC() will be handled
- internally now
+Eventual missing values of the series passed to the naiveFC() function will
+ be handled internally now
+\end_layout
+
+\begin_layout Itemize
+Improved plotting
 \end_layout
 
 \begin_layout Itemize
@@ -315,13 +324,18 @@ The package currently comprises the following features:
 \end_layout
 
 \begin_layout Itemize
-Point estimates for 9 simple forecasting methods, namely the 'Average' (mean
- & median), 'Seasonal Average' (seasonal mean & median), 'Naive' (Random-Walk),
- the 
+Point estimates for 10 simple forecasting methods, namely the 'Average'
+ (mean & median), 'Seasonal Average' (seasonal mean & median), 'Naive' (Random-W
+alk), the 
 \begin_inset Quotes eld
 \end_inset
 
-Naive plus drift' the 'Seasonal Naive' and the AR(1) model, are implemented.
+Naive plus drift', the 'Seasonal Naive' both with and without drift and
+ the AR(1) model, are implemented.
+\end_layout
+
+\begin_layout Itemize
+Asymptotic forecast intervals for all methods are available.
 \end_layout
 
 \begin_layout Itemize
@@ -354,12 +368,6 @@ Model –> Time series –> naive forecast(s)
 \end_inset
 
 .
-\end_layout
-
-\begin_layout Standard
-NOTE: Currently, no prediction intervals or elaborated bootstrap methods
- for computing the whole forecast density are implemented.
- These may be introduced at some later stage though.
 \end_layout
 
 \begin_layout Section
@@ -1149,6 +1157,10 @@ Forecasts of all future values are equal to the “mean” of the historical
 
 \end_layout
 
+\begin_layout Standard
+Estimation is done by regressing an intercept-only model using OLS.
+\end_layout
+
 \begin_layout Subsection
 medianFC
 \end_layout
@@ -1164,6 +1176,12 @@ median
 \end_inset
 
  of the historical data.
+ Estimation is done by regressing an intercept-only model using gretl built-in
+ 
+\family typewriter
+quantreg
+\family default
+ command for quantile regression estimation.
 \end_layout
 
 \begin_layout Subsection
@@ -1191,6 +1209,11 @@ mean
  (business week) season.
 \end_layout
 
+\begin_layout Standard
+Estimation is done by adding dummy variables indicating the different seasons
+ to a linear regression where coefficient are estimated by means of OLS.
+\end_layout
+
 \begin_layout Subsection
 smedianFC
 \end_layout
@@ -1205,6 +1228,13 @@ smeanFC
 \end_inset
 
  method but computes the seasonal median instead of the mean statistics.
+ Estimation is done by adding dummy variables indicating the different seasons
+ to a linear regression where coefficient are estimated by means the least
+ absolute deviation estimator using the 
+\family typewriter
+quantreg
+\family default
+ command.
 \end_layout
 
 \begin_layout Subsection
@@ -1308,6 +1338,15 @@ The random-walk forecast for period
 
 \end_layout
 
+\begin_layout Standard
+Estimation is done by fitting an ARIMA(0,1,0) model without intercept using
+ gretl's 
+\family typewriter
+arima
+\family default
+ command.
+\end_layout
+
 \begin_layout Subsection
 rwdFC
 \end_layout
@@ -1333,6 +1372,15 @@ rwFC
 \end_inset
 
 
+\end_layout
+
+\begin_layout Standard
+Estimation is done by fitting an ARIMA(0,1,0) model including an intercept
+ using gretl's 
+\family typewriter
+arima
+\family default
+ command.
 \end_layout
 
 \begin_layout Subsection
@@ -1445,9 +1493,17 @@ smedianFC
 \series bold
 (ix)
 \series default
- seasonal-naive forecast (
+ seasonal-naive forecast without drift (
 \family typewriter
 snaiveFC
+\family default
+) and 
+\series bold
+(x)
+\series default
+ with drift (
+\family typewriter
+snaivedriftFC
 \family default
 ) to the collection of forecasts.
 \end_layout
@@ -1601,7 +1657,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Tabular
-<lyxtabular version="3" rows="13" columns="4">
+<lyxtabular version="3" rows="14" columns="4">
 <features tabularvalignment="middle">
 <column alignment="center" valignment="top">
 <column alignment="center" valignment="top">
@@ -1863,6 +1919,46 @@ of series
 \end_inset
 
 
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+level
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+scalar
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Probability level for forecast interval.
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.9
 \end_layout
 
 \end_inset
@@ -2270,12 +2366,11 @@ NaiveThroughTime()
 CvDataSplitter
 \emph default
  written by this author (URL: 
-\begin_inset Note Note
-status open
-
-\begin_layout Plain Layout
-Add URL
-\end_layout
+\begin_inset CommandInset href
+LatexCommand href
+name "http://ricardo.ecn.wfu.edu/gretl/cgi-bin/current_fnfiles/CvDataSplitter.gfn"
+target "http://ricardo.ecn.wfu.edu/gretl/cgi-bin/current_fnfiles/CvDataSplitter.gfn"
+literal "false"
 
 \end_inset
 
@@ -2300,7 +2395,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Tabular
-<lyxtabular version="3" rows="21" columns="3">
+<lyxtabular version="3" rows="22" columns="3">
 <features tabularvalignment="middle">
 <column alignment="center" valignment="top">
 <column alignment="center" valignment="top">
@@ -2730,6 +2825,37 @@ int
 \begin_layout Plain Layout
 No.
  of maximum forecast horizon
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+level
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+scalar
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Probability level for forecast interval.
 \end_layout
 
 \end_inset
