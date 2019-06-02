@@ -3,18 +3,24 @@ function scalar isseas (void)
     return ($pd>1) ? 1 : 0
 end function
 
-
-function strings gen_colnam (matrix ci)
-    # construct column names
-    strings c = defarray("Point-Fc")
-    /* confidence intervals are not supported yet
-       loop i=1..cols(ci) -q
-       c += sprintf(" q%d", ci[i]*100)
-       endloop
-    */
-    return c
+function void gen_fc_ival(bundle *self)
+    /* Compute forecast interval assuming standard normal. */
+    if cols(self.fc)==2
+        fc = self.fc
+        factor = fc[,2]*critical(z, (1-self.level)/2)
+        self.fc = fc[,1] ~ (fc[,1]-factor) ~ (fc[,1]+factor)
+    endif
 end function
 
+function strings gen_colnam (bundle *self)
+    /* Construct column names */
+    strings s = defarray("Point-Fc")
+    if cols(self.fc)==3
+        s += sprintf("Lower (%d)", self.level*100)
+        s += sprintf("Upper (%d)", self.level*100)
+    endif
+    return s
+end function
 
 function strings gen_fcdates (bundle *self)
     # construct date strings for forecasts
@@ -52,68 +58,12 @@ function void print_noboot()
 end function
 
 
-function void gen_season_series (bundle *self)
-/* Generates a series indicating the separate seasonal
-    periods. */
-    list s = seasonals() 	# returns e.g. S1...S52/53 for weekly data
-    series obs_season = NA
-
-    if nelem(s)>=$pd
-        loop i=1..$pd -q
-            obs_season = (S$i == 1) ? i : obs_season
-        endloop
-        self.obs_season = obs_season
-    else
-        funcerr "Periodicity ($pd) does not correspond to what seasonals() in fact returns."
-    endif
-end function
-
-
-function matrix get_mean_obsminor (bundle *self, int use_median[0])
-/* Helper function for obtaining for each periodicity
-    (quarterly=4,monthly=12, weekly=52/53, etc.) the mean/ median value. */
-    # TODO: in principle one could get the mean for instance for
-    # weekly data on the monthly, weekly or daily frequency level.
-
-    string ops = (use_median==1) ? "median" : "mean"
-    # construct seasonal indicator series
-    gen_season_series(&self)
-    matrix ybar = aggregate(self.y, self.obs_season, @ops)[,3] # at maximum $pd by 1 vector
-
-    return stack_fc(&self, ybar)
-end function
-
-
-function matrix stack_fc (bundle *self, matrix ybar)
-/* Check which value $obsminor takes for the last obs.
-    Do some re-ordering. */
-    matrix val_obs_season = values(self.obs_season)
-
-    # Re-order fc to make sure that 1st forecast
-    # corresponds to the right month, quarter etc.
-    if self.obs_season[$tmax] < max(val_obs_season)		# last quarter/month/day-of-week
-        matrix selmat = 0 * vec(seq(min(val_obs_season), max(val_obs_season)) )
-        scalar counter = self.obs_season[$tmax] + 1		# identify the following month or week
-        loop i=1..rows(selmat) -q
-            selmat[counter] = $i 	# val_obs_season[i]			# set position after $tmax
-            counter = (counter==max(val_obs_season)) ? 1 : (counter+1)
-        endloop
-        ybar = msortby(ybar~selmat,2)[,1]
-    endif
-
-    # Construct h-step ahead forecasts
-    scalar k = ceil(self.h/rows(ybar))		# No. of necessary stackings
-    ybar = ones(rows(ybar),k) .* ybar	# pd by k
-    return vec(ybar)[1:self.h]
-end function
-
-
 function bundle default_naiveFC_opts (const series y)
-    # Set default values
+    /* Set default values */
 
     bundle self = null
     self.h = 10							# forecast horizon
-    self.level = 90						# Confidence level (not supported yet)
+    self.level = 0.9					# probability level for forecast interval
     self.fan = 0						# plot fan chart  (not supported yet)
     self.nboot = 0						# no. of bootstrap replications  (not supported yet)
     self.blength = 4					# Block length bootstrap  (not supported yet)
@@ -129,83 +79,34 @@ function bundle default_naiveFC_opts (const series y)
     string self.ylab = ""
     string self.xlab = ""
     string self.filename = "display"
-    
+
     return self
 end function
 
 
 function matrix call_method (bundle *self)
-    /* Helper function for running actual model. */
+    /* Helper function for calling method. */
 
-    if self.which=="meanFC"
-        return meanf(&self)
-    elif self.which=="medianFC"
-        return medianf(&self)
-    elif self.which=="ar1FC"
-        return ar1f(&self)
-    elif self.which=="ar1trendFC"
-        self.w_trend = 1
-        return ar1f(&self)
-    elif self.which=="rwFC"
-        return rwf(&self)
-    elif self.which=="rwdFC"
-        self.w_drift = 1
-        return rwf(&self)
-    endif
-
-    # For seasonal series only
-    #-------------------------
-    if self.which=="smeanFC"
-        return smeanf(&self)
-    elif self.which=="smedianFC"
-        return smedianf(&self)
-    elif self.which=="snaiveFC"
-        return snaive(&self)
-    elif self.which=="avgFC"
-        return avgf(&self)
-    endif
-
-end function
-
-
-function matrix ar1f (bundle *self)
-    /* Returns forecasts from an AR(1) model either with or without linear trend. */
-
-    scalar h = self.h
-    series y = self.y
-
-    # setup list of regressors
-    list L = const y(-1)
-    if inbundle(self, "w_trend")
-        if self.w_trend
-            genr time
-            L += time
-        endif
-    endif
-
-    # set training set
-    if self.type_roll=="rolling" || self.type_roll=="recursive"
-        smpl ; $t2
+    if self.which!="avgFC"
+        return  do_forecast(&self, self.which)
     else
-        smpl obsnum(self.t1_label) obsnum(self.t2_label)
-    endif
-
-    # Estimate
-    ols y L --quiet
-    # Set test set and forecast
-    string start = obslabel(1+$t2)
-    string ende = obslabel($t2+self.h)
-    fcast @start @ende --dynamic --quiet
-
-    return $fcast #~ $fcse
+        return avgf(&self)
+    endif    
 end function
 
 
-function matrix snaive (bundle *self)
-/* Returns forecasts from an ARIMA(0,0,0)(0,1,0)
-    model where m is the seasonal period.*/
-    series y = self.y
+function matrix do_forecast (bundle *self, string method)
+    /* Wrapper function for computing point forecast and intervals. */
 
+    if method=="smeanFC" || method=="smedianFC"
+        catch period = $obsmicro
+        if $error 
+            period = $obsminor
+        endif
+        list L = dummify(period)
+    endif
+    
+    # Set the training set
     if self.type_roll=="static"
         smpl obsnum(self.t1_label) obsnum(self.t2_label)
 
@@ -217,21 +118,62 @@ function matrix snaive (bundle *self)
         endif
     endif
 
-    # Estimate
-    arima 0 0 0 ; 0 1 0 ; y --quiet
-    # Forecast
-    fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+    # Estimation
+    series y = self.y
 
-    return $fcast #~ $fcse
+    if method=="meanFC"
+        ols y 0 --quiet
+        string fc_option = "--static"
+
+    elif method=="medianFC"
+        quantreg 0.5 y const --quiet
+        string fc_option = "--static"
+
+    elif method=="smeanFC"
+        ols y 0 L --quiet
+        string fc_option = "--static"
+        
+    elif method=="smedianFC"
+        lad y 0 L --quiet
+        string fc_option = "--static"
+
+    elif method=="snaiveFC" || method=="snaivedriftFC"
+        string arima_opt = (method=="snaiveFC") ? "--nc" : ""
+        arima 0 0 0 ; 0 1 0 ; y @arima_opt --quiet
+        string fc_option = "--dynamic"
+
+    elif method=="ar1FC" || self.which=="ar1trendFC"
+        # setup list of regressors
+        list L = const y(-1)
+        if inbundle(self, "w_trend")
+            if self.w_trend
+                genr time
+                L += time
+            endif
+        endif
+        ols y L --quiet
+        string fc_option = "--dynamic"
+
+    elif method=="rwFC" || method=="rwdriftFC"
+        string arima_opt = (method=="rwFC") ? "--nc" : ""
+        arima 0 1 0 ; y @arima_opt --quiet
+        string fc_option = "--dynamic"
+    endif
+
+    # Compute forecast
+    fc_option
+    fcast ($t2+1) ($t2+self.h) @fc_option #--quiet
+
+    return $fcast ~ $fcse
 end function
 
 
 function void initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
-    strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdFC", \
+    strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdriftFC", \
       "ar1FC", "ar1trendFC")
-    strings seas_methods = defarray("smeanFC", "smedianFC", "snaiveFC")
+    strings seas_methods = defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
     methods += seas_methods
     # Check whether called method exists
     scalar err = 1
@@ -302,21 +244,27 @@ function bundle naiveFC (const series y,
     # Add obs for forecasting
     self.obs_added = nobs_to_add(y, &self)
     dataset addobs self.obs_added
-    # update
-    series self.y = y
+    
+    series self.y = y		# update
 
     # Call method
     #==============
     if self.type_roll=="static"
         matrix self.fc = call_method(&self)
 
+        # Compute (not yet for all methods implemented) forecast intervals
+        if which != "avgFC"
+            gen_fc_ival(&self)
+        endif
+
         # Add column/ row strings
         if which != "avgFC"
-            cnameset(self.fc, gen_colnam(self.fc))
+            cnameset(self.fc, gen_colnam(&self))
         else
             cnameset(self.fc, self.method_names)
         endif
-        rnameset(self.fc, gen_fcdates(&self)) #gen_rownam(self.h))
+        
+        rnameset(self.fc, gen_fcdates(&self))
 
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         NaiveThroughTime(&self)
@@ -326,9 +274,7 @@ function bundle naiveFC (const series y,
         summarize_naive_fc(&self)
     endif
 
-
     # Drop some elements from self
-    delete self.level
     delete self.fan
     delete self.blength
     delete self.nboot
@@ -341,7 +287,7 @@ end function
 
 
 function void summarize_naive_fc (bundle *self)
-    /* Print summarizing information. */
+    /* Print summarising information */
     printf "****************************************************\n"
     printf "\t\tNaive Forecasting Method\n"
     printf "\nForecasting method: \t\t\t%s\n", self.which
@@ -350,7 +296,10 @@ function void summarize_naive_fc (bundle *self)
     printf "Number of observations: \t\t%d\n", obsnum(self.t2_label)-obsnum(self.t1_label)
     printf "Forecast horizon: \t\t\t%d\n", self.h
     if self.type_roll=="static"
-        printf "First observation forecasted: \t%s\n", obslabel(obsnum(self.t2_label)+1)
+        printf "First observation forecasted: \t\t%s\n", obslabel(obsnum(self.t2_label)+1)
+        if self.which!="avgFC"
+            printf "Width forecast interval: \t\t%d pct.\n", self.level*100
+        endif
     else
         printf "Moving window length: \t\t\t%d\n", self.wsize
         printf "Number of %s forecasts: \t\t%d\n", self.type_roll, rows(self.fc)
@@ -366,7 +315,7 @@ function scalar nobs_to_add (const series y, bundle *self)
     /* Determine the number of additional observations to add to the dataset. */
 
     smpl y --contiguous
-    t2_new = $t2				# unconsider eventual missings in the data passed to naiveFC()
+    t2_new = $t2				# don't consider eventual missings in the data passed to naiveFC()
     return self.h - ($tmax-t2_new)
 end function
 
@@ -396,17 +345,17 @@ function matrix avgf (bundle *self)
    each horizon using all simple forecast methods
     available. */
 
-    # Models for both seasonal and non-seasonal frequencies
-    matrix FC = meanf(&self)
-    FC ~= medianf(&self) ~ rwf(&self)
-    self.w_drift = 1
-    FC ~= rwf(&self) ~ ar1f(&self)
-    self.w_trend = 1
-    FC ~= ar1f(&self)
+    # Models for both seasonal and non-seasonal frequencies (grab only point forecasts)
+    matrix FC = do_forecast(&self, "meanFC")[,1] \
+      ~ do_forecast(&self, "medianFC")[,1] ~ do_forecast(&self, "rwFC")[,1] \
+      ~ do_forecast(&self, "rwdriftFC")[,1] ~ do_forecast(&self, "ar1FC")[,1] \
+      ~ do_forecast(&self, "ar1trendFC")[,1]
 
     # Models for seasonal frequencies only
     if self.is_seas
-        FC ~= smeanf(&self) ~ smedianf(&self) ~ snaive(&self)
+        
+        FC ~= ~ do_forecast(&self, "smeanFC")[,1] ~ do_forecast(&self, "smedianFC")[,1] \
+        do_forecast(&self, "snaiveFC")[,1]  ~ do_forecast(&self, "snaivedriftFC")[,1]
     endif
 
     # Cross-sectional forecast-combination statistics
@@ -415,7 +364,7 @@ function matrix avgf (bundle *self)
     # Add column names
     strings method_names = strsplit("Average-FC SD Mean Median RW RW+Drift AR(1) AR(1)+Trend", " ")
     if self.is_seas
-        method_names += strsplit("Seas-Mean Seas-Median Seas-Naive", " ")
+        method_names += strsplit("Seas-Mean Seas-Median Seas-Naive Seas-Naive+Drift", " ")
     endif
     self.method_names = method_names
 
@@ -423,62 +372,8 @@ function matrix avgf (bundle *self)
 end function
 
 
-function matrix meanf (bundle *self)
-/* Forecasts of all future values are equal to the mean
-    of the historical data*/
-    return ones(self.h, 1) .* mean(self.y)
-end function
-
-
-function matrix medianf (bundle *self)
-/* Forecasts of all future values are equal to the median
-    # of the historical data*/
-    return ones(self.h, 1) .* median(self.y)
-end function
-
-
-function matrix smeanf (bundle *self)
-/* Forecasts of all future values are equal to the mean of
-   the respective historical seasonal period
-    where m is the seasonal period.*/
-    return get_mean_obsminor(&self)
-end function
-
-function matrix smedianf (bundle *self)
-/* Forecasts of all future values are equal to the median of
-   the respective historical seasonal period
-    where m is the seasonal period.*/
-    return get_mean_obsminor(&self, 1)
-end function
-
-
-function matrix rwf (bundle *self)
-/* Naïve forecast is optimal when data follow a random-walk
-    or random-walk + drift. */
-
-    if self.type_roll=="rolling" || self.type_roll=="recursive"
-        smpl ; $t2# - self.h)
-    else
-        smpl obsnum(self.t1_label) obsnum(self.t2_label)
-    endif
-
-    matrix fc = ones(self.h, 1) .* self.y[$t2]
-    if inbundle(self, "w_drift")
-        if self.w_drift
-            # equivalent to an ARIMA(0,1,0) model with an optional drift coefficient
-            scalar avg = (self.y[$t2]-self.y[$t1])/(nobs(self.y)-1)	# average growth rate
-            return fc .+ cum(ones(self.h,1)) * avg
-        else
-            return fc
-        endif
-    else
-        return fc
-    endif
-end function
-
-
 function void NaiveThroughTime (bundle *self)
-    /* This function estimates the point forecasts either in (i) a rolling or
+/* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores a sequence of point forecasts */
 
     if $nobs<self.wsize
@@ -523,7 +418,7 @@ function void NaiveThroughTime (bundle *self)
 
         # 1st obs being forecasted (h=1) based on information up to (self.initfc-1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-        self.fc[lwin,] = call_method(&self)'	# compute forecast
+        self.fc[lwin,] = call_method(&self)[,1]'	# compute point forecast
     endloop
 
     # Attach column names
@@ -544,9 +439,8 @@ end function
 function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     /* Function for plotting actual and forecast values over time. */
 
-    # Plot point forecast
-    string out = self.filename #!inbundle(self,"filename") ? "display" : self.filename
-    
+    string out = self.filename
+
     # No. of pre-forecast obs. to plot - default 25pct. of total obs.
     scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*self.T) : self.preobs_fc
 
@@ -556,7 +450,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     smpl obsnum(self.t1_label) $t2				# restrict back
     series y = self.y
     delete self.y
-    
+
 
     # Set up the fcmat matrix holding results
     if self.type_roll=="static"
@@ -577,34 +471,39 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
         smpl start start
         # Loop over diff. training sets; each produces h-step ahead forecasts
         loop i=1..rows(self.fc) -q
-            if self.type_roll != "static"
                 start++
                 smpl start (start+self.h-1)
                 series fc_$i = fcmat[i,]
                 str = sprintf("TrainSet=%d", $i)
                 setinfo fc_$i --graph-name="@str"
                 lplot += fc_$i
-            endif
         endloop
 
     elif self.type_roll=="static"
-        self.initfc = self.T+1							# no yet defined for this case
+        self.initfc = self.T+1
 
         loop i=1..cols(self.fc) -q
-            if i!=2 && self.type_roll=="static"			# i==2 refers to standard deviation stats
-                series fc_$i = fcmat[,i]
-                if self.which=="avgFC"
+            series fc_$i = fcmat[,i]
+
+            if self.which=="avgFC"
+                if i!=2
                     str = sprintf("%s", self.method_names[i])
                     setinfo fc_$i --graph-name="@str"
-                else
-                    if self.type_roll=="static"
-                        setinfo fc_$i --graph-name="Point-Fc"
-                    else
-                        str = sprintf("h=%d", $i)
-                        setinfo fc_$i --graph-name="@str"
+                endif
+            else
+                setinfo fc_$i --graph-name="Point-Fc"
+                if cols(self.fc)==3
+                    string s = sprintf("(%d pct.)", self.level*100)
+                    if i==2
+                        setinfo fc_$i --graph-name="Lower"
+                    elif i==3
+                        setinfo fc_$i --graph-name="Upper"
                     endif
                 endif
-                lplot += fc_$i
+            endif
+            lplot += fc_$i
+            if self.which=="avgFC" && i==2
+                lplot -= fc_$i		# drop cross-sectional std. statistics
             endif
         endloop
     endif
@@ -621,34 +520,60 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     # TODO: lplot may become A VERY long list -- think about a restriction showing
     # only the k last forecasts
 
-    plot lplot
-        options with-lp time-series single-yaxis
-        literal set linetype 1 lc rgb "black" lw 1 pt -1
-        literal set linetype 2 lc rgb "red" lw 1.25 pt 2 ps 0.5
-        literal set linetype 3 lc rgb "blue" lw 1#.25
-        literal set linetype 4 lc rgb "black" lw 1#.25
-        literal set linetype 5 lc rgb "grey" lw 1#.25
-        literal set linetype 6 lc rgb "violet" lw 1#.25 #pt 3 ps 0.5
-        literal set linetype 7 lc rgb "brown" lw 1#.25 #pt 4 ps 0.5
-        literal set linetype 8 lc rgb "yellow" lw 1#.25 #pt 5 ps 0.5
-        literal set linetype 9 lc rgb "red" lw 1#.25 #pt 1 ps 0.5
-        literal set linetype 10 lc rgb "green" lw 1#.25
-        literal set linetype 10 lc rgb "black" lw 1#.25
-        literal set key left bottom below
-        #literal set key inside left bottom
-        #put the border more to the background by applying it
-        # only on the left and bottom part and put it and the tics in gray
-        literal set style line 11 lc rgb "#808080" lt 1
-        literal set border 3 back ls 11			# get rid of upper + left border
-        literal set tics nomirror
-        #add a slight grid to make it easier to follow the exact position of the curves
-        literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
-        literal set grid back ls 12
-        printf "set yrange[%g:%g]", ylo, yup
-        printf "set ylabel \"%s\"", self.ylab
-        printf "set xlabel \"%s\"", self.xlab
-        printf "set title \"%s\"", self.title
-    end plot --output="@out"
+
+    if cols(self.fc)!=3
+        plot lplot
+            options with-lp time-series single-yaxis
+            literal set linetype 1 lc rgb "black" lw 1 pt -1
+            literal set linetype 2 lc rgb "red" lw 1.25 pt 2 ps 0.5
+            literal set linetype 3 lc rgb "blue" lw 1#.25
+            literal set linetype 4 lc rgb "black" lw 1#.25
+            literal set linetype 5 lc rgb "grey" lw 1#.25
+            literal set linetype 6 lc rgb "violet" lw 1#.25 #pt 3 ps 0.5
+            literal set linetype 7 lc rgb "brown" lw 1#.25 #pt 4 ps 0.5
+            literal set linetype 8 lc rgb "yellow" lw 1#.25 #pt 5 ps 0.5
+            literal set linetype 9 lc rgb "red" lw 1#.25 #pt 1 ps 0.5
+            literal set linetype 10 lc rgb "green" lw 1#.25
+            literal set linetype 10 lc rgb "black" lw 1#.25
+            literal set key left bottom below
+            #literal set key inside left bottom
+            #put the border more to the background by applying it
+            # only on the left and bottom part and put it and the tics in gray
+            literal set style line 11 lc rgb "#808080" lt 1
+            literal set border 3 back ls 11			# get rid of upper + left border
+            literal set tics nomirror
+            #add a slight grid to make it easier to follow the exact position of the curves
+            literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
+            literal set grid back ls 12
+            printf "set yrange[%g:%g]", ylo, yup
+            printf "set ylabel \"%s\"", self.ylab
+            printf "set xlabel \"%s\"", self.xlab
+            printf "set title \"%s\"", self.title
+        end plot --output="@out"
+        
+    else
+        plot lplot
+            options with-lines time-series single-yaxis
+            literal set linetype 1 lc rgb "black" lw 1 pt -1
+            literal set linetype 2 lc rgb "red" lw 1.25 pt 2 ps 0.5
+            literal set linetype 3 lc rgb "blue" lw 1.25
+            literal set linetype 4 lc rgb "blue" lw 1.25
+            literal set key left bottom below
+            #literal set key inside left bottom
+            #put the border more to the background by applying it
+            # only on the left and bottom part and put it and the tics in gray
+            literal set style line 11 lc rgb "#808080" lt 1
+            literal set border 3 back ls 11			# get rid of upper + left border
+            literal set tics nomirror
+            #add a slight grid to make it easier to follow the exact position of the curves
+            literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
+            literal set grid back ls 12
+            printf "set yrange[%g:%g]", ylo, yup
+            printf "set ylabel \"%s\"", self.ylab
+            printf "set xlabel \"%s\"", self.xlab
+            printf "set title \"%s\"", self.title
+        end plot --output="@out"
+    endif
 end function
 
 
@@ -687,13 +612,13 @@ function matrix avgfc (const series y, int h "Forecast horizon")
     matrix FC = meanf(&self)
     FC ~= medianf(&self) ~ rwf(&self)
     self.w_drift = 1
-    FC ~= rwf(&self) ~ ar1f(&self)
+    FC ~= rwf(&self) ~ ar1f(&self)[,1]
     self.w_trend = 1
-    FC ~= ar1f(&self)
+    FC ~= ar1f(&self)[,1]
 
     # Models for seasonal frequencies only
     if self.is_seas
-        FC ~= smeanf(&self) ~ smedianf(&self) ~ snaive(&self)
+        FC ~= smeanf(&self) ~ smedianf(&self) ~ snaive(&self) ~ snaivedrift(&self)
     endif
 
     # Cross-sectional forecast-combination statistics

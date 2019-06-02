@@ -1,7 +1,8 @@
 clear
 set verbose off
 
-include naiveFC.gfn --force
+#include naiveFC.gfn --force
+include "/home/at/git/naiveFC/gretl/naiveFC.inp"
 
 # Select an example
 #==================
@@ -32,7 +33,7 @@ b = naiveFC(y, "avgFC")		# compute forecasts
 naivePlot(&b)				# plot forecast results
 print b
 eval b.fc					# print forecast results
-
+stop
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
 scalar opt.h = 15
@@ -56,7 +57,7 @@ naivePlot(&b)
 eval b.fc
 
 # Random-Walk + Drift
-bundle b = naiveFC(y, "rwdFC")
+bundle b = naiveFC(y, "rwdriftFC")
 naivePlot(&b)
 eval b.fc
 
@@ -81,21 +82,26 @@ bundle b = naiveFC(y, "smedianFC")
 naivePlot(&b)
 eval b.fc
 
-# Seasonal naive
+# Seasonal naive without drift
 bundle b = naiveFC(y, "snaiveFC")
 naivePlot(&b)
 eval b.fc
 
+# Seasonal naive with drift
+bundle b = naiveFC(y, "snaivedriftFC")
+naivePlot(&b)
+eval b.fc
+stop
 
 #=========================
 # Rolling-window forecasts
 #=========================
 bundle opts = null					# setup additional options
 opts.type_roll = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
-opts.wsize = xmax($pd,100) 			# moving window length (optional)
+opts.wsize = xmax($pd, 100) 			# moving window length (optional)
 #opts.verbose = 0					# Don't print details (optional)
 
-methods = defarray("rwdFC")#, "medianFC", "rwFC", "rwdFC", "smeanFC", "smedianFC", "snaiveFC", "ar1FC", "ar1trendFC")
+methods = defarray("ar1FC")#, "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", , "snaivedriftFC", "ar1FC", "ar1trendFC")
 loop i=1..nelem(methods) -q
     bundle b = null
     eval methods[i]
