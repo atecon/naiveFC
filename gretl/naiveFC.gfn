@@ -357,10 +357,10 @@ elif method==&quot;medianFC&quot;
   quantreg 0.5 y const --quiet
   fcast ($t2+1) ($t2+self.h) --static --quiet
 elif method==&quot;smeanFC&quot;
-  quantreg 0.5 y L --quiet
+  ols y const L --quiet
   fcast ($t2+1) ($t2+self.h) --static --quiet
 elif method==&quot;smedianFC&quot;
-  lad y 0 L --quiet
+  quantreg 0.5 y const L --quiet
   fcast ($t2+1) ($t2+self.h) --static --quiet
 elif method==&quot;snaiveFC&quot; || method==&quot;snaivedriftFC&quot;
   string arima_opt = (method==&quot;snaiveFC&quot;) ? &quot;--nc&quot; : &quot;&quot;

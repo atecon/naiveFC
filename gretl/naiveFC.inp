@@ -103,7 +103,7 @@ function matrix do_forecast (bundle *self, string method)
         if $error 
             period = $obsminor
         endif
-        list L = 0 dummify(period)
+        list L = dummify(period)
     endif
     if self.which=="ar1trendFC" && inbundle(self, "w_trend") && self.w_trend
         genr time
@@ -135,11 +135,11 @@ function matrix do_forecast (bundle *self, string method)
         fcast ($t2+1) ($t2+self.h) --static --quiet
 
     elif method=="smeanFC"
-        quantreg 0.5 y L --quiet
+        ols y const L --quiet
         fcast ($t2+1) ($t2+self.h) --static --quiet        
         
     elif method=="smedianFC"
-        lad y 0 L --quiet
+        quantreg 0.5 y const L --quiet
         fcast ($t2+1) ($t2+self.h) --static --quiet
 
     elif method=="snaiveFC" || method=="snaivedriftFC"
