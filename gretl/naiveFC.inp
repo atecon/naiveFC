@@ -105,7 +105,12 @@ function matrix do_forecast (bundle *self, string method)
         endif
         list L = dummify(period)
     endif
-    
+    if self.which=="ar1trendFC" && inbundle(self, "w_trend") && self.w_trend
+        genr time
+        #list L = time
+    endif    
+
+
     # Set the training set
     if self.type_roll=="static"
         smpl obsnum(self.t1_label) obsnum(self.t2_label)
@@ -145,14 +150,11 @@ function matrix do_forecast (bundle *self, string method)
     elif method=="ar1FC" || self.which=="ar1trendFC"
         # setup list of regressors
         list L = const y(-1)
+        string fc_option = "--dynamic"        
         if inbundle(self, "w_trend")
-            if self.w_trend
-                genr time
-                L += time
-            endif
+            L += trend
         endif
         ols y L --quiet
-        string fc_option = "--dynamic"
 
     elif method=="rwFC" || method=="rwdriftFC"
         string arima_opt = (method=="rwFC") ? "--nc" : ""
@@ -161,8 +163,11 @@ function matrix do_forecast (bundle *self, string method)
     endif
 
     # Compute forecast
-    fc_option
-    fcast ($t2+1) ($t2+self.h) @fc_option #--quiet
+    if self.which!="ar1trendFC"
+        fcast ($t2+1) ($t2+self.h) @fc_option --quiet
+    else
+        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+    endif    
 
     return $fcast ~ $fcse
 end function
@@ -348,14 +353,12 @@ function matrix avgf (bundle *self)
     # Models for both seasonal and non-seasonal frequencies (grab only point forecasts)
     matrix FC = do_forecast(&self, "meanFC")[,1] \
       ~ do_forecast(&self, "medianFC")[,1] ~ do_forecast(&self, "rwFC")[,1] \
-      ~ do_forecast(&self, "rwdriftFC")[,1] ~ do_forecast(&self, "ar1FC")[,1] \
-      ~ do_forecast(&self, "ar1trendFC")[,1]
+      ~ do_forecast(&self, "rwdriftFC")[,1] ~ do_forecast(&self, "ar1FC")[,1] ~ do_forecast(&self, "ar1trendFC")[,1]
 
     # Models for seasonal frequencies only
-    if self.is_seas
-        
-        FC ~= ~ do_forecast(&self, "smeanFC")[,1] ~ do_forecast(&self, "smedianFC")[,1] \
-        do_forecast(&self, "snaiveFC")[,1]  ~ do_forecast(&self, "snaivedriftFC")[,1]
+    if self.is_seas      
+        FC ~= do_forecast(&self, "smeanFC")[,1] ~ do_forecast(&self, "smedianFC")[,1] \
+        ~ do_forecast(&self, "snaiveFC")[,1]  ~ do_forecast(&self, "snaivedriftFC")[,1]
     endif
 
     # Cross-sectional forecast-combination statistics
