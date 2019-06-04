@@ -583,9 +583,35 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     endif
 end function
 
+/*
+function bundle GUI_gig (series y "Dependent Variable",
+                         int type[1:7:1] "Model type" {"GARCH", "Taylor/Schwert GARCH", "GJR", "TARCH", "NARCH", "APARCH", "EGARCH"},
+                         int p[1] "GARCH",
+                         int q[1] "ARCH",
+                         list X[null] "Mean regressors",
+                         bool hasconst[1] "Constant",
+                         int ARlags[0::0] "AR lags",
+                         list Y[null] "Variance regressors",
+                         int cdist[0:4:0] "Distribution" {"Normal", "t", "GED", "Skewed t", "Skewed GED"},
+                         int vtype[0:2:0] "Covariance estimator" {"Sandwich", "Hessian", "OPG"},
+                         int verb[0:2:1] "Verbosity")
+    if hasconst
+        list X = const || X
+    endif
+    bundle m = gig_setup(y, type, X, Y, ARlags)
+    # this has to be forced
+    m.depvarname = argname(y)
+    gig_set_dist(&m, cdist)
+    gig_set_pq(&m, p, q)
+    m.vcvtype = vtype
+    gig_estimate(&m, verb)
+    return m
+end function
+*/
 
-function matrix avgfc_gui (const series y "Series",
-                           int h[1::10] "Horizon")
+function matrix avgfc_gui (const series y "Dependent variable",
+                           int which[1:10:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"}
+                           int h[1::10] "Forecast horizon")
     /* Helper function for GUI access. */
     matrix FC = avgfc(y,h)
     printf "%12.4f\n", FC
