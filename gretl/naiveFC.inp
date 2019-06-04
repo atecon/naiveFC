@@ -14,10 +14,10 @@ end function
 
 function strings gen_colnam (bundle *self)
     /* Construct column names */
-    strings s = defarray("Point-Fc")
+    strings s = defarray(self.which) #defarray("Point-Fc")
     if cols(self.fc)==3
-        s += sprintf("Lower (%d)", self.level*100)
-        s += sprintf("Upper (%d)", self.level*100)
+        s += sprintf("Lo (%.1f)", (1-self.level)/2*100)
+        s += sprintf("Up (%.1f)", (1-(1-self.level)/2)*100)
     endif
     return s
 end function
@@ -496,13 +496,15 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
                     setinfo fc_$i --graph-name="@str"
                 endif
             else
-                setinfo fc_$i --graph-name="Point-Fc"
+                string meth = self.which
+                setinfo fc_$i --graph-name="@meth"	#"Point-Fc"
                 if cols(self.fc)==3
-                    string s = sprintf("(%d pct.)", self.level*100)
                     if i==2
-                        setinfo fc_$i --graph-name="Lower"
+                        string s = sprintf("%.1f", (1-self.level)/2*100 )
+                        setinfo fc_$i --graph-name="@s"
                     elif i==3
-                        setinfo fc_$i --graph-name="Upper"
+                        string s = sprintf("%.1f", (1-(1-self.level)/2)*100 )
+                        setinfo fc_$i --graph-name="@s"
                     endif
                 endif
             endif

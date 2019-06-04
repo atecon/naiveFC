@@ -1,7 +1,8 @@
 clear
 set verbose off
 
-include naiveFC.gfn --force
+# include naiveFC.gfn --force
+include "~/git/naiveFC/gretl/naiveFC.inp"
 
 # Select an example
 #==================
