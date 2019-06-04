@@ -1,9 +1,9 @@
-function scalar isseas (void)
+function scalar isSeas (void)
     # flag seasonality
     return ($pd>1) ? 1 : 0
 end function
 
-function void gen_fc_ival(bundle *self)
+function void genFcIval (bundle *self)
     /* Compute forecast interval assuming standard normal. */
     if cols(self.fc)==2
         fc = self.fc
@@ -12,7 +12,7 @@ function void gen_fc_ival(bundle *self)
     endif
 end function
 
-function strings gen_colnam (bundle *self)
+function strings genColnam (bundle *self)
     /* Construct column names */
     strings s = defarray(self.which) #defarray("Point-Fc")
     if cols(self.fc)==3
@@ -22,8 +22,8 @@ function strings gen_colnam (bundle *self)
     return s
 end function
 
-function strings gen_fcdates (bundle *self)
-    # construct date strings for forecasts
+function strings genFcDates (bundle *self)
+    /* construct date strings for forecasts */
     strings r = array(self.h)
     # Here we explicitly consider the case when the last obs are missings
     matrix date = {$obsdate}[1+obsnum(self.t2_label):]
@@ -43,8 +43,8 @@ function strings gen_fcdates (bundle *self)
 end function
 
 
-function strings gen_rownam (scalar h)
-    # construct row names (horizons)
+function strings genRownam (scalar h)
+    /* construct row names (horizons) */
     strings r = array(h)
     loop i=1..h -q
         r[i] = sprintf(" h=%d", i)
@@ -53,12 +53,12 @@ function strings gen_rownam (scalar h)
 end function
 
 
-function void print_noboot()
+function void printNoboot()
     funcerr "Bootstrap confidence intervals are not supported, yet"
 end function
 
 
-function bundle default_naiveFC_opts (const series y)
+function bundle defaultNaiveFcOpts (const series y)
     /* Set default values */
 
     bundle self = null
@@ -67,7 +67,7 @@ function bundle default_naiveFC_opts (const series y)
     self.fan = 0						# plot fan chart  (not supported yet)
     self.nboot = 0						# no. of bootstrap replications  (not supported yet)
     self.blength = 4					# Block length bootstrap  (not supported yet)
-    self.is_seas = isseas()				# check for seasonality
+    self.is_seas = isSeas()				# check for seasonality
     self.verbose = 1					# print details (default: True)
 
     # For NaiveThroughTime()
@@ -84,18 +84,18 @@ function bundle default_naiveFC_opts (const series y)
 end function
 
 
-function matrix call_method (bundle *self)
+function matrix callMethod (bundle *self)
     /* Helper function for calling method. */
 
     if self.which!="avgFC"
-        return  do_forecast(&self, self.which)
+        return  doForecast(&self, self.which)
     else
         return avgf(&self)
     endif    
 end function
 
 
-function matrix do_forecast (bundle *self, string method)
+function matrix doForecast (bundle *self, string method)
     /* Wrapper function for computing point forecast and intervals. */
 
     if method=="smeanFC" || method=="smedianFC"
@@ -175,7 +175,7 @@ function matrix do_forecast (bundle *self, string method)
 end function
 
 
-function void initial_checks (bundle *self)
+function void initialChecks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdriftFC", \
@@ -215,7 +215,7 @@ function void initial_checks (bundle *self)
     endif
 
     if self.nboot>0
-        print_noboot()
+        printNoboot()
     endif
 
     if (self.type_roll=="rolling" || self.type_roll=="recursive") && self.which=="avgFC"
@@ -235,21 +235,21 @@ function bundle naiveFC (const series y,
     /*=======================*/
 
     # Set up the bundle
-    bundle self = default_naiveFC_opts(y)
+    bundle self = defaultNaiveFcOpts(y)
     if exists(opts)
         self = opts + self			# override defaults
     endif
     self.which = which
 
     # Check whether method is applicable
-    initial_checks(&self)
+    initialChecks(&self)
 
     # Drop missings + determine number of obs.
-    drop_missings(y, &self)
+    dropMissings(y, &self)
     # smpl obsnum(self.t1_label) obsnum(self.t2_label) # restrict to valid set
 
     # Add obs for forecasting
-    self.obs_added = nobs_to_add(y, &self)
+    self.obs_added = nobsToAdd(y, &self)
     dataset addobs self.obs_added
     
     series self.y = y		# update
@@ -257,11 +257,11 @@ function bundle naiveFC (const series y,
     # Call method
     #==============
     if self.type_roll=="static"
-        matrix self.fc = call_method(&self)
+        matrix self.fc = callMethod(&self)
 
         # Compute (not yet for all methods implemented) forecast intervals
         if which != "avgFC"
-            gen_fc_ival(&self)
+            genFcIval(&self)
         endif
 
         # Add column/ row strings
@@ -271,14 +271,14 @@ function bundle naiveFC (const series y,
             cnameset(self.fc, self.method_names)
         endif
         
-        rnameset(self.fc, gen_fcdates(&self))
+        rnameset(self.fc, genFcDates(&self))
 
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         NaiveThroughTime(&self)
     endif
 
     if self.verbose
-        summarize_naive_fc(&self)
+        summarizeNaiveFc(&self)
     endif
 
     # Drop some elements from self
@@ -293,7 +293,7 @@ function bundle naiveFC (const series y,
 end function
 
 
-function void summarize_naive_fc (bundle *self)
+function void summarizeNaiveFc (bundle *self)
     /* Print summarising information */
     printf "****************************************************\n"
     printf "\t\tNaive Forecasting Method\n"
@@ -318,7 +318,7 @@ end function
 
 
 
-function scalar nobs_to_add (const series y, bundle *self)
+function scalar nobsToAdd (const series y, bundle *self)
     /* Determine the number of additional observations to add to the dataset. */
 
     smpl y --contiguous
@@ -327,7 +327,7 @@ function scalar nobs_to_add (const series y, bundle *self)
 end function
 
 
-function void drop_missings (const series y, bundle *self)
+function void dropMissings (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
     self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
@@ -353,14 +353,14 @@ function matrix avgf (bundle *self)
     available. */
 
     # Models for both seasonal and non-seasonal frequencies (grab only point forecasts)
-    matrix FC = do_forecast(&self, "meanFC")[,1] \
-      ~ do_forecast(&self, "medianFC")[,1] ~ do_forecast(&self, "rwFC")[,1] \
-      ~ do_forecast(&self, "rwdriftFC")[,1] ~ do_forecast(&self, "ar1FC")[,1] ~ do_forecast(&self, "ar1trendFC")[,1]
+    matrix FC = doForecast(&self, "meanFC")[,1] \
+      ~ doForecast(&self, "medianFC")[,1] ~ doForecast(&self, "rwFC")[,1] \
+      ~ doForecast(&self, "rwdriftFC")[,1] ~ doForecast(&self, "ar1FC")[,1] ~ doForecast(&self, "ar1trendFC")[,1]
 
     # Models for seasonal frequencies only
     if self.is_seas      
-        FC ~= do_forecast(&self, "smeanFC")[,1] ~ do_forecast(&self, "smedianFC")[,1] \
-        ~ do_forecast(&self, "snaiveFC")[,1]  ~ do_forecast(&self, "snaivedriftFC")[,1]
+        FC ~= doForecast(&self, "smeanFC")[,1] ~ doForecast(&self, "smedianFC")[,1] \
+        ~ doForecast(&self, "snaiveFC")[,1]  ~ doForecast(&self, "snaivedriftFC")[,1]
     endif
 
     # Cross-sectional forecast-combination statistics
@@ -423,11 +423,11 @@ function void NaiveThroughTime (bundle *self)
 
         # 1st obs being forecasted (h=1) based on information up to (self.initfc-1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-        self.fc[lwin,] = call_method(&self)[,1]'	# compute point forecast
+        self.fc[lwin,] = callMethod(&self)[,1]'	# compute point forecast
     endloop
 
     # Attach column names
-    cnameset(self.fc, gen_rownam(self.h))
+    cnameset(self.fc, genRownam(self.h))
     # Attach rownames: on rows we put date strings referring to
     # the information set (time/ date) based on which the h-step
     # ahead forecast is computed for.
@@ -597,20 +597,20 @@ function matrix avgfc (const series y, int h "Forecast horizon")
     /* Wrapper called by avgfc_gui. */
 
     # Models for both seasonal and non-seasonal frequencies
-    bundle self = default_naiveFC_opts(y)
+    bundle self = defaultNaiveFcOpts(y)
     series self.y = y
     scalar self.h = h
     string self.which="avgFC"
 
     # Check whether method is applicable
-    initial_checks(&self)
+    initialChecks(&self)
 
     # Drop missings + determine number of obs.
-    drop_missings(y, &self)
+    dropMissings(y, &self)
     # smpl obsnum(self.t1_label) obsnum(self.t2_label) # restrict to valid set
 
     # Add obs for forecasting
-    self.obs_added = nobs_to_add(y, &self)
+    self.obs_added = nobsToAdd(y, &self)
     dataset addobs self.obs_added
     # update
     series self.y = y
@@ -640,10 +640,10 @@ function matrix avgfc (const series y, int h "Forecast horizon")
 
     # Add row + column names
     cnameset(FC, method_names)
-    rnameset(FC, gen_fcdates(&self)) #gen_rownam(self.h))
+    rnameset(FC, genFcDates(&self)) #genRownam(self.h))
 
     if self.verbose
-        summarize_naive_fc(&self)
+        summarizeNaiveFc(&self)
     endif
     return FC
 end function
