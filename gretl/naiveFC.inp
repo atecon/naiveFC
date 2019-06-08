@@ -1,5 +1,5 @@
 function scalar isSeas (void)
-    # flag seasonality
+    /* flag seasonality */
     return ($pd>1) ? 1 : 0
 end function
 
@@ -105,7 +105,7 @@ function matrix doForecast (bundle *self, string method)
         endif
         list L = dummify(period)
     endif
-    if self.which=="ar1trendFC" && inbundle(self, "w_trend") && self.w_trend
+    if method=="ar1trendFC" && inbundle(self, "w_trend") && self.w_trend
         genr time
         #list L = time
     endif    
@@ -147,7 +147,7 @@ function matrix doForecast (bundle *self, string method)
         arima 0 0 0 ; 0 1 0 ; y @arima_opt --quiet
         fcast ($t2+1) ($t2+self.h) --dynamic --quiet
         
-    elif method=="ar1FC" || self.which=="ar1trendFC"
+    elif method=="ar1FC" || method=="ar1trendFC"
         # setup list of regressors
         list L = const y(-1)
         if inbundle(self, "w_trend")
@@ -161,15 +161,6 @@ function matrix doForecast (bundle *self, string method)
         arima 0 1 0 ; y @arima_opt --quiet
         fcast ($t2+1) ($t2+self.h) --dynamic --quiet
     endif
-
-    /*
-    # Compute forecast
-    if self.which!="ar1trendFC"
-        fcast ($t2+1) ($t2+self.h) @fc_option --quiet
-    else
-        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
-    endif    
-    */
 
     return $fcast ~ $fcse
 end function
@@ -266,7 +257,7 @@ function bundle naiveFC (const series y,
 
         # Add column/ row strings
         if which != "avgFC"
-            cnameset(self.fc, gen_colnam(&self))
+            cnameset(self.fc, genColnam(&self))
         else
             cnameset(self.fc, self.method_names)
         endif
@@ -583,93 +574,27 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     endif
 end function
 
-/*
-function bundle GUI_gig (series y "Dependent Variable",
-                         int type[1:7:1] "Model type" {"GARCH", "Taylor/Schwert GARCH", "GJR", "TARCH", "NARCH", "APARCH", "EGARCH"},
-                         int p[1] "GARCH",
-                         int q[1] "ARCH",
-                         list X[null] "Mean regressors",
-                         bool hasconst[1] "Constant",
-                         int ARlags[0::0] "AR lags",
-                         list Y[null] "Variance regressors",
-                         int cdist[0:4:0] "Distribution" {"Normal", "t", "GED", "Skewed t", "Skewed GED"},
-                         int vtype[0:2:0] "Covariance estimator" {"Sandwich", "Hessian", "OPG"},
-                         int verb[0:2:1] "Verbosity")
-    if hasconst
-        list X = const || X
-    endif
-    bundle m = gig_setup(y, type, X, Y, ARlags)
-    # this has to be forced
-    m.depvarname = argname(y)
-    gig_set_dist(&m, cdist)
-    gig_set_pq(&m, p, q)
-    m.vcvtype = vtype
-    gig_estimate(&m, verb)
-    return m
-end function
-*/
 
-function matrix avgfc_gui (const series y "Dependent variable",
-                           int which[1:10:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"}
-                           int h[1::10] "Forecast horizon")
+function matrix GUI_naiveFC (const series y "Dependent variable",
+                           int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
+                           int h[1::10] "Forecast horizon",
+                           bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */
-    matrix FC = avgfc(y,h)
-    printf "%12.4f\n", FC
-    return FC
+    
+    # map integer value to string
+    strings methods=defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC")
+
+    bundle opts = null
+    bundle self = null
+    opts.h = h
+    self = naiveFC(y, methods[which], opts)
+    
+    # output
+    printf "%12.4f\n", self.fc    
+    if Plot
+        naivePlot(&self)        
+    endif    
+
+    return self.fc    
 end function
 
-
-function matrix avgfc (const series y, int h "Forecast horizon")
-    /* Wrapper called by avgfc_gui. */
-
-    # Models for both seasonal and non-seasonal frequencies
-    bundle self = defaultNaiveFcOpts(y)
-    series self.y = y
-    scalar self.h = h
-    string self.which="avgFC"
-
-    # Check whether method is applicable
-    initialChecks(&self)
-
-    # Drop missings + determine number of obs.
-    dropMissings(y, &self)
-    # smpl obsnum(self.t1_label) obsnum(self.t2_label) # restrict to valid set
-
-    # Add obs for forecasting
-    self.obs_added = nobsToAdd(y, &self)
-    dataset addobs self.obs_added
-    # update
-    series self.y = y
-
-
-    matrix FC = meanf(&self)
-    FC ~= medianf(&self) ~ rwf(&self)
-    self.w_drift = 1
-    FC ~= rwf(&self) ~ ar1f(&self)[,1]
-    self.w_trend = 1
-    FC ~= ar1f(&self)[,1]
-
-    # Models for seasonal frequencies only
-    if self.is_seas
-        FC ~= smeanf(&self) ~ smedianf(&self) ~ snaive(&self) ~ snaivedrift(&self)
-    endif
-
-    # Cross-sectional forecast-combination statistics
-    FC = meanr(FC) ~ sdc(FC', rows(FC')-1)' ~ FC
-
-    # Add column names
-    strings method_names = strsplit("Average-FC SD Mean Median RW RW+Drift AR(1) AR(1)+Trend", " ")
-    if self.is_seas
-        method_names += strsplit("Seas-Mean Seas-Median Seas-Naive", " ")
-    endif
-    method_names = method_names
-
-    # Add row + column names
-    cnameset(FC, method_names)
-    rnameset(FC, genFcDates(&self)) #genRownam(self.h))
-
-    if self.verbose
-        summarizeNaiveFc(&self)
-    endif
-    return FC
-end function
