@@ -636,7 +636,7 @@ naivePlot(&amp;b)
 bundle b = naiveFC(y, &quot;meanFC&quot;)
 naivePlot(&amp;b)
 eval b.fc
-stop
+
 # Median forecast
 bundle b = naiveFC(y, &quot;medianFC&quot;)
 naivePlot(&amp;b)
