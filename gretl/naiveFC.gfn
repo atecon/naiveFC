@@ -3,7 +3,7 @@
 <gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2019b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
 <version>0.6</version>
-<date>2019-08-08</date>
+<date>2019-06-09</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
 <label>naive forecast(s)</label>

@@ -1,7 +1,7 @@
 author = Artur Tarassow
 email = atecon@posteo.de
 version = 0.6
-date = 2019-08-08
+date = 2019-06-09
 description = Simple forecasting methods
 tags = C53
 min-version = 2019b
