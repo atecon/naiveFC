@@ -1,0 +1,9 @@
+naiveFC BUG
+
+- Wenn der Prognose-Horizont geringer ist, als die restliche Beobachtungsanzahlt beträgt, dann klappt 'addobs' nicht. Man muss dann künstlich einen längen Horizont wählen so dass h>("$tmax-$t2)
+
+- String date für die 1. und letzte Prognosebeobachtung zum bundle hunzufügen; siehe "First observation forecasted: 		2019-06-15
+
+- Allow for xlist regressors
+
+- Add for mov-window regressions also the fc-intervals (array of matrices or separate matrices)
