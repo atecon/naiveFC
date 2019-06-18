@@ -28,71 +28,70 @@ endif
 
 # Forecast combination
 bundle b = null
-b = naiveFC(y, "avgFC")		# compute forecasts
-naivePlot(&b)				# plot forecast results
+b = naiveFC(y, "avgFC")				# compute forecasts
+naivePlot(&b)						# plot forecast results
 print b
-eval b.fc					# print forecast results
+eval b.fc							# print forecast results
 
-/*
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
-scalar opt.h = 15
+scalar opt.h = 5
+#list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
 bundle b = naiveFC(y, "avgFC", opt)
-b.preobs_fc = 5					# optional: set no. of pre.-forecast periods obs. to plot
+eval b.fc
+b.preobs_fc = 15					# optional: set no. of pre.-forecast periods obs. to plot
 naivePlot(&b)
-*/
 
 # Mean forecast
-bundle b = naiveFC(y, "meanFC")
+bundle b = naiveFC(y, "meanFC", opt)
 naivePlot(&b)
 eval b.fc
 
 # Median forecast
-bundle b = naiveFC(y, "medianFC")
+bundle b = naiveFC(y, "medianFC", opt)
 naivePlot(&b)
 eval b.fc
 
 # Random-Walk
-bundle b = naiveFC(y, "rwFC")
+bundle b = naiveFC(y, "rwFC", opt)
 naivePlot(&b)
 eval b.fc
 
 # Random-Walk + Drift
-bundle b = naiveFC(y, "rwdriftFC")
+bundle b = naiveFC(y, "rwdriftFC", opt)
 naivePlot(&b)
 eval b.fc
 
 # AR(1)
-b = null
-bundle b = naiveFC(y, "ar1FC")
+bundle b = naiveFC(y, "ar1FC", opt)
 naivePlot(&b)
 eval b.fc
 
 # AR(1) + Trend
-bundle b = naiveFC(y, "ar1trendFC")
+bundle b = naiveFC(y, "ar1trendFC", opt)
 naivePlot(&b)
 eval b.fc
 
 # Seasonal mean
-bundle b = naiveFC(y, "smeanFC")
+bundle b = naiveFC(y, "smeanFC", opt)
 naivePlot(&b)
 eval b.fc
 
 # Seasonal median
-bundle b = naiveFC(y, "smedianFC")
+bundle b = naiveFC(y, "smedianFC", opt)
 naivePlot(&b)
 eval b.fc
 
 # Seasonal naive without drift
-bundle b = naiveFC(y, "snaiveFC")
+bundle b = naiveFC(y, "snaiveFC", opt)
 naivePlot(&b)
 eval b.fc
 
 # Seasonal naive with drift
-bundle b = naiveFC(y, "snaivedriftFC")
+bundle b = naiveFC(y, "snaivedriftFC", opt)
 naivePlot(&b)
 eval b.fc
-
+stop
 
 /* ACTIVATE IF WANTED: may take a while
 #=========================
@@ -101,6 +100,7 @@ eval b.fc
 bundle opts = null					# setup additional options
 opts.type_roll = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
 opts.wsize = xmax($pd, 80) 			# moving window length (optional)
+#list opts.xlist = D743 FDD			# optional additional regressors
 #opts.verbose = 0					# Don't print details (optional)
 
 # Select methods 

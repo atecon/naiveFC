@@ -62,17 +62,18 @@ function bundle defaultNaiveFcOpts (const series y)
     /* Set default values */
 
     bundle self = null
-    self.h = 10							# forecast horizon
-    self.level = 0.9					# probability level for forecast interval
-    self.fan = 0						# plot fan chart  (not supported yet)
-    self.nboot = 0						# no. of bootstrap replications  (not supported yet)
-    self.blength = 4					# Block length bootstrap  (not supported yet)
-    self.is_seas = isSeas()				# check for seasonality
-    self.verbose = 1					# print details (default: True)
+    list self.xlist = null
+    scalar self.h = 10							# forecast horizon
+    scalar self.level = 0.9					# probability level for forecast interval
+    scalar self.fan = 0						# plot fan chart  (not supported yet)
+    scalar self.nboot = 0						# no. of bootstrap replications  (not supported yet)
+    scalar self.blength = 4					# Block length bootstrap  (not supported yet)
+    scalar self.is_seas = isSeas()				# check for seasonality
+    scalar self.verbose = 1					# print details (default: True)
 
     # For NaiveThroughTime()
-    self.type_roll = "static" 			# "static", "rolling" or "recursive"
-    self.wsize = ceil(0.25*nobs(y))		# default window length
+    string self.type_roll = "static" 			# "static", "rolling" or "recursive"
+    scalar self.wsize = ceil(0.25*nobs(y))		# default window length
 
     # For naivePlot()
     string self.title = ""
@@ -91,25 +92,25 @@ function matrix callMethod (bundle *self)
         return  doForecast(&self, self.which)
     else
         return avgf(&self)
-    endif    
+    endif
 end function
 
 
 function matrix doForecast (bundle *self, string method)
     /* Wrapper function for computing point forecast and intervals. */
 
+    list xlist = null
+
     if method=="smeanFC" || method=="smedianFC"
         catch period = $obsmicro
-        if $error 
+        if $error
             period = $obsminor
         endif
-        list L = dummify(period)
+        xlist += dummify(period)
     endif
     if method=="ar1trendFC" && inbundle(self, "w_trend") && self.w_trend
         genr time
-        #list L = time
-    endif    
-
+    endif
 
     # Set the training set
     if self.type_roll=="static"
@@ -123,46 +124,55 @@ function matrix doForecast (bundle *self, string method)
         endif
     endif
 
-    # Estimation
+    # Set up variables
     series y = self.y
+    if method!="rwFC" && method!="rwdriftFC"
+        xlist += const
+    endif
+    xlist += self.xlist
 
+    # Estimation
+    scalar dynamic_fc = 0
     if method=="meanFC"
-        ols y 0 --quiet
-        fcast ($t2+1) ($t2+self.h) --static --quiet
+        ols y xlist --quiet
 
     elif method=="medianFC"
-        quantreg 0.5 y const --quiet
-        fcast ($t2+1) ($t2+self.h) --static --quiet
+        quantreg 0.5 y xlist --quiet
 
     elif method=="smeanFC"
-        ols y const L --quiet
-        fcast ($t2+1) ($t2+self.h) --static --quiet        
-        
+        ols y xlist --quiet
+
     elif method=="smedianFC"
-        quantreg 0.5 y const L --quiet
-        fcast ($t2+1) ($t2+self.h) --static --quiet
+        quantreg 0.5 y xlist --quiet
 
     elif method=="snaiveFC" || method=="snaivedriftFC"
+        dynamic_fc++
         string arima_opt = (method=="snaiveFC") ? "--nc" : ""
-        arima 0 0 0 ; 0 1 0 ; y @arima_opt --quiet
-        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
-        
-    elif method=="ar1FC" || method=="ar1trendFC"
-        # setup list of regressors
-        list L = const y(-1)
-        if inbundle(self, "w_trend")
-            L += trend
-        endif
-        ols y L --quiet
-        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
-        
+        arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet        
+
     elif method=="rwFC" || method=="rwdriftFC"
+        dynamic_fc++
         string arima_opt = (method=="rwFC") ? "--nc" : ""
-        arima 0 1 0 ; y @arima_opt --quiet
-        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+        arima 0 1 0 ; y xlist @arima_opt --quiet
+
+    elif method=="ar1FC" || method=="ar1trendFC"
+        dynamic_fc++
+        # setup list of regressors
+        list xlist += y(-1)
+        if inbundle(self, "w_trend")
+            xlist += trend
+        endif
+        ols y xlist --quiet        
     endif
 
-    return $fcast ~ $fcse
+    if dynamic_fc==0
+        fcast ($t2+1) ($t2+self.h) --static --quiet
+    else
+        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+    endif    
+
+#    scalar n = rows($fcast)
+    return $fcast ~ $fcse#[1:n]
 end function
 
 
@@ -231,18 +241,20 @@ function bundle naiveFC (const series y,
         self = opts + self			# override defaults
     endif
     self.which = which
+    self.name_endo = argname(y)
 
     # Check whether method is applicable
     initialChecks(&self)
 
     # Drop missings + determine number of obs.
     dropMissings(y, &self)
-    # smpl obsnum(self.t1_label) obsnum(self.t2_label) # restrict to valid set
 
     # Add obs for forecasting
     self.obs_added = nobsToAdd(y, &self)
-    dataset addobs self.obs_added
-    
+    if self.obs_added>0
+        dataset addobs self.obs_added
+    endif
+
     series self.y = y		# update
 
     # Call method
@@ -261,7 +273,7 @@ function bundle naiveFC (const series y,
         else
             cnameset(self.fc, self.method_names)
         endif
-        
+
         rnameset(self.fc, genFcDates(&self))
 
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
@@ -288,7 +300,9 @@ function void summarizeNaiveFc (bundle *self)
     /* Print summarising information */
     printf "****************************************************\n"
     printf "\t\tNaive Forecasting Method\n"
-    printf "\nForecasting method: \t\t\t%s\n", self.which
+    printf "\nEndogenous: \t\t\t\t%s\n", self.name_endo
+    printf "Number of additional exogenous: \t%d\n", nelem(self.xlist)
+    printf "Forecasting method: \t\t\t%s\n", self.which
     printf "Start valid data set: \t\t\t%s\n", self.t1_label
     printf "End valid data set: \t\t\t%s\n", self.t2_label
     printf "Number of observations: \t\t%d\n", obsnum(self.t2_label)-obsnum(self.t1_label)
@@ -309,7 +323,7 @@ end function
 
 
 
-function scalar nobsToAdd (const series y, bundle *self)
+function scalar nobsToAdd (const list y, bundle *self)
     /* Determine the number of additional observations to add to the dataset. */
 
     smpl y --contiguous
@@ -322,14 +336,43 @@ function void dropMissings (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
     self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
+
+    if nelem(self.xlist)>0
+        list xlist = self.xlist
+        smpl y --contiguous
+        scalar t2_y = $t2
+        smpl full
+        smpl xlist --contiguous
+        scalar t2_xlist = $t2
+        scalar self.tdiff_xlist_y = t2_xlist - t2_y
+
+        if self.tdiff_xlist_y>0 && self.tdiff_xlist_y<self.h
+            printf "\nError: The last valid observation of series %s is %s.\n", self.name_endo, obslabel(t2_y)
+            printf "You requested a %d-step ahead sequence of forecasts.\n", self.h
+            printf "The last valid observation of the contiguous sample for the additional\n\
+              exogenous regressors is %s.\n", obslabel(t2_xlist)
+            printf "Thus, it is impossible to compute the requested h-steap ahead\n\
+            sequence of forecasts.\n"
+            printf "Either reduce the forecast horizon to h=%d or add future information\n\
+              for your 'xlist' variables.\n", (self.h-self.tdiff_xlist_y)
+            funcerr ""            
+        elif self.tdiff_xlist_y<=0
+            printf "\nError: The 'xlist' variables include no valid future observations\n\
+              but only missings.\n"
+            printf "Last valid of additional exogenous regressors is %s\n", obslabel(t2_xlist)
+            funcerr "Re-specify."
+        endif
+        smpl full
+    endif
+
     smpl y --contiguous
     self.t1_label = obslabel($t1)
     self.t2_label = obslabel($t2)
     self.T = $nobs		# no. of valid obs before adding obs. for forecasting purpose
     if self.T<self.T_all && !self.verbose
         printf "\nWarning: The time-series sample has been restricted\n"
-        printf "due to %d missing values in the original dataset.\n", (self.T_all-$nobs)
-        printf "Information on the new contiguous set:\n"
+        printf "due to %d missing values in series %s.\n", (self.T_all-$nobs), self.name_endo
+        printf "Information on the new contiguous set for series %s:\n", , self.name_endo
         printf "Start date: %s\n", obslabel($t1)
         printf "End date: %s\n", obslabel($t2)
         printf "\n"
@@ -349,9 +392,9 @@ function matrix avgf (bundle *self)
       ~ doForecast(&self, "rwdriftFC")[,1] ~ doForecast(&self, "ar1FC")[,1] ~ doForecast(&self, "ar1trendFC")[,1]
 
     # Models for seasonal frequencies only
-    if self.is_seas      
+    if self.is_seas
         FC ~= doForecast(&self, "smeanFC")[,1] ~ doForecast(&self, "smedianFC")[,1] \
-        ~ doForecast(&self, "snaiveFC")[,1]  ~ doForecast(&self, "snaivedriftFC")[,1]
+          ~ doForecast(&self, "snaiveFC")[,1]  ~ doForecast(&self, "snaivedriftFC")[,1]
     endif
 
     # Cross-sectional forecast-combination statistics
@@ -374,7 +417,7 @@ function void NaiveThroughTime (bundle *self)
 
     if $nobs<self.wsize
         printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
-          no. of valid observations.\n", self.wsize
+          number of valid observations.\n", self.wsize
         funcerr "Re-specify."
     endif
 
@@ -441,7 +484,9 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*self.T) : self.preobs_fc
 
     # Augment the dataset
-    dataset addobs self.obs_added
+    if self.obs_added>0
+        dataset addobs self.obs_added
+    endif
     # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
     smpl obsnum(self.t1_label) $t2				# restrict back
     series y = self.y
@@ -467,12 +512,12 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
         smpl start start
         # Loop over diff. training sets; each produces h-step ahead forecasts
         loop i=1..rows(self.fc) -q
-                start++
-                smpl start (start+self.h-1)
-                series fc_$i = fcmat[i,]
-                str = sprintf("TrainSet=%d", $i)
-                setinfo fc_$i --graph-name="@str"
-                lplot += fc_$i
+            start++
+            smpl start (start+self.h-1)
+            series fc_$i = fcmat[i,]
+            str = sprintf("TrainSet=%d", $i)
+            setinfo fc_$i --graph-name="@str"
+            lplot += fc_$i
         endloop
 
     elif self.type_roll=="static"
@@ -548,7 +593,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
             printf "set xlabel \"%s\"", self.xlab
             printf "set title \"%s\"", self.title
         end plot --output="@out"
-        
+
     else
         plot lplot
             options with-lines time-series single-yaxis
@@ -576,25 +621,28 @@ end function
 
 
 function matrix GUI_naiveFC (const series y "Dependent variable",
-                           int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
-                           int h[1::10] "Forecast horizon",
-                           bool Plot[1] "Plot forecast")
+                             const list xlist[null] "Additional exogenous (future values must be known)",
+                             int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
+                             int h[1::10] "Forecast horizon",
+                             bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */
-    
+
     # map integer value to string
-    strings methods=defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC")
+    strings methods=defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC",\
+      "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC")
 
     bundle opts = null
     bundle self = null
     opts.h = h
+    opts.xlist = xlist
     self = naiveFC(y, methods[which], opts)
-    
-    # output
-    printf "%12.4f\n", self.fc    
-    if Plot
-        naivePlot(&self)        
-    endif    
 
-    return self.fc    
+    # output
+    printf "%12.4f\n", self.fc
+    if Plot
+        naivePlot(&self)
+    endif
+
+    return self.fc
 end function
 
