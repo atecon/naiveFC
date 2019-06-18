@@ -103,7 +103,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.6
+Version 0.7
 \end_layout
 
 \begin_layout Standard
@@ -128,36 +128,72 @@ status open
 \begin_layout Plain Layout
 
 \series bold
+\size footnotesize
 Changelog
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
+Version 0.7 (June, 2019)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+
+\size footnotesize
+Fix a bug with the 'dataset addobs' command
+\end_layout
+
+\begin_layout Itemize
+
+\size footnotesize
+Include the option to pass an additional list of exogenous regressors (named
+ 'xlist') the optional bundle 'opts'
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+
+\size footnotesize
 Version 0.6 (May, 2019)
 \end_layout
 
 \begin_deeper
 \begin_layout Itemize
+
+\size footnotesize
 Fully revamped framework heavily exploiting the idea of bundles
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 Fix a bug related to some seasonal frequencies
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 Add the seasonal median, seasonal naive with and without drift forecasting
  methods
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 Add computation of (asymptotic) forecast intervals
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 Add further sample datasets of different frequencies to the sample script
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 Make use of the user-contributed gretl package 
 \emph on
 CvDataSplitter
@@ -166,42 +202,60 @@ CvDataSplitter
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 Eventual missing values of the series passed to the naiveFC() function will
  be handled internally now
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 Improved plotting
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 Further minor changes
 \end_layout
 
 \end_deeper
 \begin_layout Itemize
+
+\size footnotesize
 Version 0.4 (Jan, 2019)
 \end_layout
 
 \begin_deeper
 \begin_layout Itemize
+
+\size footnotesize
 correct bug in smeanf() which caused referencing the forecast to the wrong
  minor period (quarter, month, day) under some circumstances
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 add option to compute median value for both meanf() and smeanf()
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 speed-up: loop in stack_fc() replaced by matrix operation
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 speed-up: use aggregate() in get_mean_obsminor() and avoid a loop
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 use 
 \family typewriter
 --contiguous
@@ -215,47 +269,67 @@ use
 
 \end_deeper
 \begin_layout Itemize
+
+\size footnotesize
 Version 0.3 (Oct, 2018)
 \end_layout
 
 \begin_deeper
 \begin_layout Itemize
+
+\size footnotesize
 add NaiveThroughTime() for computing rolling/ recursive forecasts
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 add nttplot() for computing plotting rolling/ recursive forecasts
 \end_layout
 
 \end_deeper
 \begin_layout Itemize
+
+\size footnotesize
 Version 0.11 (Oct, 2018)
 \end_layout
 
 \begin_deeper
 \begin_layout Itemize
+
+\size footnotesize
 initial public version
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 add AR(1)-based forecasts
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 minor changes and corrections
 \end_layout
 
 \begin_layout Itemize
+
+\size footnotesize
 set minimum gretl version to 2018a
 \end_layout
 
 \end_deeper
 \begin_layout Itemize
+
+\size footnotesize
 Version 0.1 (Oct, 2018)
 \end_layout
 
 \begin_deeper
 \begin_layout Itemize
+
+\size footnotesize
 initial non-public version
 \end_layout
 
@@ -1657,7 +1731,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Tabular
-<lyxtabular version="3" rows="14" columns="4">
+<lyxtabular version="3" rows="16" columns="4">
 <features tabularvalignment="middle">
 <column alignment="center" valignment="top">
 <column alignment="center" valignment="top">
@@ -1748,6 +1822,84 @@ Forecast horizon: Must be
 
 \begin_layout Plain Layout
 10
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+xlist
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+list
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+LIst of additional regressors for which future
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+null
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+values must be known.
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
 \end_layout
 
 \end_inset
@@ -2395,7 +2547,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Tabular
-<lyxtabular version="3" rows="22" columns="3">
+<lyxtabular version="3" rows="24" columns="3">
 <features tabularvalignment="middle">
 <column alignment="center" valignment="top">
 <column alignment="center" valignment="top">
@@ -2628,6 +2780,70 @@ str
 \begin_layout Plain Layout
 Date string of the last valid obs.
  of the (last) training set.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+t1_forecast_label
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Date string of the 1st obs.
+ being forecasted out-of-sample
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+t2_forecast_label
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+str
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Date string of the last obs.
+ being forecasted out-of-sample
 \end_layout
 
 \end_inset

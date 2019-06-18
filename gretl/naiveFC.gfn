@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2019b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.6</version>
-<date>2019-06-09</date>
+<version>0.7</version>
+<date>2019-06-18</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
 <label>naive forecast(s)</label>
@@ -414,6 +414,10 @@ if dynamic_fc==0
 else
   fcast ($t2+1) ($t2+self.h) --dynamic --quiet
 endif
+if self.type_roll==&quot;static&quot;
+  string self.t1_forecast_label = obslabel($t2+1)
+  string self.t2_forecast_label = obslabel($t2+self.h)
+endif
 #    scalar n = rows($fcast)
 return $fcast ~ $fcse#[1:n]
 </code>
@@ -524,7 +528,7 @@ if nelem(self.xlist)&gt;0
     printf &quot;You requested a %d-step ahead sequence of forecasts.\n&quot;, self.h
     printf &quot;The last valid observation of the contiguous sample for the additional\n               exogenous regressors is %s.\n&quot;, obslabel(t2_xlist)
     printf &quot;Thus, it is impossible to compute the requested h-steap ahead\n             sequence of forecasts.\n&quot;
-    printf &quot;Either reduce the forecast horizon to h=%d or add future information\n               for your 'xlist' variables.\n&quot;, (self.h-self.tdiff_xlist_y)
+    printf &quot;Either reduce the forecast horizon to h=%d or add future information\n               for your 'xlist' variables.\n&quot;, (self.tdiff_xlist_y)
     funcerr &quot;&quot;
   elif self.tdiff_xlist_y&lt;=0
     printf &quot;\nError: The 'xlist' variables include no valid future observations\n               but only missings.\n&quot;
@@ -666,7 +670,7 @@ eval b.fc							# print forecast results
 
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
-scalar opt.h = 5
+scalar opt.h = 10
 #list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
 bundle b = naiveFC(y, &quot;avgFC&quot;, opt)
 eval b.fc
@@ -722,7 +726,7 @@ eval b.fc
 bundle b = naiveFC(y, &quot;snaivedriftFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
-stop
+
 
 /* ACTIVATE IF WANTED: may take a while
 #=========================

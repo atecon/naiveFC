@@ -27,6 +27,7 @@ function strings genFcDates (bundle *self)
     strings r = array(self.h)
     # Here we explicitly consider the case when the last obs are missings
     matrix date = {$obsdate}[1+obsnum(self.t2_label):]
+    
     loop i=1..self.h -q
         string sdate = sprintf("%d", date[i])
         if $pd==1
@@ -170,7 +171,10 @@ function matrix doForecast (bundle *self, string method)
     else
         fcast ($t2+1) ($t2+self.h) --dynamic --quiet
     endif    
-
+    if self.type_roll=="static"
+        string self.t1_forecast_label = obslabel($t2+1)
+        string self.t2_forecast_label = obslabel($t2+self.h)
+    endif    
 #    scalar n = rows($fcast)
     return $fcast ~ $fcse#[1:n]
 end function
@@ -354,7 +358,7 @@ function void dropMissings (const series y, bundle *self)
             printf "Thus, it is impossible to compute the requested h-steap ahead\n\
             sequence of forecasts.\n"
             printf "Either reduce the forecast horizon to h=%d or add future information\n\
-              for your 'xlist' variables.\n", (self.h-self.tdiff_xlist_y)
+              for your 'xlist' variables.\n", (self.tdiff_xlist_y)
             funcerr ""            
         elif self.tdiff_xlist_y<=0
             printf "\nError: The 'xlist' variables include no valid future observations\n\
