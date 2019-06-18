@@ -32,14 +32,16 @@ if exists(opts)
   self = opts + self			# override defaults
 endif
 self.which = which
+self.name_endo = argname(y)
 # Check whether method is applicable
 initialChecks(&amp;self)
 # Drop missings + determine number of obs.
 dropMissings(y, &amp;self)
-# smpl obsnum(self.t1_label) obsnum(self.t2_label) # restrict to valid set
 # Add obs for forecasting
 self.obs_added = nobsToAdd(y, &amp;self)
-dataset addobs self.obs_added
+if self.obs_added&gt;0
+  dataset addobs self.obs_added
+endif
 series self.y = y		# update
 # Call method
 #==============
@@ -83,7 +85,9 @@ string out = self.filename
 # No. of pre-forecast obs. to plot - default 25pct. of total obs.
 scalar preobs_fc = !inbundle(self,&quot;preobs_fc&quot;) ? int(0.25*self.T) : self.preobs_fc
 # Augment the dataset
-dataset addobs self.obs_added
+if self.obs_added&gt;0
+  dataset addobs self.obs_added
+endif
 # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
 smpl obsnum(self.t1_label) $t2				# restrict back
 series y = self.y
@@ -206,9 +210,12 @@ endif
 </code>
 </gretl-function>
 <gretl-function name="GUI_naiveFC" type="matrix" menu-only="1" pkg-role="gui-main">
- <params count="4">
+ <params count="5">
   <param name="y" type="series" const="true">
 <description>Dependent variable</description>
+  </param>
+  <param name="xlist" type="list" optional="true" const="true">
+<description>Additional exogenous (future values must be known)</description>
   </param>
   <param name="which" type="int" min="1" max="11" default="1">
 <description>Model type</description>
@@ -228,6 +235,7 @@ strings methods=defarray(&quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&qu
 bundle opts = null
 bundle self = null
 opts.h = h
+opts.xlist = xlist
 self = naiveFC(y, methods[which], opts)
 # output
 printf &quot;%12.4f\n&quot;, self.fc
@@ -310,16 +318,17 @@ return r
  </params>
 <code>/* Set default values */
 bundle self = null
-self.h = 10							# forecast horizon
-self.level = 0.9					# probability level for forecast interval
-self.fan = 0						# plot fan chart  (not supported yet)
-self.nboot = 0						# no. of bootstrap replications  (not supported yet)
-self.blength = 4					# Block length bootstrap  (not supported yet)
-self.is_seas = isSeas()				# check for seasonality
-self.verbose = 1					# print details (default: True)
+list self.xlist = null
+scalar self.h = 10							# forecast horizon
+scalar self.level = 0.9					# probability level for forecast interval
+scalar self.fan = 0						# plot fan chart  (not supported yet)
+scalar self.nboot = 0						# no. of bootstrap replications  (not supported yet)
+scalar self.blength = 4					# Block length bootstrap  (not supported yet)
+scalar self.is_seas = isSeas()				# check for seasonality
+scalar self.verbose = 1					# print details (default: True)
 # For NaiveThroughTime()
-self.type_roll = &quot;static&quot; 			# &quot;static&quot;, &quot;rolling&quot; or &quot;recursive&quot;
-self.wsize = ceil(0.25*nobs(y))		# default window length
+string self.type_roll = &quot;static&quot; 			# &quot;static&quot;, &quot;rolling&quot; or &quot;recursive&quot;
+scalar self.wsize = ceil(0.25*nobs(y))		# default window length
 # For naivePlot()
 string self.title = &quot;&quot;
 string self.ylab = &quot;&quot;
@@ -346,16 +355,16 @@ endif
   <param name="method" type="string"/>
  </params>
 <code>/* Wrapper function for computing point forecast and intervals. */
+list xlist = null
 if method==&quot;smeanFC&quot; || method==&quot;smedianFC&quot;
   catch period = $obsmicro
   if $error
     period = $obsminor
   endif
-  list L = dummify(period)
+  xlist += dummify(period)
 endif
 if method==&quot;ar1trendFC&quot; &amp;&amp; inbundle(self, &quot;w_trend&quot;) &amp;&amp; self.w_trend
   genr time
-  #list L = time
 endif
 # Set the training set
 if self.type_roll==&quot;static&quot;
@@ -367,38 +376,46 @@ elif self.type_roll==&quot;rolling&quot; || self.type_roll==&quot;recursive&quot
     funcerr &quot;Check your sample and window size.&quot;
   endif
 endif
-# Estimation
+# Set up variables
 series y = self.y
+if method!=&quot;rwFC&quot; &amp;&amp; method!=&quot;rwdriftFC&quot;
+  xlist += const
+endif
+xlist += self.xlist
+# Estimation
+scalar dynamic_fc = 0
 if method==&quot;meanFC&quot;
-  ols y 0 --quiet
-  fcast ($t2+1) ($t2+self.h) --static --quiet
+  ols y xlist --quiet
 elif method==&quot;medianFC&quot;
-  quantreg 0.5 y const --quiet
-  fcast ($t2+1) ($t2+self.h) --static --quiet
+  quantreg 0.5 y xlist --quiet
 elif method==&quot;smeanFC&quot;
-  ols y const L --quiet
-  fcast ($t2+1) ($t2+self.h) --static --quiet
+  ols y xlist --quiet
 elif method==&quot;smedianFC&quot;
-  quantreg 0.5 y const L --quiet
-  fcast ($t2+1) ($t2+self.h) --static --quiet
+  quantreg 0.5 y xlist --quiet
 elif method==&quot;snaiveFC&quot; || method==&quot;snaivedriftFC&quot;
+  dynamic_fc++
   string arima_opt = (method==&quot;snaiveFC&quot;) ? &quot;--nc&quot; : &quot;&quot;
-  arima 0 0 0 ; 0 1 0 ; y @arima_opt --quiet
-  fcast ($t2+1) ($t2+self.h) --dynamic --quiet
-elif method==&quot;ar1FC&quot; || method==&quot;ar1trendFC&quot;
-  # setup list of regressors
-  list L = const y(-1)
-  if inbundle(self, &quot;w_trend&quot;)
-    L += trend
-  endif
-  ols y L --quiet
-  fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+  arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet
 elif method==&quot;rwFC&quot; || method==&quot;rwdriftFC&quot;
+  dynamic_fc++
   string arima_opt = (method==&quot;rwFC&quot;) ? &quot;--nc&quot; : &quot;&quot;
-  arima 0 1 0 ; y @arima_opt --quiet
+  arima 0 1 0 ; y xlist @arima_opt --quiet
+elif method==&quot;ar1FC&quot; || method==&quot;ar1trendFC&quot;
+  dynamic_fc++
+  # setup list of regressors
+  list xlist += y(-1)
+  if inbundle(self, &quot;w_trend&quot;)
+    xlist += trend
+  endif
+  ols y xlist --quiet
+endif
+if dynamic_fc==0
+  fcast ($t2+1) ($t2+self.h) --static --quiet
+else
   fcast ($t2+1) ($t2+self.h) --dynamic --quiet
 endif
-return $fcast ~ $fcse
+#    scalar n = rows($fcast)
+return $fcast ~ $fcse#[1:n]
 </code>
 </gretl-function>
 <gretl-function name="initialChecks" type="void" private="1">
@@ -455,7 +472,9 @@ endif
 <code>/* Print summarising information */
 printf &quot;****************************************************\n&quot;
 printf &quot;\t\tNaive Forecasting Method\n&quot;
-printf &quot;\nForecasting method: \t\t\t%s\n&quot;, self.which
+printf &quot;\nEndogenous: \t\t\t\t%s\n&quot;, self.name_endo
+printf &quot;Number of additional exogenous: \t%d\n&quot;, nelem(self.xlist)
+printf &quot;Forecasting method: \t\t\t%s\n&quot;, self.which
 printf &quot;Start valid data set: \t\t\t%s\n&quot;, self.t1_label
 printf &quot;End valid data set: \t\t\t%s\n&quot;, self.t2_label
 printf &quot;Number of observations: \t\t%d\n&quot;, obsnum(self.t2_label)-obsnum(self.t1_label)
@@ -476,7 +495,7 @@ printf &quot;\n&quot;
 </gretl-function>
 <gretl-function name="nobsToAdd" type="scalar" private="1">
  <params count="2">
-  <param name="y" type="series" const="true"/>
+  <param name="y" type="list" const="true"/>
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Determine the number of additional observations to add to the dataset. */
@@ -492,14 +511,36 @@ return self.h - ($tmax-t2_new)
  </params>
 <code>/* Drop missing values + construct a contiguous data set. */
 self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
+if nelem(self.xlist)&gt;0
+  list xlist = self.xlist
+  smpl y --contiguous
+  scalar t2_y = $t2
+  smpl full
+  smpl xlist --contiguous
+  scalar t2_xlist = $t2
+  scalar self.tdiff_xlist_y = t2_xlist - t2_y
+  if self.tdiff_xlist_y&gt;0 &amp;&amp; self.tdiff_xlist_y&lt;self.h
+    printf &quot;\nError: The last valid observation of series %s is %s.\n&quot;, self.name_endo, obslabel(t2_y)
+    printf &quot;You requested a %d-step ahead sequence of forecasts.\n&quot;, self.h
+    printf &quot;The last valid observation of the contiguous sample for the additional\n               exogenous regressors is %s.\n&quot;, obslabel(t2_xlist)
+    printf &quot;Thus, it is impossible to compute the requested h-steap ahead\n             sequence of forecasts.\n&quot;
+    printf &quot;Either reduce the forecast horizon to h=%d or add future information\n               for your 'xlist' variables.\n&quot;, (self.h-self.tdiff_xlist_y)
+    funcerr &quot;&quot;
+  elif self.tdiff_xlist_y&lt;=0
+    printf &quot;\nError: The 'xlist' variables include no valid future observations\n               but only missings.\n&quot;
+    printf &quot;Last valid of additional exogenous regressors is %s\n&quot;, obslabel(t2_xlist)
+    funcerr &quot;Re-specify.&quot;
+  endif
+  smpl full
+endif
 smpl y --contiguous
 self.t1_label = obslabel($t1)
 self.t2_label = obslabel($t2)
 self.T = $nobs		# no. of valid obs before adding obs. for forecasting purpose
 if self.T&lt;self.T_all &amp;&amp; !self.verbose
   printf &quot;\nWarning: The time-series sample has been restricted\n&quot;
-  printf &quot;due to %d missing values in the original dataset.\n&quot;, (self.T_all-$nobs)
-  printf &quot;Information on the new contiguous set:\n&quot;
+  printf &quot;due to %d missing values in series %s.\n&quot;, (self.T_all-$nobs), self.name_endo
+  printf &quot;Information on the new contiguous set for series %s:\n&quot;, , self.name_endo
   printf &quot;Start date: %s\n&quot;, obslabel($t1)
   printf &quot;End date: %s\n&quot;, obslabel($t2)
   printf &quot;\n&quot;
@@ -538,7 +579,7 @@ return FC
 <code>/* This function estimates the point forecasts either in (i) a rolling or
 (ii) a recursive manner and stores a sequence of point forecasts */
 if $nobs&lt;self.wsize
-  printf &quot;\nError: The window size you selected (wsize=%d) exceeds the\n           no. of valid observations.\n&quot;, self.wsize
+  printf &quot;\nError: The window size you selected (wsize=%d) exceeds the\n           number of valid observations.\n&quot;, self.wsize
   funcerr &quot;Re-specify.&quot;
 endif
 include CvDataSplitter.gfn		# load another external package
@@ -618,71 +659,70 @@ endif
 
 # Forecast combination
 bundle b = null
-b = naiveFC(y, &quot;avgFC&quot;)		# compute forecasts
-naivePlot(&amp;b)				# plot forecast results
+b = naiveFC(y, &quot;avgFC&quot;)				# compute forecasts
+naivePlot(&amp;b)						# plot forecast results
 print b
-eval b.fc					# print forecast results
+eval b.fc							# print forecast results
 
-/*
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
-scalar opt.h = 15
+scalar opt.h = 5
+#list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
 bundle b = naiveFC(y, &quot;avgFC&quot;, opt)
-b.preobs_fc = 5					# optional: set no. of pre.-forecast periods obs. to plot
+eval b.fc
+b.preobs_fc = 15					# optional: set no. of pre.-forecast periods obs. to plot
 naivePlot(&amp;b)
-*/
 
 # Mean forecast
-bundle b = naiveFC(y, &quot;meanFC&quot;)
+bundle b = naiveFC(y, &quot;meanFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # Median forecast
-bundle b = naiveFC(y, &quot;medianFC&quot;)
+bundle b = naiveFC(y, &quot;medianFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # Random-Walk
-bundle b = naiveFC(y, &quot;rwFC&quot;)
+bundle b = naiveFC(y, &quot;rwFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # Random-Walk + Drift
-bundle b = naiveFC(y, &quot;rwdriftFC&quot;)
+bundle b = naiveFC(y, &quot;rwdriftFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # AR(1)
-b = null
-bundle b = naiveFC(y, &quot;ar1FC&quot;)
+bundle b = naiveFC(y, &quot;ar1FC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # AR(1) + Trend
-bundle b = naiveFC(y, &quot;ar1trendFC&quot;)
+bundle b = naiveFC(y, &quot;ar1trendFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # Seasonal mean
-bundle b = naiveFC(y, &quot;smeanFC&quot;)
+bundle b = naiveFC(y, &quot;smeanFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # Seasonal median
-bundle b = naiveFC(y, &quot;smedianFC&quot;)
+bundle b = naiveFC(y, &quot;smedianFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # Seasonal naive without drift
-bundle b = naiveFC(y, &quot;snaiveFC&quot;)
+bundle b = naiveFC(y, &quot;snaiveFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
 
 # Seasonal naive with drift
-bundle b = naiveFC(y, &quot;snaivedriftFC&quot;)
+bundle b = naiveFC(y, &quot;snaivedriftFC&quot;, opt)
 naivePlot(&amp;b)
 eval b.fc
-
+stop
 
 /* ACTIVATE IF WANTED: may take a while
 #=========================
@@ -691,6 +731,7 @@ eval b.fc
 bundle opts = null					# setup additional options
 opts.type_roll = &quot;rolling&quot; 			# &quot;rolling&quot; / &quot;recursive&quot; -&gt; type of moving-window forecasting  (optional)
 opts.wsize = xmax($pd, 80) 			# moving window length (optional)
+#list opts.xlist = D743 FDD			# optional additional regressors
 #opts.verbose = 0					# Don't print details (optional)
 
 # Select methods 
