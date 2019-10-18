@@ -1,10 +1,12 @@
-function scalar isSeas (void)
-    /* flag seasonality */
+function scalar data_has_seasonality (void)
+    /* Flag seasonality of data set */
+    
     return ($pd>1) ? 1 : 0
 end function
 
-function void genFcIval (bundle *self)
+function void gen_forecast_intervals (bundle *self)
     /* Compute forecast interval assuming standard normal. */
+    
     if cols(self.fc)==2
         fc = self.fc
         factor = fc[,2]*critical(z, (1-self.level)/2)
@@ -12,22 +14,37 @@ function void genFcIval (bundle *self)
     endif
 end function
 
-function strings genColnam (bundle *self)
+function strings gen_column_names (bundle *self)
     /* Construct column names */
+    
     strings s = defarray(self.which) #defarray("Point-Fc")
     if cols(self.fc)==3
         s += sprintf("Lo (%.1f)", (1-self.level)/2*100)
         s += sprintf("Up (%.1f)", (1-(1-self.level)/2)*100)
     endif
+    
     return s
 end function
 
-function strings genFcDates (bundle *self)
-    /* construct date strings for forecasts */
+function strings gen_row_names (scalar h)
+    /* construct row names (horizons) */
+    
+    strings r = array(h)
+    loop i=1..h -q
+        r[i] = sprintf(" h=%d", i)
+    endloop
+    
+    return r
+end function
+
+
+function strings gen_array_of_forecast_dates (bundle *self)
+    /* Construct date strings for forecasts */
+    
     strings r = array(self.h)
     # Here we explicitly consider the case when the last obs are missings
     matrix date = {$obsdate}[1+obsnum(self.t2_label):]
-    
+
     loop i=1..self.h -q
         string sdate = sprintf("%d", date[i])
         if $pd==1
@@ -40,26 +57,16 @@ function strings genFcDates (bundle *self)
               substr(sdate,5,6), substr(sdate,7,8))
         endif
     endloop
+    
     return r
 end function
 
-
-function strings genRownam (scalar h)
-    /* construct row names (horizons) */
-    strings r = array(h)
-    loop i=1..h -q
-        r[i] = sprintf(" h=%d", i)
-    endloop
-    return r
-end function
-
-
-function void printNoboot()
+function void print_no_bootstrap_support (void)
     funcerr "Bootstrap confidence intervals are not supported, yet"
 end function
 
 
-function bundle defaultNaiveFcOpts (const series y)
+function bundle get_default_values (const series y)
     /* Set default values */
 
     bundle self = null
@@ -69,7 +76,7 @@ function bundle defaultNaiveFcOpts (const series y)
     scalar self.fan = 0						# plot fan chart  (not supported yet)
     scalar self.nboot = 0						# no. of bootstrap replications  (not supported yet)
     scalar self.blength = 4					# Block length bootstrap  (not supported yet)
-    scalar self.is_seas = isSeas()				# check for seasonality
+    scalar self.is_seas = data_has_seasonality()				# check for seasonality
     scalar self.verbose = 1					# print details (default: True)
 
     # For NaiveThroughTime()
@@ -86,18 +93,18 @@ function bundle defaultNaiveFcOpts (const series y)
 end function
 
 
-function matrix callMethod (bundle *self)
+function matrix call_method (bundle *self)
     /* Helper function for calling method. */
 
     if self.which!="avgFC"
-        return  doForecast(&self, self.which)
+        return  do_forecast_and_get_values(&self, self.which)
     else
         return avgf(&self)
     endif
 end function
 
 
-function matrix doForecast (bundle *self, string method)
+function matrix do_forecast_and_get_values (bundle *self, string method)
     /* Wrapper function for computing point forecast and intervals. */
 
     list xlist = null
@@ -135,26 +142,26 @@ function matrix doForecast (bundle *self, string method)
     # Estimation
     scalar dynamic_fc = 0
     if method=="meanFC"
-        ols y xlist --quiet
+        catch ols y xlist --quiet
 
     elif method=="medianFC"
-        quantreg 0.5 y xlist --quiet
+        catch quantreg 0.5 y xlist --quiet
 
     elif method=="smeanFC"
-        ols y xlist --quiet
+        catch ols y xlist --quiet
 
     elif method=="smedianFC"
-        quantreg 0.5 y xlist --quiet
+        catch quantreg 0.5 y xlist --quiet
 
     elif method=="snaiveFC" || method=="snaivedriftFC"
         dynamic_fc++
         string arima_opt = (method=="snaiveFC") ? "--nc" : ""
-        arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet        
+        catch arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet
 
     elif method=="rwFC" || method=="rwdriftFC"
         dynamic_fc++
         string arima_opt = (method=="rwFC") ? "--nc" : ""
-        arima 0 1 0 ; y xlist @arima_opt --quiet
+        catch arima 0 1 0 ; y xlist @arima_opt --quiet
 
     elif method=="ar1FC" || method=="ar1trendFC"
         dynamic_fc++
@@ -163,24 +170,34 @@ function matrix doForecast (bundle *self, string method)
         if inbundle(self, "w_trend")
             xlist += trend
         endif
-        ols y xlist --quiet        
+        catch ols y xlist --quiet
     endif
 
-    if dynamic_fc==0
-        fcast ($t2+1) ($t2+self.h) --static --quiet
+    if $error
+        printf "\nError: Model estimation failed. Forecast values are set to NA.\n"
     else
-        fcast ($t2+1) ($t2+self.h) --dynamic --quiet
-    endif    
+        if dynamic_fc==0
+            fcast ($t2+1) ($t2+self.h) --static --quiet
+        else
+            fcast ($t2+1) ($t2+self.h) --dynamic --quiet
+        endif
+
+    endif
+    
     if self.type_roll=="static"
         string self.t1_forecast_label = obslabel($t2+1)
         string self.t2_forecast_label = obslabel($t2+self.h)
+    endif
+    
+    if $error
+        return NA * zeros(self.h,2)
+    else        
+        return $fcast ~ $fcse
     endif    
-#    scalar n = rows($fcast)
-    return $fcast ~ $fcse#[1:n]
 end function
 
 
-function void initialChecks (bundle *self)
+function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdriftFC", \
@@ -220,7 +237,7 @@ function void initialChecks (bundle *self)
     endif
 
     if self.nboot>0
-        printNoboot()
+        print_no_bootstrap_support()
     endif
 
     if (self.type_roll=="rolling" || self.type_roll=="recursive") && self.which=="avgFC"
@@ -240,7 +257,7 @@ function bundle naiveFC (const series y,
     /*=======================*/
 
     # Set up the bundle
-    bundle self = defaultNaiveFcOpts(y)
+    bundle self = get_default_values(y)
     if exists(opts)
         self = opts + self			# override defaults
     endif
@@ -248,13 +265,13 @@ function bundle naiveFC (const series y,
     self.name_endo = argname(y)
 
     # Check whether method is applicable
-    initialChecks(&self)
+    do_initial_checks(&self)
 
-    # Drop missings + determine number of obs.
-    dropMissings(y, &self)
+    # Drop missings + determine number of valid observations
+    drop_missing_values(y, &self)
 
     # Add obs for forecasting
-    self.obs_added = nobsToAdd(y, &self)
+    self.obs_added = nobs_to_add_to_dataset(y, &self)
     if self.obs_added>0
         dataset addobs self.obs_added
     endif
@@ -264,28 +281,28 @@ function bundle naiveFC (const series y,
     # Call method
     #==============
     if self.type_roll=="static"
-        matrix self.fc = callMethod(&self)
+        matrix self.fc = call_method(&self)
 
         # Compute (not yet for all methods implemented) forecast intervals
         if which != "avgFC"
-            genFcIval(&self)
+            gen_forecast_intervals(&self)
         endif
 
         # Add column/ row strings
         if which != "avgFC"
-            cnameset(self.fc, genColnam(&self))
+            cnameset(self.fc, gen_column_names(&self))
         else
             cnameset(self.fc, self.method_names)
         endif
 
-        rnameset(self.fc, genFcDates(&self))
+        rnameset(self.fc, gen_array_of_forecast_dates(&self))
 
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         NaiveThroughTime(&self)
     endif
 
     if self.verbose
-        summarizeNaiveFc(&self)
+        summarize_naive_fc_results(&self)
     endif
 
     # Drop some elements from self
@@ -300,7 +317,7 @@ function bundle naiveFC (const series y,
 end function
 
 
-function void summarizeNaiveFc (bundle *self)
+function void summarize_naive_fc_results (bundle *self)
     /* Print summarising information */
     printf "****************************************************\n"
     printf "\t\tNaive Forecasting Method\n"
@@ -327,16 +344,17 @@ end function
 
 
 
-function scalar nobsToAdd (const list y, bundle *self)
+function scalar nobs_to_add_to_dataset (const list y, bundle *self)
     /* Determine the number of additional observations to add to the dataset. */
 
     smpl y --contiguous
     t2_new = $t2				# don't consider eventual missings in the data passed to naiveFC()
+    
     return self.h - ($tmax-t2_new)
 end function
 
 
-function void dropMissings (const series y, bundle *self)
+function void drop_missing_values (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
     self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
@@ -356,10 +374,10 @@ function void dropMissings (const series y, bundle *self)
             printf "The last valid observation of the contiguous sample for the additional\n\
               exogenous regressors is %s.\n", obslabel(t2_xlist)
             printf "Thus, it is impossible to compute the requested h-steap ahead\n\
-            sequence of forecasts.\n"
+              sequence of forecasts.\n"
             printf "Either reduce the forecast horizon to h=%d or add future information\n\
               for your 'xlist' variables.\n", (self.tdiff_xlist_y)
-            funcerr ""            
+            funcerr ""
         elif self.tdiff_xlist_y<=0
             printf "\nError: The 'xlist' variables include no valid future observations\n\
               but only missings.\n"
@@ -391,14 +409,14 @@ function matrix avgf (bundle *self)
     available. */
 
     # Models for both seasonal and non-seasonal frequencies (grab only point forecasts)
-    matrix FC = doForecast(&self, "meanFC")[,1] \
-      ~ doForecast(&self, "medianFC")[,1] ~ doForecast(&self, "rwFC")[,1] \
-      ~ doForecast(&self, "rwdriftFC")[,1] ~ doForecast(&self, "ar1FC")[,1] ~ doForecast(&self, "ar1trendFC")[,1]
+    matrix FC = do_forecast_and_get_values(&self, "meanFC")[,1] \
+      ~ do_forecast_and_get_values(&self, "medianFC")[,1] ~ do_forecast_and_get_values(&self, "rwFC")[,1] \
+      ~ do_forecast_and_get_values(&self, "rwdriftFC")[,1] ~ do_forecast_and_get_values(&self, "ar1FC")[,1] ~ do_forecast_and_get_values(&self, "ar1trendFC")[,1]
 
     # Models for seasonal frequencies only
     if self.is_seas
-        FC ~= doForecast(&self, "smeanFC")[,1] ~ doForecast(&self, "smedianFC")[,1] \
-          ~ doForecast(&self, "snaiveFC")[,1]  ~ doForecast(&self, "snaivedriftFC")[,1]
+        FC ~= do_forecast_and_get_values(&self, "smeanFC")[,1] ~ do_forecast_and_get_values(&self, "smedianFC")[,1] \
+          ~ do_forecast_and_get_values(&self, "snaiveFC")[,1]  ~ do_forecast_and_get_values(&self, "snaivedriftFC")[,1]
     endif
 
     # Cross-sectional forecast-combination statistics
@@ -461,11 +479,11 @@ function void NaiveThroughTime (bundle *self)
 
         # 1st obs being forecasted (h=1) based on information up to (self.initfc-1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-        self.fc[lwin,] = callMethod(&self)[,1]'	# compute point forecast
+        self.fc[lwin,] = call_method(&self)[,1]'	# compute point forecast
     endloop
 
     # Attach column names
-    cnameset(self.fc, genRownam(self.h))
+    cnameset(self.fc, gen_row_names(self.h))
     # Attach rownames: on rows we put date strings referring to
     # the information set (time/ date) based on which the h-step
     # ahead forecast is computed for.
@@ -626,9 +644,9 @@ end function
 
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
-                             int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
-                             int h[1::10] "Forecast horizon",
-                             bool Plot[1] "Plot forecast")
+      int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
+      int h[1::10] "Forecast horizon",
+      bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */
 
     # map integer value to string
