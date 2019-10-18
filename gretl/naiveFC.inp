@@ -13,33 +13,61 @@ function scalar data_has_seasonality (void)
     return ($pd>1) ? 1 : 0
 end function
 
-function void get_forecast_intervals (bundle *self)
-    /* Compute forecast interval assuming standard normal. */
+function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
+                                   const scalar level[0.001:0.999:] "confidence level")
+    /* Compute width for a given condifdence level assuming standard normal. */
+    
+    return fc_sd * critical(z, (1-level)/2)
+end function 
 
-    if cols(self.fc)==2
-        fc = self.fc		# h by 2 matrix
-        factor = fc[,2] * critical(z, (1-self.level)/2)
 
-        forecast_intervals(fc[,1], factor, &self)		# put 3 separate matrices to self
-    endif
+function void get_forecast_intervals (const matrices fc_and_sd,
+                                      bundle *self)
+    /* Using each model's point forecast and standard error, compute
+    the forecast interval assuming standard normal. */
+
+    scalar m = nelem(fc_and_sd)
+
+    matrices point_forecasts = array(m)
+    matrices factors = array(m)
+    
+    loop i=1..m -q        
+        point_forecasts[i] = fc_and_sd[i][,1]
+        factors[i] = fc_interval_width(fc_and_sd[i][,1], self.level)
+    endloop
+    
+    point_lower_upper_bound_arrays(point_forecasts, factors, &self)	# writes arrays into self
 end function
 
-function void forecast_intervals (const matrix fc "Vector of point forecasts",
-                                  const matrix factor "Vector if withts for interval",
-                                  bundle *self)
-    /* Generate seperate mtrices for interval forecasts. */
 
-    matrix self.forecasts_point = fc[,1]
-    matrix self.forecasts_lower_bound = fc[,1] - factor
-    matrix self.forecasts_upper_bound = fc[,1] + factor
+function void point_lower_upper_bound_arrays (const matrices point_forcasts "Array of vectors of point forecasts",
+                                  const matrices factors "Array of vectors of widths of intervals",
+                                  bundle *self)
+    /* Generate for each model based on respective point forecasts and 
+    estimated standard derrors, arrays holding the interval forecasts. */
+
+    scalar n = nelem(point_forcasts)
+    if n != nelem(factors)
+        funcerr "Number of matrices does not equal.
+    endif
+    
+    matrices self.forecasts_point = array(n)
+    matrices self.forecasts_lower_bound = array(n)
+    matrices self.forecasts_upper_bound = array(n)
+
+    loop i=1..n -q
+        self.forecasts_point[i] = point_forcasts[i]
+        self.forecasts_lower_bound[i] = point_forcasts[i] - factors[i]
+        self.forecasts_upper_bound[i] = point_forcasts[i] + factors[i]
+    endloop
 end function
 
 
 function strings gen_column_names (bundle *self)
     /* Construct column names */
 
-    strings s = defarray(self.which) #defarray("Point-Fc")
-    if cols(self.fc)==3
+    strings s = defarray(self.which)
+    if tolower(self.which) != "avgfc"
         s += sprintf("Lo (%.1f)", (1-self.level)/2*100)
         s += sprintf("Up (%.1f)", (1-(1-self.level)/2)*100)
     endif
@@ -113,18 +141,6 @@ function bundle get_default_values (const series y)
     return self
 end function
 
-
-function matrix call_method (bundle *self)
-    /* Helper function for calling method. */
-
-    if self.which != "avgFC"
-        return do_forecast_and_get_values(&self, self.which)
-    else
-        return avgf(&self)
-    endif
-end function
-
-
 function series get_period_series (string method)
     catch series period = $obsmicro
     if $error
@@ -135,11 +151,41 @@ function series get_period_series (string method)
 end function
 
 
-function matrix do_forecast_and_get_values (bundle *self, string method)
-    /* Wrapper function for computing point forecast and intervals. */
+function void get_static_forecasts (bundle *self)
+    /* This function is called by naiveFC(). */
+    
+    matrices fc_and_sd = call_method(&self)
 
+    # Compute interval forecasts
+    get_forecast_intervals(fc_and_sd, &self)
+
+    attach_column_names(&self)
+    attach_dates_to_rows(&self)
+
+end function
+
+
+function matrices call_method (bundle *self)
+    /* Wrapper for calling method. Returns p-dimension array where
+    each matrix is of size h by 2 holding point forecasts and forecast
+    standard errors. */
+
+    if tolower(self.which) != "avgfc"
+        matrices fc_and_sd = forecast_and_get_fc_sd(&self, self.which)
+    else
+        matrices fc_and_sd = avg_forecast_and_get_fc_sd(&self)
+    endif
+
+    return fc_and_sd
+end function
+
+
+function matrix forecast_and_get_fc_sd (bundle *self, string method)
+    /* Compute point forecast and forecast standard errors. */
+
+    matrix fc_and_sd = NA * zeros(self.h, 2)
     list xlist = null
-
+    
     if method=="smeanFC" || method=="smedianFC"
         series period = get_period_series(method)
         xlist += dummify(period)
@@ -216,13 +262,13 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
         endif
     endif
 
-    gen_t1_and_t2_fc_labels($t2, &self)
-
-    if model_error
-        return NA * zeros(self.h, 2)
-    else
-        return $fcast ~ $fcse
+    gen_t1_and_t2_fc_labels($t2, &self)			# adds to self
+    
+    if !model_error
+        matrix fc_and_sd = $fcast ~ $fcse
     endif
+    
+    return fc_and_sd
 end function
 
 
@@ -331,18 +377,15 @@ function bundle naiveFC (const series y,
 
     # Call method
     if self.type_roll == "static"
-        matrix self.fc = call_method(&self)
-        eval self.fc
-        stop
+        
+        get_static_forecasts(&self)
+        print self
+        eval self.forecasts_lower_bound
+        eval self.forecasts_lower_bound[1]
+        eval self.forecasts_lower_bound[10]
 
-        # Compute (not yet for all methods implemented) forecast intervals
-        if which != "avgFC"
-            #gen_forecast_intervals(&self)		# TODO: deprectated
-            get_forecast_intervals(&self)
-        endif
-
-        attach_column_names(which, &self)
-        attach_dates_to_rows(&self)
+        *** HIER WEITERMACHEN ***
+        # Es scheint bis hierher für static zu funktionieren!
 
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         NaiveThroughTime(&self)
@@ -368,24 +411,35 @@ function void attach_dates_to_rows (bundle *self)
     /* Add date strings as row labels */
 
     strings dates = gen_array_of_forecast_dates(&self)
+    scalar m = nelem(self.forecasts_point)
 
-    rnameset(self.forecasts_point, dates)
-    rnameset(self.forecasts_lower_bound, dates)
-    rnameset(self.forecasts_upper_bound, dates)
+    loop i=1..m -q
+        rnameset(self.forecasts_point[i], dates)
+        rnameset(self.forecasts_lower_bound[i], dates)
+        rnameset(self.forecasts_upper_bound[i], dates)
+    endloop
 end function
 
 
-function void attach_column_names (const string which, bundle *self)
+function void attach_column_names (bundle *self)
     /* Add column labels */
 
-    strings colname = gen_column_names(&self)
-    if which != "avgFC"
-        cnameset(self.forecasts_point, colname)
-        cnameset(self.forecasts_lower_bound, colname)
-        cnameset(self.forecasts_upper_bound, colname)
+    scalar m = nelem(self.forecasts_point)
+
+    string label_lo = sprintf("Lo (%.1f)", (1-self.level)/2*100)
+    string label_up = sprintf("Up (%.1f)", (1-(1-self.level)/2)*100)
+    if self.which != "avgFC"
+        string label_point = self.which
     else
-        cnameset(self.self.forecasts_point, self.method_names)
+        strings label_point = self.methods_used
     endif
+
+        loop i=1..m -q
+            cnameset(self.forecasts_point[i], label_point)
+            cnameset(self.forecasts_lower_bound[i], label_lo)
+            cnameset(self.forecasts_upper_bound[i], label_up)
+        endloop
+    
 end function
 
 
@@ -477,20 +531,20 @@ function void drop_missing_values (const series y, bundle *self)
 end function
 
 
-function matrices get_forecasts_and_sds (const strings methods, bundle *self)
-    /* Compute forecasts for each method, and store point forecast
-    and associated standard error in matrices */
+function matrices array_of_forecasts_and_sds (const strings methods, bundle *self)
+    /* Compute forecasts for each method. For each mezthod we obtain a matrix
+    of size h by 2 holding point forecasts and associated standard errors. */
 
     scalar m = nelem(methods)
     matrices fc_and_sd = array(m)
-    
+
     loop i=1..m -q
-        fc_and_sd[i] = do_forecast_and_get_values(&self, methods[i])
+        fc_and_sd[i] = forecast_and_get_fc_sd(&self, methods[i])
     endloop
     
-    cnameset(fc_and_sd, "Point SD")
     return fc_and_sd
 end function
+
 
 function strings drop_string_from_array (const strings S, const string drop_str)
     /* Drop a specific string from string array. String yay occur multiple times. */
@@ -505,36 +559,36 @@ function strings drop_string_from_array (const strings S, const string drop_str)
     return ret
 end function
 
-function matrix avgf (bundle *self)
-/* Computes the mean (average) and cross-sectional (across forecast methods) standard deviation at
-    each horizon using all simple forecast methods available. */
 
+function matrices avg_forecast_and_get_fc_sd (bundle *self)
+    /* Compute forecasts using different methods supported, and return array of point
+    forecasts and associated standard errors. */
+    
     # Models for both seasonal and non-seasonal frequencies
-    strings methods = drop_string_from_array(get_supported_methods(), "avgFC")
+    strings self.methods_used = drop_string_from_array(get_supported_methods(), "avgFC")   
     if self.is_seas
         strings methods_seasonals = get_supported_seas_methods()
+        self.methods_used += methods_seasonals
     endif
+    
+    return array_of_forecasts_and_sds(self.methods_used, &self)
+end function
 
-    matrices fc_and_sd = get_forecasts_and_sds(methods, &self)
 
-    # Models for seasonal frequencies only
-    if exists(methods_seasonals)
-        matrices fc_and_sd += get_forecasts_and_sds(methods_seasonals, &self)
-    endif
-
-    *** HIER WEITERMACHEN ***
-
-    # Cross-sectional forecast-combination statistics
-    FC = meanr(FC) ~ sdc(FC', rows(FC')-1)' ~ FC
-
-    # Add column names
-    strings method_names = strsplit("Average-FC SD Mean Median RW RW+Drift AR(1) AR(1)+Trend", " ")
-    if self.is_seas
-        method_names += strsplit("Seas-Mean Seas-Median Seas-Naive Seas-Naive+Drift", " ")
-    endif
-    self.method_names = method_names
-
-    return FC
+function bundle get_mean_fc_and_mean_sd (const matrices fc_and_sd)
+    /* */
+    
+    scalar n = nelem(fc_and_sd)
+    scalar h = rows(fc_and_sd[1])
+    matrix point_fc_avg = NA * zeros(h, n)	# avg. point forecast across all models
+    matrix sd_fc_avg = NA * zeros(h, n)		# avg. std. error of forecasts across all models
+    
+    loop i=1..n -q			# TODO: Future drill() may replace this
+        point_fc_avg[,i] = fc_and_sd[i][,1]
+        sd_fc[,i] = fc_and_sd[i][,2]
+    endloop
+       
+    return defbundle("fc_point_avg", meanr(point_fc_avg), "fc_sd_avg", meanr(sd_fc_avg))   
 end function
 
 
