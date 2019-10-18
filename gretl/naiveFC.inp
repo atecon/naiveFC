@@ -1,3 +1,12 @@
+function strings get_supported_seas_methods (void)
+    return defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
+end function
+
+function strings get_supported_methods (void)
+    return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC",\
+      "ar1trendFC", "avgFC")
+end function
+
 function scalar data_has_seasonality (void)
     /* Flag seasonality of data set */
 
@@ -6,11 +15,11 @@ end function
 
 function void get_forecast_intervals (bundle *self)
     /* Compute forecast interval assuming standard normal. */
-    
+
     if cols(self.fc)==2
         fc = self.fc		# h by 2 matrix
         factor = fc[,2] * critical(z, (1-self.level)/2)
-        
+
         forecast_intervals(fc[,1], factor, &self)		# put 3 separate matrices to self
     endif
 end function
@@ -258,22 +267,23 @@ end function
 function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
-    strings methods = get_supported_methods()    
-    strings seas_methods = defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
+    strings methods = get_supported_methods()
+    strings seas_methods = get_supported_seas_methods()
 
     # Check whether called method exists
     matrix check = strpos(methods, self.which)
-    if sum(check) > 0
+
+    if sum(check) == 0
         funcerr "The forecasting method you selected does not exist."
     endif
 
     matrix check = strpos(seas_methods, self.which)
-    if sum(check) > 0
-       funcerr "The method you requested is not available for non-seasonal data."
+    if sum(check) == 0 && self.which!="avgFC"
+        funcerr "The method you requested is not available for non-seasonal data."
     endif
 
     if self.wsize < $pd
-        printf "\nError:\n"
+        printf "\nError: Problem with current periodicity.\n"
         printf "Window size = %d\n", self.wsize
         printf "Periodicity = %d\n", $pd
         funcerr "The size of the moving window cannot be smaller than the underlying periodicity."
@@ -333,7 +343,7 @@ function bundle naiveFC (const series y,
 
         attach_column_names(which, &self)
         attach_dates_to_rows(&self)
-       
+
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         NaiveThroughTime(&self)
     endif
@@ -362,7 +372,7 @@ function void attach_dates_to_rows (bundle *self)
     rnameset(self.forecasts_point, dates)
     rnameset(self.forecasts_lower_bound, dates)
     rnameset(self.forecasts_upper_bound, dates)
-end function 
+end function
 
 
 function void attach_column_names (const string which, bundle *self)
@@ -376,7 +386,7 @@ function void attach_column_names (const string which, bundle *self)
     else
         cnameset(self.self.forecasts_point, self.method_names)
     endif
-end function 
+end function
 
 
 function void summarize_naive_fc_results (bundle *self)
@@ -467,23 +477,52 @@ function void drop_missing_values (const series y, bundle *self)
 end function
 
 
+function matrices get_forecasts_and_sds (const strings methods, bundle *self)
+    /* Compute forecasts for each method, and store point forecast
+    and associated standard error in matrices */
+
+    scalar m = nelem(methods)
+    matrices fc_and_sd = array(m)
+    
+    loop i=1..m -q
+        fc_and_sd[i] = do_forecast_and_get_values(&self, methods[i])
+    endloop
+    
+    cnameset(fc_and_sd, "Point SD")
+    return fc_and_sd
+end function
+
+function strings drop_string_from_array (const strings S, const string drop_str)
+    /* Drop a specific string from string array. String yay occur multiple times. */
+    
+    strings ret = null
+    loop i=1..nelem(S) -q
+        if S[i] != drop_str
+            ret += S[i]
+        endif
+    endloop
+    
+    return ret
+end function
+
 function matrix avgf (bundle *self)
 /* Computes the mean (average) and cross-sectional (across forecast methods) standard deviation at
-   each horizon using all simple forecast methods available. */
+    each horizon using all simple forecast methods available. */
 
-   # Models for both seasonal and non-seasonal frequencies
-   matrices avg_forecasts = array()   
+    # Models for both seasonal and non-seasonal frequencies
+    strings methods = drop_string_from_array(get_supported_methods(), "avgFC")
+    if self.is_seas
+        strings methods_seasonals = get_supported_seas_methods()
+    endif
 
-
-    matrix FC = do_forecast_and_get_values(&self, "meanFC")[,1] \
-      ~ do_forecast_and_get_values(&self, "medianFC")[,1] ~ do_forecast_and_get_values(&self, "rwFC")[,1] \
-      ~ do_forecast_and_get_values(&self, "rwdriftFC")[,1] ~ do_forecast_and_get_values(&self, "ar1FC")[,1] ~ do_forecast_and_get_values(&self, "ar1trendFC")[,1]
+    matrices fc_and_sd = get_forecasts_and_sds(methods, &self)
 
     # Models for seasonal frequencies only
-    if self.is_seas
-        FC ~= do_forecast_and_get_values(&self, "smeanFC")[,1] ~ do_forecast_and_get_values(&self, "smedianFC")[,1] \
-          ~ do_forecast_and_get_values(&self, "snaiveFC")[,1]  ~ do_forecast_and_get_values(&self, "snaivedriftFC")[,1]
+    if exists(methods_seasonals)
+        matrices fc_and_sd += get_forecasts_and_sds(methods_seasonals, &self)
     endif
+
+    *** HIER WEITERMACHEN ***
 
     # Cross-sectional forecast-combination statistics
     FC = meanr(FC) ~ sdc(FC', rows(FC')-1)' ~ FC
@@ -705,11 +744,6 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
             printf "set title \"%s\"", self.title
         end plot --output="@out"
     endif
-end function
-
-function strings get_supported_methods (void)
-    return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC",\
-      "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC")
 end function
 
 
