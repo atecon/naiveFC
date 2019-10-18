@@ -5,7 +5,7 @@ set verbose off
 
 # Select an example
 #==================
-scalar runEX = 2
+scalar runEX = 1
 
 # Load data
 if runEX==1
@@ -36,7 +36,7 @@ eval b.fc							# print forecast results
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
 scalar opt.h = 10
-list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
+#list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
 bundle b = naiveFC(y, "avgFC", opt)
 eval b.fc
 b.preobs_fc = 15					# optional: set no. of pre.-forecast periods obs. to plot

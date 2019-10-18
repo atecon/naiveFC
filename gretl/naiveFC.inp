@@ -1,12 +1,12 @@
 function scalar data_has_seasonality (void)
     /* Flag seasonality of data set */
-    
+
     return ($pd>1) ? 1 : 0
 end function
 
 function void gen_forecast_intervals (bundle *self)
     /* Compute forecast interval assuming standard normal. */
-    
+
     if cols(self.fc)==2
         fc = self.fc
         factor = fc[,2]*critical(z, (1-self.level)/2)
@@ -16,31 +16,31 @@ end function
 
 function strings gen_column_names (bundle *self)
     /* Construct column names */
-    
+
     strings s = defarray(self.which) #defarray("Point-Fc")
     if cols(self.fc)==3
         s += sprintf("Lo (%.1f)", (1-self.level)/2*100)
         s += sprintf("Up (%.1f)", (1-(1-self.level)/2)*100)
     endif
-    
+
     return s
 end function
 
 function strings gen_row_names (scalar h)
     /* construct row names (horizons) */
-    
+
     strings r = array(h)
     loop i=1..h -q
         r[i] = sprintf(" h=%d", i)
     endloop
-    
+
     return r
 end function
 
 
 function strings gen_array_of_forecast_dates (bundle *self)
     /* Construct date strings for forecasts */
-    
+
     strings r = array(self.h)
     # Here we explicitly consider the case when the last obs are missings
     matrix date = {$obsdate}[1+obsnum(self.t2_label):]
@@ -57,7 +57,7 @@ function strings gen_array_of_forecast_dates (bundle *self)
               substr(sdate,5,6), substr(sdate,7,8))
         endif
     endloop
-    
+
     return r
 end function
 
@@ -96,11 +96,21 @@ end function
 function matrix call_method (bundle *self)
     /* Helper function for calling method. */
 
-    if self.which!="avgFC"
-        return  do_forecast_and_get_values(&self, self.which)
+    if self.which != "avgFC"
+        return do_forecast_and_get_values(&self, self.which)
     else
         return avgf(&self)
     endif
+end function
+
+
+function series get_period_series (string method)
+    catch series period = $obsmicro
+    if $error
+        series period = $obsminor
+    endif
+
+    return period
 end function
 
 
@@ -110,12 +120,10 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
     list xlist = null
 
     if method=="smeanFC" || method=="smedianFC"
-        catch period = $obsmicro
-        if $error
-            period = $obsminor
-        endif
+        series period = get_period_series(method)
         xlist += dummify(period)
     endif
+
     if method=="ar1trendFC" && inbundle(self, "w_trend") && self.w_trend
         genr time
     endif
@@ -183,17 +191,17 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
         endif
 
     endif
-    
+
     if self.type_roll=="static"
         string self.t1_forecast_label = obslabel($t2+1)
         string self.t2_forecast_label = obslabel($t2+self.h)
     endif
-    
+
     if $error
         return NA * zeros(self.h,2)
-    else        
+    else
         return $fcast ~ $fcse
-    endif    
+    endif
 end function
 
 
@@ -252,9 +260,7 @@ function bundle naiveFC (const series y,
                          string which "Select forecasting method",
                          bundle opts[null] "Bundle incl. optional parameters")
 
-    /*=======================*/
     /* Main package function */
-    /*=======================*/
 
     # Set up the bundle
     bundle self = get_default_values(y)
@@ -279,7 +285,6 @@ function bundle naiveFC (const series y,
     series self.y = y		# update
 
     # Call method
-    #==============
     if self.type_roll=="static"
         matrix self.fc = call_method(&self)
 
@@ -349,7 +354,7 @@ function scalar nobs_to_add_to_dataset (const list y, bundle *self)
 
     smpl y --contiguous
     t2_new = $t2				# don't consider eventual missings in the data passed to naiveFC()
-    
+
     return self.h - ($tmax-t2_new)
 end function
 
@@ -359,7 +364,7 @@ function void drop_missing_values (const series y, bundle *self)
 
     self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
 
-    if nelem(self.xlist)>0
+    if nelem(self.xlist) > 0
         list xlist = self.xlist
         smpl y --contiguous
         scalar t2_y = $t2
@@ -378,12 +383,14 @@ function void drop_missing_values (const series y, bundle *self)
             printf "Either reduce the forecast horizon to h=%d or add future information\n\
               for your 'xlist' variables.\n", (self.tdiff_xlist_y)
             funcerr ""
+
         elif self.tdiff_xlist_y<=0
             printf "\nError: The 'xlist' variables include no valid future observations\n\
               but only missings.\n"
             printf "Last valid of additional exogenous regressors is %s\n", obslabel(t2_xlist)
             funcerr "Re-specify."
         endif
+
         smpl full
     endif
 
@@ -391,6 +398,7 @@ function void drop_missing_values (const series y, bundle *self)
     self.t1_label = obslabel($t1)
     self.t2_label = obslabel($t2)
     self.T = $nobs		# no. of valid obs before adding obs. for forecasting purpose
+
     if self.T<self.T_all && !self.verbose
         printf "\nWarning: The time-series sample has been restricted\n"
         printf "due to %d missing values in series %s.\n", (self.T_all-$nobs), self.name_endo
