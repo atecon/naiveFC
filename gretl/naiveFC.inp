@@ -4,15 +4,28 @@ function scalar data_has_seasonality (void)
     return ($pd>1) ? 1 : 0
 end function
 
-function void gen_forecast_intervals (bundle *self)
+function void get_forecast_intervals_dict (bundle *self)
     /* Compute forecast interval assuming standard normal. */
 
     if cols(self.fc)==2
-        fc = self.fc
-        factor = fc[,2]*critical(z, (1-self.level)/2)
-        self.fc = fc[,1] ~ (fc[,1]-factor) ~ (fc[,1]+factor)
+        fc = self.fc		# h by 2 matrix
+        factor = fc[,2] * critical(z, (1-self.level)/2)
+        self.interval_forecasts_dict = forecast_intervals_dict(fc[,1], factor)
     endif
 end function
+
+function bundle forecast_intervals_dict (const matrix fc "Vector of point forecasts",
+                                         const matrix factor "Vector if withts for interval")
+    /* Generates a dictionary with intervall forecasts. */
+
+    bundle intervall_forecasts
+    intervall_forecasts.point_forecast = fc[,1]
+    intervall_forecasts.lower_bound_forecast = fc[,1] - factor
+    intervall_forecasts.upper_bound_forecast = fc[,1] + factor
+
+    return intervall_forecasts
+end function
+
 
 function strings gen_column_names (bundle *self)
     /* Construct column names */
@@ -149,7 +162,7 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
 
     # Estimation
     scalar dynamic_fc = 0
-    
+
     if method=="meanFC"
         catch ols y xlist --quiet
 
@@ -182,9 +195,11 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
         catch ols y xlist --quiet
     endif
 
-    if $error
+    scalar model_error = $error
+
+    if model_error
         printf "\nError: Model estimation failed. \n\
-        Forecast values are set to NA for the current sample.\n"
+          Forecast values are set to NA for the current sample.\n"
     else
         if dynamic_fc == 0
             fcast ($t2+1) ($t2+self.h) --static --quiet
@@ -192,11 +207,11 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
             fcast ($t2+1) ($t2+self.h) --dynamic --quiet
         endif
     endif
-    
+
     gen_t1_and_t2_fc_labels($t2, &self)
 
-    if $error
-        return NA * zeros(self.h,2)
+    if model_error
+        return NA * zeros(self.h, 2)
     else
         return $fcast ~ $fcse
     endif
@@ -205,12 +220,12 @@ end function
 
 function void gen_t1_and_t2_fc_labels (const int t2, bundle *self)
     /* Return dates for which current forecasts are computed. */
-    
+
     if self.type_roll=="static"
         string self.t1_forecast_label = obslabel(t2+1)
         string self.t2_forecast_label = obslabel(t2+self.h)
     endif
-end function 
+end function
 
 
 function void do_initial_checks (bundle *self)
@@ -293,7 +308,7 @@ function bundle naiveFC (const series y,
     series self.y = y		# update
 
     # Call method
-    if self.type_roll=="static"
+    if self.type_roll == "static"
         matrix self.fc = call_method(&self)
 
         # Compute (not yet for all methods implemented) forecast intervals

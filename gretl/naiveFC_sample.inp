@@ -25,13 +25,11 @@ endif
 #=======================
 # Static naive forecasts
 #=======================
-
+/*
 # Forecast combination
 bundle b = null
 b = naiveFC(y, "avgFC")				# compute forecasts
 naivePlot(&b)						# plot forecast results
-print b
-eval b.fc							# print forecast results
 
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
@@ -41,11 +39,15 @@ bundle b = naiveFC(y, "avgFC", opt)
 eval b.fc
 b.preobs_fc = 15					# optional: set no. of pre.-forecast periods obs. to plot
 naivePlot(&b)
+*/
 
 # Mean forecast
+bundle opt = null					# set specific options
+scalar opt.h = 10
 bundle b = naiveFC(y, "meanFC", opt)
 naivePlot(&b)
 eval b.fc
+stop
 
 # Median forecast
 bundle b = naiveFC(y, "medianFC", opt)
