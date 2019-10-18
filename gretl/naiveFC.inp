@@ -4,26 +4,25 @@ function scalar data_has_seasonality (void)
     return ($pd>1) ? 1 : 0
 end function
 
-function void get_forecast_intervals_dict (bundle *self)
+function void get_forecast_intervals (bundle *self)
     /* Compute forecast interval assuming standard normal. */
-
+    
     if cols(self.fc)==2
         fc = self.fc		# h by 2 matrix
         factor = fc[,2] * critical(z, (1-self.level)/2)
-        self.interval_forecasts_dict = forecast_intervals_dict(fc[,1], factor)
+        
+        forecast_intervals(fc[,1], factor, &self)		# put 3 separate matrices to self
     endif
 end function
 
-function bundle forecast_intervals_dict (const matrix fc "Vector of point forecasts",
-                                         const matrix factor "Vector if withts for interval")
-    /* Generates a dictionary with intervall forecasts. */
+function void forecast_intervals (const matrix fc "Vector of point forecasts",
+                                  const matrix factor "Vector if withts for interval",
+                                  bundle *self)
+    /* Generate seperate mtrices for interval forecasts. */
 
-    bundle intervall_forecasts
-    intervall_forecasts.point_forecast = fc[,1]
-    intervall_forecasts.lower_bound_forecast = fc[,1] - factor
-    intervall_forecasts.upper_bound_forecast = fc[,1] + factor
-
-    return intervall_forecasts
+    matrix self.forecasts_point = fc[,1]
+    matrix self.forecasts_lower_bound = fc[,1] - factor
+    matrix self.forecasts_upper_bound = fc[,1] + factor
 end function
 
 
@@ -310,21 +309,18 @@ function bundle naiveFC (const series y,
     # Call method
     if self.type_roll == "static"
         matrix self.fc = call_method(&self)
+        eval self.fc
+        stop
 
         # Compute (not yet for all methods implemented) forecast intervals
         if which != "avgFC"
-            gen_forecast_intervals(&self)
+            #gen_forecast_intervals(&self)		# TODO: deprectated
+            get_forecast_intervals(&self)
         endif
 
-        # Add column/ row strings
-        if which != "avgFC"
-            cnameset(self.fc, gen_column_names(&self))
-        else
-            cnameset(self.fc, self.method_names)
-        endif
-
-        rnameset(self.fc, gen_array_of_forecast_dates(&self))
-
+        attach_column_names(which, &self)
+        attach_dates_to_rows(&self)
+       
     elif self.type_roll=="rolling" || self.type_roll=="recursive"
         NaiveThroughTime(&self)
     endif
@@ -343,6 +339,31 @@ function bundle naiveFC (const series y,
 
     return self
 end function
+
+
+function void attach_dates_to_rows (bundle *self)
+    /* Add date strings as row labels */
+
+    strings dates = gen_array_of_forecast_dates(&self)
+
+    rnameset(self.forecasts_point, dates)
+    rnameset(self.forecasts_lower_bound, dates)
+    rnameset(self.forecasts_upper_bound, dates)
+end function 
+
+
+function void attach_column_names (const string which, bundle *self)
+    /* Add column labels */
+
+    strings colname = gen_column_names(&self)
+    if which != "avgFC"
+        cnameset(self.forecasts_point, colname)
+        cnameset(self.forecasts_lower_bound, colname)
+        cnameset(self.forecasts_upper_bound, colname)
+    else
+        cnameset(self.self.forecasts_point, self.method_names)
+    endif
+end function 
 
 
 function void summarize_naive_fc_results (bundle *self)
