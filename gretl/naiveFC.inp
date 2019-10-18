@@ -226,37 +226,50 @@ function void gen_t1_and_t2_fc_labels (const int t2, bundle *self)
     endif
 end function
 
+# TODO: Will be part of etra.gfn in v0.51
+function matrix strpos (const strings S "Array of strings",
+                        const string str "String being searched for in S",
+                        const bool print_warnings[1] "Print eventual warnings")
+    # Returns the positional entries of string in S in a column vector
+    # if S contains string, 0 otherwise.
+
+    if nelem(S) == 0
+        if print_warnings
+            printf "Warning: String array '%s' is empty.\n", argname(S)
+        endif
+        return {0}
+    endif
+
+    matrix ret = {}
+    loop i=1..nelem(S) -q
+        if S[i] == str
+            ret |= $i
+        endif
+    endloop
+
+    if rows(ret) > 0
+        return ret
+    else
+        return {0}
+    endif
+end function
+
 
 function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
-    strings methods = defarray("meanFC", "medianFC", "avgFC", "rwFC", "rwdriftFC", \
-      "ar1FC", "ar1trendFC")
+    strings methods = get_supported_methods()    
     strings seas_methods = defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
-    methods += seas_methods
+
     # Check whether called method exists
-    scalar err = 1
-    loop i=1..nelem(methods) -q
-        if methods[i]==self.which
-            err=0
-            break
-        endif
-    endloop
-    if err==1
+    matrix check = strpos(methods, self.which)
+    if sum(check) > 0
         funcerr "The forecasting method you selected does not exist."
     endif
 
-    if self.is_seas==0
-        scalar err = 0
-        loop i=1..nelem(seas_methods) -q
-            if seas_methods[i]==self.which
-                err=1
-                break
-            endif
-        endloop
-        if err==1
-            funcerr "The method you requested is not available for non-seasonal data."
-        endif
+    matrix check = strpos(seas_methods, self.which)
+    if sum(check) > 0
+       funcerr "The method you requested is not available for non-seasonal data."
     endif
 
     if self.wsize < $pd
@@ -455,12 +468,13 @@ end function
 
 
 function matrix avgf (bundle *self)
-/* Computes the mean (average) and cross-sectional
-   (across forecast methods) standard deviation at
-   each horizon using all simple forecast methods
-    available. */
+/* Computes the mean (average) and cross-sectional (across forecast methods) standard deviation at
+   each horizon using all simple forecast methods available. */
 
-    # Models for both seasonal and non-seasonal frequencies (grab only point forecasts)
+   # Models for both seasonal and non-seasonal frequencies
+   matrices avg_forecasts = array()   
+
+
     matrix FC = do_forecast_and_get_values(&self, "meanFC")[,1] \
       ~ do_forecast_and_get_values(&self, "medianFC")[,1] ~ do_forecast_and_get_values(&self, "rwFC")[,1] \
       ~ do_forecast_and_get_values(&self, "rwdriftFC")[,1] ~ do_forecast_and_get_values(&self, "ar1FC")[,1] ~ do_forecast_and_get_values(&self, "ar1trendFC")[,1]
@@ -693,6 +707,11 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     endif
 end function
 
+function strings get_supported_methods (void)
+    return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC",\
+      "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC")
+end function
+
 
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
@@ -702,8 +721,7 @@ function matrix GUI_naiveFC (const series y "Dependent variable",
     /* Helper function for GUI access. */
 
     # map integer value to string
-    strings methods=defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC",\
-      "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC")
+    strings methods = get_supported_methods()
 
     bundle opts = null
     bundle self = null
