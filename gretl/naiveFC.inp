@@ -143,12 +143,13 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
     # Set up variables
     series y = self.y
     if method!="rwFC" && method!="rwdriftFC"
-        xlist += const
+        list xlist += const
     endif
-    xlist += self.xlist
+    list xlist += self.xlist
 
     # Estimation
     scalar dynamic_fc = 0
+    
     if method=="meanFC"
         catch ols y xlist --quiet
 
@@ -182,20 +183,17 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
     endif
 
     if $error
-        printf "\nError: Model estimation failed. Forecast values are set to NA.\n"
+        printf "\nError: Model estimation failed. \n\
+        Forecast values are set to NA for the current sample.\n"
     else
-        if dynamic_fc==0
+        if dynamic_fc == 0
             fcast ($t2+1) ($t2+self.h) --static --quiet
         else
             fcast ($t2+1) ($t2+self.h) --dynamic --quiet
         endif
-
     endif
-
-    if self.type_roll=="static"
-        string self.t1_forecast_label = obslabel($t2+1)
-        string self.t2_forecast_label = obslabel($t2+self.h)
-    endif
+    
+    gen_t1_and_t2_fc_labels($t2, &self)
 
     if $error
         return NA * zeros(self.h,2)
@@ -203,6 +201,16 @@ function matrix do_forecast_and_get_values (bundle *self, string method)
         return $fcast ~ $fcse
     endif
 end function
+
+
+function void gen_t1_and_t2_fc_labels (const int t2, bundle *self)
+    /* Return dates for which current forecasts are computed. */
+    
+    if self.type_roll=="static"
+        string self.t1_forecast_label = obslabel(t2+1)
+        string self.t2_forecast_label = obslabel(t2+self.h)
+    endif
+end function 
 
 
 function void do_initial_checks (bundle *self)
