@@ -3,7 +3,7 @@ function strings get_supported_seas_methods (void)
 end function
 
 function strings get_supported_methods (void)
-    return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC",\
+    return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", \
       "ar1trendFC", "avgFC")
 end function
 
@@ -16,9 +16,9 @@ end function
 function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
                                    const scalar level[0.001:0.999:] "confidence level")
     /* Compute width for a given condifdence level assuming standard normal. */
-    
+
     return fc_sd * critical(z, (1-level)/2)
-end function 
+end function
 
 
 function void get_forecast_intervals (const matrices fc_and_sd,
@@ -76,7 +76,7 @@ function strings gen_column_names (bundle *self)
 end function
 
 function strings gen_row_names (scalar h)
-    /* construct row names (horizons) */
+    /* Construct row names indicating forecast horizons. */
 
     strings r = array(h)
     loop i=1..h -q
@@ -110,6 +110,7 @@ function strings gen_array_of_forecast_dates (bundle *self)
     return r
 end function
 
+
 function void print_no_bootstrap_support (void)
     funcerr "Bootstrap confidence intervals are not supported, yet"
 end function
@@ -120,17 +121,17 @@ function bundle get_default_values (const series y)
 
     bundle self = null
     list self.xlist = null
-    scalar self.horizon = 10							# forecast horizon
+    scalar self.horizon = 10				# maximum forecast horizon
     scalar self.level = 0.9					# probability level for forecast interval
     scalar self.fan = 0						# plot fan chart  (not supported yet)
-    scalar self.nboot = 0						# no. of bootstrap replications  (not supported yet)
+    scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
     scalar self.blength = 4					# Block length bootstrap  (not supported yet)
-    scalar self.is_seas = data_has_seasonality()				# check for seasonality
-    scalar self.verbose = 1					# print details (default: True)
+    scalar self.is_seas = data_has_seasonality()
+    scalar self.verbose = 1
 
     # For NaiveThroughTime()
     string self.type_roll = "static" 			# "static", "rolling" or "recursive"
-    scalar self.window_size = ceil(0.25*nobs(y))		# default window length
+    scalar self.window_length = ceil(0.25*nobs(y))		# default window length
 
     # For naivePlot()
     string self.title = ""
@@ -330,9 +331,9 @@ function void do_initial_checks (bundle *self)
         funcerr "The method you requested is not available for non-seasonal data."
     endif
 
-    if self.window_size < $pd
+    if self.window_length < $pd
         printf "\nError: Problem with current periodicity.\n"
-        printf "Window size = %d\n", self.window_size
+        printf "Window size = %d\n", self.window_length
         printf "Periodicity = %d\n", $pd
         funcerr "The size of the moving window cannot be smaller than the underlying periodicity."
     endif
@@ -461,7 +462,7 @@ function void summarize_naive_fc_results (bundle *self)
             printf "Width forecast interval: \t\t%d pct.\n", self.level*100
         endif
     else
-        printf "Moving window length: \t\t\t%d\n", self.window_size
+        printf "Moving window length: \t\t\t%d\n", self.window_length
         printf "Number of %s forecasts: \t\t%d\n", self.type_roll, rows(self.fc)
         printf "First observation forecasted (h=1): \t%s\n", obslabel(self.initfc)
     endif
@@ -597,9 +598,9 @@ function void NaiveThroughTime (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores a sequence of point forecasts */
 
-    if $nobs<self.window_size
+    if $nobs<self.window_length
         printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
-          number of valid observations.\n", self.window_size
+          number of valid observations.\n", self.window_length
         funcerr "Re-specify."
     endif
 
@@ -613,7 +614,7 @@ function void NaiveThroughTime (bundle *self)
     bundle cv = null
     list cv.X = X
     string cv.cv_type = (self.type_roll=="rolling") ? "rolwin" : "recwin"
-    scalar cv.win_size = self.window_size
+    scalar cv.win_size = self.window_length
     CvDataSplitter(&cv)
 
     /* Required seto, as CvDataSplitter() doesn't consider the very last obs in
