@@ -25,7 +25,7 @@ endif
 #=======================
 # Static naive forecasts
 #=======================
-#/*
+/*
 # Forecast combination
 bundle b = null
 b = naiveFC(y, "avgFC")				# compute forecasts
@@ -34,7 +34,7 @@ matrix fc_method1_lb = b.forecasts_lower_bound[1]
 fc_method1_lb
 naivePlot(&b)						# plot forecast results
 
-/*
+
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
 scalar opt.horizon = 10
@@ -43,7 +43,7 @@ bundle b = naiveFC(y, "avgFC", opt)
 matrix fc_avgfc_pt = b.forecasts_point[10]
 b.preobs_fc = 15					# optional: set no. of pre.-forecast periods obs. to plot
 naivePlot(&b)
-#*/
+*/
 
 # Mean forecast
 bundle opt = null					# set specific options
@@ -101,7 +101,7 @@ naivePlot(&b)
 eval b.fc
 
 
-/* ACTIVATE IF WANTED: may take a while
+#/* ACTIVATE IF WANTED: may take a while
 #=========================
 # Moving-window forecasts
 #=========================

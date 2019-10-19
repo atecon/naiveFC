@@ -139,7 +139,7 @@ function bundle get_default_values (const series y)
     scalar self.is_seas = data_has_seasonality()
     scalar self.verbose = 1
 
-    # For NaiveThroughTime()
+    # For get_moving_window_forecasts()
     string self.type_moving_window = "static" 			# "static", "rolling" or "recursive"
     scalar self.window_length = ceil(0.25*nobs(y))		# default window length
 
@@ -382,17 +382,7 @@ function bundle naiveFC (const series y,
     series self.y = y		# update
 
     # Call method
-    if self.type_moving_window == "static"
-        
-        get_static_forecasts(&self)
-        print self
-        eval self.forecasts_lower_bound
-        eval self.forecasts_lower_bound[1]
-#        eval self.forecasts_lower_bound[10]
-
-    elif self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
-        NaiveThroughTime(&self)
-    endif
+    do_naive_fc(&self)
 
     if self.verbose
         summarize_naive_fc_results(&self)
@@ -408,6 +398,26 @@ function bundle naiveFC (const series y,
 
     return self
 end function
+
+
+function void do_naive_fc (bundle *self)
+    /* Wrapper function actually calling static or
+    moving-window procedures. */
+
+    if self.type_moving_window == "static"
+        get_static_forecasts(&self)
+        
+        print self
+        eval self.forecasts_lower_bound
+        eval self.forecasts_lower_bound[1]
+        #        eval self.forecasts_lower_bound[10]		# only for "avgfc"
+
+    else
+        get_moving_window_forecasts(&self)
+    endif
+    
+end function
+
 
 
 function void attach_dates_to_rows (bundle *self)
@@ -594,11 +604,11 @@ function bundle get_mean_fc_and_mean_sd (const matrices fc_and_sd)
 end function
 
 
-function void NaiveThroughTime (bundle *self)
+function void get_moving_window_forecasts (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
-    (ii) a recursive manner and stores a sequence of point forecasts */
+    (ii) a recursive manner and stores a sequence of point forecasts. */
 
-    if $nobs<self.window_length
+    if $nobs < self.window_length
         printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
           number of valid observations.\n", self.window_length
         funcerr "Re-specify."
@@ -607,14 +617,15 @@ function void NaiveThroughTime (bundle *self)
     include CvDataSplitter.gfn		# load another external package
 
     series y = self.y
-    list X = y						# a list must be passed to data splitter
+    list X = y						# CvDataSplitter() expects a list
 
-    # Set data splitter using the valid observation set w.o. obs. addiotnally added for forecasting
+    # Set data splitter using the valid observation set w.o. obs. additionally added for forecasting
     smpl obsnum(self.t1_label) obsnum(self.t2_label)
     bundle cv = null
     list cv.X = X
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
+    
     CvDataSplitter(&cv)
 
     /* Required seto, as CvDataSplitter() doesn't consider the very last obs in
