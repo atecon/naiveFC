@@ -130,7 +130,7 @@ function bundle get_default_values (const series y)
     scalar self.verbose = 1
 
     # For NaiveThroughTime()
-    string self.type_roll = "static" 			# "static", "rolling" or "recursive"
+    string self.type_moving_window = "static" 			# "static", "rolling" or "recursive"
     scalar self.window_length = ceil(0.25*nobs(y))		# default window length
 
     # For naivePlot()
@@ -199,10 +199,10 @@ function matrix forecast_and_get_fc_sd (bundle *self, string method)
     endif
 
     # Set the training set
-    if self.type_roll=="static"
+    if self.type_moving_window=="static"
         smpl obsnum(self.t1_label) obsnum(self.t2_label)
 
-    elif self.type_roll=="rolling" || self.type_roll=="recursive"
+    elif self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
         # set to training set
         catch smpl ; ($t2-self.horizon)
         if $error
@@ -278,7 +278,7 @@ end function
 function void gen_t1_and_t2_fc_labels (const int t2, bundle *self)
     /* Return dates for which current forecasts are computed. */
 
-    if self.type_roll=="static"
+    if self.type_moving_window=="static"
         string self.t1_forecast_date = obslabel(t2+1)
         string self.t2_forecast_date = obslabel(t2+self.horizon)
     endif
@@ -342,7 +342,7 @@ function void do_initial_checks (bundle *self)
         print_no_bootstrap_support()
     endif
 
-    if (self.type_roll=="rolling" || self.type_roll=="recursive") && self.which=="avgFC"
+    if (self.type_moving_window=="rolling" || self.type_moving_window=="recursive") && self.which=="avgFC"
         printf "Error: Automatic forecast averaging ('avgfc') is currently not compatible\n"
         printf "with moving forecasts.\n"
         funcerr "Re-specify."
@@ -379,7 +379,7 @@ function bundle naiveFC (const series y,
     series self.y = y		# update
 
     # Call method
-    if self.type_roll == "static"
+    if self.type_moving_window == "static"
         
         get_static_forecasts(&self)
         print self
@@ -390,7 +390,7 @@ function bundle naiveFC (const series y,
 #        *** HIER WEITERMACHEN ***
         # Es scheint bis hierher für static zu funktionieren!
 
-    elif self.type_roll=="rolling" || self.type_roll=="recursive"
+    elif self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
         NaiveThroughTime(&self)
     endif
 
@@ -456,14 +456,14 @@ function void summarize_naive_fc_results (bundle *self)
     printf "End valid data set: \t\t\t%s\n", self.t2_label
     printf "Number of observations: \t\t%d\n", obsnum(self.t2_label)-obsnum(self.t1_label)
     printf "Forecast horizon: \t\t\t%d\n", self.horizon
-    if self.type_roll=="static"
+    if self.type_moving_window=="static"
         printf "First observation forecasted: \t\t%s\n", obslabel(obsnum(self.t2_label)+1)
         if self.which!="avgFC"
             printf "Width forecast interval: \t\t%d pct.\n", self.level*100
         endif
     else
         printf "Moving window length: \t\t\t%d\n", self.window_length
-        printf "Number of %s forecasts: \t\t%d\n", self.type_roll, rows(self.fc)
+        printf "Number of %s forecasts: \t\t%d\n", self.type_moving_window, rows(self.fc)
         printf "First observation forecasted (h=1): \t%s\n", obslabel(self.initfc)
     endif
     printf "****************************************************\n"
@@ -613,7 +613,7 @@ function void NaiveThroughTime (bundle *self)
     smpl obsnum(self.t1_label) obsnum(self.t2_label)
     bundle cv = null
     list cv.X = X
-    string cv.cv_type = (self.type_roll=="rolling") ? "rolwin" : "recwin"
+    string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
     CvDataSplitter(&cv)
 
@@ -677,7 +677,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
 
 
     # Set up the fcmat matrix holding results
-    if self.type_roll=="static"
+    if self.type_moving_window=="static"
         matrix fcmat = zeros(self.T, cols(self.fc))		# length equal to no, of obs. of the non-augmented sample
         fcmat = (fcmat.=0) ? NA : fcmat
         fcmat |= self.fc							# concatenate forecasts
@@ -689,7 +689,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
     setinfo y --graph-name="Actuals"
     list lplot = y
 
-    if self.type_roll!="static"						# rolling/ recursive window
+    if self.type_moving_window!="static"						# rolling/ recursive window
         # Initialization
         scalar start = self.initfc-1
         smpl start start
@@ -703,7 +703,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
             lplot += fc_$i
         endloop
 
-    elif self.type_roll=="static"
+    elif self.type_moving_window=="static"
         self.initfc = self.T+1
 
         loop i=1..cols(self.fc) -q
