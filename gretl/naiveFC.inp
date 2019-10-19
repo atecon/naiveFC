@@ -687,6 +687,10 @@ function void get_moving_window_forecasts (bundle *self)
     cnameset(forecasts_lower_bound, self.fcperiods)
     cnameset(forecasts_upper_bound, self.fcperiods)
 
+    *** HIER WEITERMACHEN *** 
+    Denke über das putput format nach und auch wie die Sachen geplottet werden!
+
+
 end function
 
 
