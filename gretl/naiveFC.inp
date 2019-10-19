@@ -27,7 +27,7 @@ function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
     the forecast interval assuming standard normal. */
 
     bundle bout = null
-    
+
     scalar m = nelem(fc_and_sd)
     matrices point_forecasts = array(m)
     matrices factors = array(m)
@@ -36,7 +36,7 @@ function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
         point_forecasts[i] = fc_and_sd[i][,1]
         factors[i] = fc_interval_width(fc_and_sd[i][,1], self.level)
     endloop
-    
+
     bout.point_forecasts = point_forecasts
     bout.factors = factors
 
@@ -44,10 +44,10 @@ function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
 end function
 
 
-function void get_point_low_up_bound_arrays (bundle *bout, bundle *self)   
-    /* Generate for each model based on respective point forecasts and 
+function void get_point_low_up_bound_arrays (bundle *bout, bundle *self)
+/* Generate for each model based on respective point forecasts and
     estimated standard derrors, arrays holding the interval forecasts. */
-    
+
     if !inbundle(bout, "point_forecasts")
         funcerr "Could not find item 'point_forecasts' in bundle"
     endif
@@ -59,7 +59,7 @@ function void get_point_low_up_bound_arrays (bundle *bout, bundle *self)
     if n != nelem(bout.factors)
         funcerr "Number of matrices does not equal.
     endif
-    
+
     matrices self.forecasts_point = array(n)
     matrices self.forecasts_lower_bound = array(n)
     matrices self.forecasts_upper_bound = array(n)
@@ -69,7 +69,7 @@ function void get_point_low_up_bound_arrays (bundle *bout, bundle *self)
         self.forecasts_lower_bound[i] = bout.point_forecasts[i] - bout.factors[i]
         self.forecasts_upper_bound[i] = bout.point_forecasts[i] + bout.factors[i]
     endloop
-    
+
 end function
 
 
@@ -163,8 +163,8 @@ end function
 
 
 function void get_static_forecasts (bundle *self)
-    /* This function is called by naiveFC(). */
-    
+    /* This function is called by naiveFC() and for 'static' forecasts only. */
+
     matrices fc_and_sd = call_method(&self)
     bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &self)
     get_point_low_up_bound_arrays(&bout, &self)
@@ -175,12 +175,12 @@ end function
 
 
 function matrices call_method (bundle *self)
-    /* Wrapper for calling method. Returns p-dimension array where
-    each matrix is of size h by 2 holding point forecasts and forecast
+/* Wrapper for calling method. Returns p-dimension array where
+   each matrix is of size h by 2 holding point forecasts and forecast
     standard errors. */
 
     if tolower(self.which) != "avgfc"
-        matrices fc_and_sd = defarray(forecast_and_get_fc_sd(&self, self.which))	# 1-dim array incl. single h by 2 matrix 
+        matrices fc_and_sd = defarray(forecast_and_get_fc_sd(&self, self.which))	# 1-dim array incl. single h by 2 matrix
     else
         matrices fc_and_sd = avg_forecast_and_get_fc_sd(&self)	# function already transforms into array
     endif
@@ -194,7 +194,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, string method)
 
     matrix fc_and_sd_matrix = zeros(self.horizon, 2) * NA
     list xlist = null
-    
+
     if method=="smeanFC" || method=="smedianFC"
         series period = get_period_series(method)
         xlist += dummify(period)
@@ -272,11 +272,11 @@ function matrix forecast_and_get_fc_sd (bundle *self, string method)
     endif
 
     gen_t1_and_t2_fc_labels($t2, &self)			# adds to self
-    
+
     if !model_error
         fc_and_sd_matrix = $fcast ~ $fcse
     endif
-    
+
     return fc_and_sd_matrix
 end function
 
@@ -381,8 +381,7 @@ function bundle naiveFC (const series y,
 
     series self.y = y		# update
 
-    # Call method
-    do_naive_fc(&self)
+    do_naive_forecasting(&self)
 
     if self.verbose
         summarize_naive_fc_results(&self)
@@ -400,22 +399,26 @@ function bundle naiveFC (const series y,
 end function
 
 
-function void do_naive_fc (bundle *self)
-    /* Wrapper function actually calling static or
+function void do_naive_forecasting (bundle *self)
+/* Wrapper function actually calling static or
     moving-window procedures. */
 
     if self.type_moving_window == "static"
         get_static_forecasts(&self)
-        
+
         print self
         eval self.forecasts_lower_bound
         eval self.forecasts_lower_bound[1]
         #        eval self.forecasts_lower_bound[10]		# only for "avgfc"
 
     else
+        catch include CvDataSplitter.gfn		# load another external package
+        if !$error
+            printf "\nInfo: Necessary package 'CvDataSplitter' succesfully loaded.\n"
+        endif
         get_moving_window_forecasts(&self)
     endif
-    
+
 end function
 
 
@@ -446,12 +449,12 @@ function void attach_column_names (bundle *self)
         strings label_point = self.methods_used
     endif
 
-        loop i=1..m -q
-            cnameset(self.forecasts_point[i], label_point)
-            cnameset(self.forecasts_lower_bound[i], label_lo)
-            cnameset(self.forecasts_upper_bound[i], label_up)
-        endloop
-    
+    loop i=1..m -q
+        cnameset(self.forecasts_point[i], label_point)
+        cnameset(self.forecasts_lower_bound[i], label_lo)
+        cnameset(self.forecasts_upper_bound[i], label_up)
+    endloop
+
 end function
 
 
@@ -544,7 +547,7 @@ end function
 
 
 function matrices do_avgfcs_and_get_fc_sd_array (const strings methods, bundle *self)
-    /* Compute forecasts for each method. For each mezthod we obtain a matrix
+/* Compute forecasts for each method. For each mezthod we obtain a matrix
     of size h by 2 holding point forecasts and associated standard errors. */
 
     scalar m = nelem(methods)
@@ -553,60 +556,60 @@ function matrices do_avgfcs_and_get_fc_sd_array (const strings methods, bundle *
     loop i=1..m -q
         fc_and_sd[i] = forecast_and_get_fc_sd(&self, methods[i])
     endloop
-    
+
     return fc_and_sd
 end function
 
 
 function strings drop_string_from_array (const strings S, const string drop_str)
     /* Drop a specific string from string array. String yay occur multiple times. */
-    
+
     strings ret = null
     loop i=1..nelem(S) -q
         if S[i] != drop_str
             ret += S[i]
         endif
     endloop
-    
+
     return ret
 end function
 
 
 function matrices avg_forecast_and_get_fc_sd (bundle *self)
-    /* Compute forecasts using different methods supported, and return array of point
+/* Compute forecasts using different methods supported, and return array of point
     forecasts and associated standard errors. */
-    
+
     # Models for both seasonal and non-seasonal frequencies
-    strings self.methods_used = drop_string_from_array(get_supported_methods(), "avgFC")   
+    strings self.methods_used = drop_string_from_array(get_supported_methods(), "avgFC")
     if self.is_seas
         strings methods_seasonals = get_supported_seas_methods()
         self.methods_used += methods_seasonals
     endif
-    
+
     return do_avgfcs_and_get_fc_sd_array(self.methods_used, &self)
 end function
 
 
 function bundle get_mean_fc_and_mean_sd (const matrices fc_and_sd)
     /* */
-    
+
     scalar n = nelem(fc_and_sd)
     scalar h = rows(fc_and_sd[1])
     matrix point_fc_avg = NA * zeros(h, n)	# avg. point forecast across all models
     matrix sd_fc_avg = NA * zeros(h, n)		# avg. std. error of forecasts across all models
-    
+
     loop i=1..n -q			# TODO: Future drill() may replace this
         point_fc_avg[,i] = fc_and_sd[i][,1]
         sd_fc[,i] = fc_and_sd[i][,2]
     endloop
-       
-    return defbundle("fc_point_avg", meanr(point_fc_avg), "fc_sd_avg", meanr(sd_fc_avg))   
+
+    return defbundle("fc_point_avg", meanr(point_fc_avg), "fc_sd_avg", meanr(sd_fc_avg))
 end function
 
 
 function void get_moving_window_forecasts (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
-    (ii) a recursive manner and stores a sequence of point forecasts. */
+    (ii) a recursive manner and stores sequences of interval forecasts. */
 
     if $nobs < self.window_length
         printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
@@ -614,23 +617,20 @@ function void get_moving_window_forecasts (bundle *self)
         funcerr "Re-specify."
     endif
 
-    include CvDataSplitter.gfn		# load another external package
-
     series y = self.y
-    list X = y						# CvDataSplitter() expects a list
 
     # Set data splitter using the valid observation set w.o. obs. additionally added for forecasting
     smpl obsnum(self.t1_label) obsnum(self.t2_label)
     bundle cv = null
-    list cv.X = X
+    list cv.X = y					# CvDataSplitter() expects a list
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
-    
+
     CvDataSplitter(&cv)
 
-    /* Required seto, as CvDataSplitter() doesn't consider the very last obs in
+    /* Required, as CvDataSplitter() doesn't consider the very last obs in
     the final training set for 'rolwin' and 'recwin'. */
-    cv.X_train += cv.X_train[cv.n_folds] | ({$t2}~{y[$t2]})
+    cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
     cv.n_folds++
 
     /*	For debugging only
@@ -643,19 +643,37 @@ function void get_moving_window_forecasts (bundle *self)
        endloop
     */
 
-    # Loop over training sets
+    # Loop over training sets, run estimation and retrieve forecasts
     matrix self.fc = zeros(cv.n_folds, self.horizon)
+
+    # Retrieve point forecasts and forecast standard errors
+    matrices fc_and_sd_from_all_cv = array(cv.n_folds)
     loop lwin=1..cv.n_folds -q
         mat = cv.X_train[lwin]
         smpl minc(mat[,1]) maxc(mat[,1])		# read time index of the training set
 
         # 1st obs being forecasted (h=1) based on information up to (self.initfc-1)
         scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-        self.fc[lwin,] = call_method(&self)[,1]'	# compute point forecast
+
+        fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
     endloop
 
+    # TODO: Put into separate function
+    bundle bout = point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)
+    matrix forecasts_point = flatten(bout.point_forecasts)		# rows: horizon, cols: sample period
+    matrices get_movwin_low_up_matrices = get_movwin_low_up_matrices(forecasts_point, \
+      flatten(bout.factors))
+    matrix forecasts_lower_bound = get_movwin_low_up_matrices[1]
+    matrix forecasts_upper_bound = get_movwin_low_up_matrices[2]
+
+
+    # TODO: Put into separate function
     # Attach column names
-    cnameset(self.fc, gen_row_names(self.horizon))
+    rnameset(forecasts_point, gen_row_names(self.horizon))
+    rnameset(forecasts_lower_bound, gen_row_names(self.horizon))
+    rnameset(forecasts_upper_bound, gen_row_names(self.horizon))
+
+    # TODO: Put into separate function
     # Attach rownames: on rows we put date strings referring to
     # the information set (time/ date) based on which the h-step
     # ahead forecast is computed for.
@@ -665,8 +683,25 @@ function void get_moving_window_forecasts (bundle *self)
         # based on which the first h=1,...,H OoS-forecasts are made.
         self.fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-2) )
     endloop
-    rnameset(self.fc, self.fcperiods)
+    cnameset(forecasts_point, self.fcperiods)
+    cnameset(forecasts_lower_bound, self.fcperiods)
+    cnameset(forecasts_upper_bound, self.fcperiods)
+
 end function
+
+
+function matrices get_movwin_low_up_matrices (const matrix point_forecasts,
+                                              const matrix factors)
+    /* Compute for all horizons and moving windows the intervals
+    for the forecast. */
+
+    matrices lower_and_upper = array(2)
+    matrix lower_and_upper[1] = point_forecasts .- factors
+    matrix lower_and_upper[2] = point_forecasts .+ factors
+
+    return lower_and_upper
+end function
+
 
 
 function void naivePlot (bundle *self "Bundle returned from naiveFC()")

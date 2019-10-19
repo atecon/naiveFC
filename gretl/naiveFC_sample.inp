@@ -43,7 +43,6 @@ bundle b = naiveFC(y, "avgFC", opt)
 matrix fc_avgfc_pt = b.forecasts_point[10]
 b.preobs_fc = 15					# optional: set no. of pre.-forecast periods obs. to plot
 naivePlot(&b)
-*/
 
 # Mean forecast
 bundle opt = null					# set specific options
@@ -99,7 +98,7 @@ eval b.fc
 bundle b = naiveFC(y, "snaivedriftFC", opt)
 naivePlot(&b)
 eval b.fc
-
+*/
 
 #/* ACTIVATE IF WANTED: may take a while
 #=========================
@@ -112,11 +111,10 @@ opts.window_size = xmax($pd, 80) 			# moving window length (optional)
 #opts.verbose = 0					# Don't print details (optional)
 
 # Select methods 
-methods = defarray("meanFC") #, "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
+strings methods = defarray("meanFC") #, "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
 #  "snaivedriftFC", "ar1FC", "ar1trendFC")
 loop i=1..nelem(methods) -q
     bundle b = null
-    eval methods[i]
     bundle b = naiveFC(y, methods[i], opts)
     eval b.fc
     
