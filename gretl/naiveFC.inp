@@ -21,33 +21,42 @@ function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
 end function
 
 
-function void get_forecast_intervals (const matrices fc_and_sd,
-                                      bundle *self)
+function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
+                                               bundle *self)
     /* Using each model's point forecast and standard error, compute
     the forecast interval assuming standard normal. */
 
+    bundle bout = null
+    
     scalar m = nelem(fc_and_sd)
-
     matrices point_forecasts = array(m)
     matrices factors = array(m)
-    
-    loop i=1..m -q        
+
+    loop i=1..m -q
         point_forecasts[i] = fc_and_sd[i][,1]
         factors[i] = fc_interval_width(fc_and_sd[i][,1], self.level)
     endloop
     
-    point_lower_upper_bound_arrays(point_forecasts, factors, &self)	# writes arrays into self
+    bout.point_forecasts = point_forecasts
+    bout.factors = factors
+
+    return bout
 end function
 
 
-function void point_lower_upper_bound_arrays (const matrices point_forcasts "Array of vectors of point forecasts",
-                                  const matrices factors "Array of vectors of widths of intervals",
-                                  bundle *self)
+function void get_point_low_up_bound_arrays (bundle *bout, bundle *self)   
     /* Generate for each model based on respective point forecasts and 
     estimated standard derrors, arrays holding the interval forecasts. */
+    
+    if !inbundle(bout, "point_forecasts")
+        funcerr "Could not find item 'point_forecasts' in bundle"
+    endif
+    if !inbundle(bout, "factors")
+        funcerr "Could not find item 'factors' in bundle"
+    endif
 
-    scalar n = nelem(point_forcasts)
-    if n != nelem(factors)
+    scalar n = nelem(bout.point_forecasts)
+    if n != nelem(bout.factors)
         funcerr "Number of matrices does not equal.
     endif
     
@@ -56,10 +65,11 @@ function void point_lower_upper_bound_arrays (const matrices point_forcasts "Arr
     matrices self.forecasts_upper_bound = array(n)
 
     loop i=1..n -q
-        self.forecasts_point[i] = point_forcasts[i]
-        self.forecasts_lower_bound[i] = point_forcasts[i] - factors[i]
-        self.forecasts_upper_bound[i] = point_forcasts[i] + factors[i]
+        self.forecasts_point[i] = bout.point_forecasts[i]
+        self.forecasts_lower_bound[i] = bout.point_forecasts[i] - bout.factors[i]
+        self.forecasts_upper_bound[i] = bout.point_forecasts[i] + bout.factors[i]
     endloop
+    
 end function
 
 
@@ -156,15 +166,11 @@ function void get_static_forecasts (bundle *self)
     /* This function is called by naiveFC(). */
     
     matrices fc_and_sd = call_method(&self)
-
-    get_forecast_intervals(fc_and_sd, &self)
+    bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &self)
+    get_point_low_up_bound_arrays(&bout, &self)
 
     attach_column_names(&self)
     attach_dates_to_rows(&self)
-    
-    print self
-    stop
-    
 end function
 
 
@@ -174,9 +180,9 @@ function matrices call_method (bundle *self)
     standard errors. */
 
     if tolower(self.which) != "avgfc"
-        matrices fc_and_sd = forecast_and_get_fc_sd(&self, self.which)
+        matrices fc_and_sd = defarray(forecast_and_get_fc_sd(&self, self.which))	# 1-dim array incl. single h by 2 matrix 
     else
-        matrices fc_and_sd = avg_forecast_and_get_fc_sd(&self)
+        matrices fc_and_sd = avg_forecast_and_get_fc_sd(&self)	# function already transforms into array
     endif
 
     return fc_and_sd
@@ -186,7 +192,7 @@ end function
 function matrix forecast_and_get_fc_sd (bundle *self, string method)
     /* Compute point forecast and forecast standard errors. */
 
-    matrix fc_and_sd = NA * zeros(self.horizon, 2)
+    matrix fc_and_sd_matrix = zeros(self.horizon, 2) * NA
     list xlist = null
     
     if method=="smeanFC" || method=="smedianFC"
@@ -194,7 +200,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, string method)
         xlist += dummify(period)
     endif
 
-    if method=="ar1trendFC" && inbundle(self, "w_trend") && self.w_trend
+    if method=="ar1trendFC" && (inbundle(self, "w_trend") && self.w_trend)
         genr time
     endif
 
@@ -268,10 +274,10 @@ function matrix forecast_and_get_fc_sd (bundle *self, string method)
     gen_t1_and_t2_fc_labels($t2, &self)			# adds to self
     
     if !model_error
-        matrix fc_and_sd = $fcast ~ $fcse
+        fc_and_sd_matrix = $fcast ~ $fcse
     endif
     
-    return fc_and_sd
+    return fc_and_sd_matrix
 end function
 
 
@@ -320,14 +326,11 @@ function void do_initial_checks (bundle *self)
     strings seas_methods = get_supported_seas_methods()
 
     # Check whether called method exists
-    matrix check = strpos(methods, self.which)
-
-    if sum(check) == 0
+    if sum(strpos(methods, self.which)) == 0
         funcerr "The forecasting method you selected does not exist."
     endif
 
-    matrix check = strpos(seas_methods, self.which)
-    if sum(check) == 0 && self.which!="avgFC"
+    if self.is_seas==0 && sum(strpos(seas_methods, self.which)) > 0
         funcerr "The method you requested is not available for non-seasonal data."
     endif
 
@@ -385,10 +388,7 @@ function bundle naiveFC (const series y,
         print self
         eval self.forecasts_lower_bound
         eval self.forecasts_lower_bound[1]
-        eval self.forecasts_lower_bound[10]
-
-#        *** HIER WEITERMACHEN ***
-        # Es scheint bis hierher für static zu funktionieren!
+#        eval self.forecasts_lower_bound[10]
 
     elif self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
         NaiveThroughTime(&self)
@@ -533,7 +533,7 @@ function void drop_missing_values (const series y, bundle *self)
 end function
 
 
-function matrices array_of_forecasts_and_sds (const strings methods, bundle *self)
+function matrices do_avgfcs_and_get_fc_sd_array (const strings methods, bundle *self)
     /* Compute forecasts for each method. For each mezthod we obtain a matrix
     of size h by 2 holding point forecasts and associated standard errors. */
 
@@ -573,7 +573,7 @@ function matrices avg_forecast_and_get_fc_sd (bundle *self)
         self.methods_used += methods_seasonals
     endif
     
-    return array_of_forecasts_and_sds(self.methods_used, &self)
+    return do_avgfcs_and_get_fc_sd_array(self.methods_used, &self)
 end function
 
 
