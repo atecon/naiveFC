@@ -25,16 +25,17 @@ endif
 #=======================
 # Static naive forecasts
 #=======================
-/*
+#/*
 # Forecast combination
+# smpl ; -1					# FIXME: In case the dataset is restricted, internal addobs does not work!
 bundle b = null
 b = naiveFC(y, "avgFC")				# compute forecasts
 print b
-matrix fc_method1_lb = b.forecasts_lower_bound[1]
+matrix fc_method1_lb = b.forecasts_lower_bound[2]
 fc_method1_lb
 naivePlot(&b)						# plot forecast results
 
-
+stop
 # Forecast combination but up to h=15 forecast periods
 bundle opt = null					# set specific options
 scalar opt.horizon = 10
@@ -116,7 +117,8 @@ strings methods = defarray("meanFC") #, "medianFC", "rwFC", "rwdriftFC", "smeanF
 loop i=1..nelem(methods) -q
     bundle b = null
     bundle b = naiveFC(y, methods[i], opts)
-    eval b.fc
+    b
+    stop
     
     # Plot (optional)
     b.preobs_fc = 5					# set no. of pre.-forecast periods obs. to plot
