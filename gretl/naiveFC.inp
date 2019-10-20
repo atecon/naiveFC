@@ -250,18 +250,23 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
 
     # Set the training set
     if self.type_moving_window=="static"
-        smpl obsnum(self.t1_label) obsnum(self.t2_label)
+        catch smpl obsnum(self.t1_label) obsnum(self.t2_label)
 
     elif self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
-        # set to training set
-        catch smpl ; ($t2-self.horizon)
-        if $error
-            funcerr "Check your sample and window size."
-        endif
+        *** HIER WEITERMACHEN ***
+        # Nutzer setzt window_length=500
+        # Vektor von y aus CvDataSplitter ist 500 zeilen lang
+        # Aber: Hier schränken wir auf 500-horizon ein!
+        # Wir wollen aber auf 500 obs fitten und weitere horizon forecasten!
+        catch smpl ; ($t2-self,horizon) # FIXME: <-- FALSCH
+    endif
+    if $error
+       funcerr "Check your sample and window size."
     endif
 
     # Set up variables
     series y = self.y
+
     if method!="rwFC" && method!="rwdriftFC"
         list xlist += const
     endif
@@ -376,7 +381,7 @@ function void do_initial_checks (bundle *self)
     strings seas_methods = get_supported_seas_methods()
 
     # Check whether called method exists
-    if sum(strpos(methods, self.which)) == 0
+    if sum(strpos(methods, self.which)) == 0 && sum(strpos(seas_methods, self.which)) == 0
         funcerr "The forecasting method you selected does not exist."
     endif
 
@@ -412,6 +417,7 @@ function bundle naiveFC (const series y,
     # Set up the bundle
     bundle self = get_default_values(y)
     if exists(opts)
+        # TODO: Add a check on whether items in bundle opts actually exist in self
         self = opts + self			# override defaults
     endif
     self.which = which
@@ -432,7 +438,7 @@ function bundle naiveFC (const series y,
     series self.y = y		# update
 
     do_naive_forecasting(&self)
-    
+   
     /* Debugging only
     print self
     eval self.forecasts_point
@@ -441,7 +447,7 @@ function bundle naiveFC (const series y,
     */
 
     if self.verbose
-        summarize_naive_fc_results(&self)
+    #    summarize_naive_fc_results(&self)
     endif
 
     # Drop some elements from self
@@ -669,7 +675,7 @@ function void get_moving_window_forecasts (bundle *self)
     series y = self.y
     
     # Set data splitter using the valid observation set w.o. observations
-    # additionally added for forecasting    
+    # additionally added for forecasting
     smpl obsnum(self.t1_label) obsnum(self.t2_label)
 
     bundle cv = null					# Tried to put this into a bundle, but git issues with index series
@@ -680,8 +686,13 @@ function void get_moving_window_forecasts (bundle *self)
 
     # As CvDataSplitter() doesn't consider the very last obs in
     # the final training set for 'rolwin' and 'recwin', this must be added.
-    cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
-    cv.n_folds++
+    if rows(cv.X_train[1]) != self.window_length
+        eval cv.X_train[1]
+        stop
+    endif
+    # FIXME: Is the following still needed?
+#    cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
+#    cv.n_folds++
     self.n_folds = cv.n_folds
 
     /*	For debugging only
@@ -763,7 +774,7 @@ function matrices get_cv_fc_and_sd_array (bundle *cv, bundle *self)
     loop lwin=1..cv.n_folds -q
         mat = cv.X_train[lwin]
         smpl minc(mat[,1]) maxc(mat[,1])	# time index of the training set
-        
+
         if lwin == 1
             gen_t1_forecast_date($t2, &self)	# Date for which the 1st 1-step ahead forecast is made for
         elif lwin == cv.n_folds

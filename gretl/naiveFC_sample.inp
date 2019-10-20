@@ -25,7 +25,7 @@ endif
 #=======================
 # Static naive forecasts
 #=======================
-#/*
+/*
 # Forecast combination
 # smpl ; -1					# FIXME: In case the dataset is restricted, internal addobs does not work!
 bundle b = null
@@ -50,13 +50,15 @@ bundle opt = null					# set specific options
 scalar opt.horizon = 10
 bundle b = naiveFC(y, "meanFC", opt)
 print b
-
+eval b.forecasts_point[1]
 stop
 naivePlot(&b)
 eval b.fc
 
 # Median forecast
 bundle b = naiveFC(y, "medianFC", opt)
+eval b.forecasts_point[1]
+
 naivePlot(&b)
 eval b.fc
 
@@ -107,17 +109,17 @@ eval b.fc
 #=========================
 bundle opts = null					# setup additional options
 opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
-opts.window_size = xmax($pd, 80) 			# moving window length (optional)
+opts.window_length = 500 #xmax($pd, 80) 			# moving window length (optional)
 #list opts.xlist = D743 FDD			# optional additional regressors
 #opts.verbose = 0					# Don't print details (optional)
 
 # Select methods 
-strings methods = defarray("meanFC") #, "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
+strings methods = defarray("snaiveFC") #, "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
 #  "snaivedriftFC", "ar1FC", "ar1trendFC")
 loop i=1..nelem(methods) -q
     bundle b = null
     bundle b = naiveFC(y, methods[i], opts)
-    b
+    eval b.forecasts_point[1]
     stop
     
     # Plot (optional)
