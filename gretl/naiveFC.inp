@@ -1,8 +1,12 @@
 function strings get_supported_seas_methods (void)
+    /* List all seasonal supported methods here. */
+    
     return defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
 end function
 
-function strings get_supported_methods (void)
+function strings get_supported_nonseas_methods (void)
+    /* List all non-seasonal supported methods here. */
+    
     return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", \
       "ar1trendFC", "avgFC")
 end function
@@ -98,7 +102,7 @@ end function
 
 
 function strings gen_array_of_forecast_dates (bundle *self)
-    /* Construct date strings for forecasts */
+    /* Construct date strings for forecasts. */
 
     strings r = array(self.horizon)
     # Here we explicitly consider the case when the last obs are missings
@@ -152,7 +156,7 @@ function bundle get_default_values (const series y)
     return self
 end function
 
-function series get_period_series (string method)
+function series get_period_series (const string method)
     catch series period = $obsmicro
     if $error
         series period = $obsminor
@@ -189,7 +193,7 @@ function matrices call_method (bundle *self)
 end function
 
 
-function matrix forecast_and_get_fc_sd (bundle *self, string method)
+function matrix forecast_and_get_fc_sd (bundle *self, const string method)
     /* Compute point forecast and forecast standard errors. */
 
     matrix fc_and_sd_matrix = zeros(self.horizon, 2) * NA
@@ -290,7 +294,7 @@ function void gen_t1_and_t2_fc_labels (const int t2, bundle *self)
     endif
 end function
 
-# TODO: Will be part of etra.gfn in v0.51
+# TODO: Will be part of extra.gfn in v0.51
 function matrix strpos (const strings S "Array of strings",
                         const string str "String being searched for in S",
                         const bool print_warnings[1] "Print eventual warnings")
@@ -322,7 +326,7 @@ end function
 function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
-    strings methods = get_supported_methods()
+    strings methods = get_supported_nonseas_methods()
     strings seas_methods = get_supported_seas_methods()
 
     # Check whether called method exists
@@ -422,7 +426,6 @@ function void do_naive_forecasting (bundle *self)
 end function
 
 
-
 function void attach_dates_to_rows (bundle *self)
     /* Add date strings as row labels */
 
@@ -437,7 +440,7 @@ end function
 
 
 function void attach_column_names (bundle *self)
-    /* Add column labels */
+    /* Add column labels for static forecasts only. */
 
     scalar m = nelem(self.forecasts_point)
 
@@ -482,7 +485,6 @@ function void summarize_naive_fc_results (bundle *self)
     printf "****************************************************\n"
     printf "\n"
 end function
-
 
 
 function scalar nobs_to_add_to_dataset (const list y, bundle *self)
@@ -580,7 +582,7 @@ function matrices avg_forecast_and_get_fc_sd (bundle *self)
     forecasts and associated standard errors. */
 
     # Models for both seasonal and non-seasonal frequencies
-    strings self.methods_used = drop_string_from_array(get_supported_methods(), "avgFC")
+    strings self.methods_used = drop_string_from_array(get_supported_nonseas_methods(), "avgFC")
     if self.is_seas
         strings methods_seasonals = get_supported_seas_methods()
         self.methods_used += methods_seasonals
@@ -618,20 +620,22 @@ function void get_moving_window_forecasts (bundle *self)
     endif
 
     series y = self.y
-
-    # Set data splitter using the valid observation set w.o. obs. additionally added for forecasting
+    
+    # Set data splitter using the valid observation set w.o. observations
+    # additionally added for forecasting    
     smpl obsnum(self.t1_label) obsnum(self.t2_label)
-    bundle cv = null
-    list cv.X = y					# CvDataSplitter() expects a list
+
+    bundle cv = null					# Tried to put this into a bundle, but git issues with index series
+    list cv.X = 	y					# CvDataSplitter() expects a list
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
-
     CvDataSplitter(&cv)
 
-    /* Required, as CvDataSplitter() doesn't consider the very last obs in
-    the final training set for 'rolwin' and 'recwin'. */
+    /* As CvDataSplitter() doesn't consider the very last obs in
+    the final training set for 'rolwin' and 'recwin', this must be added. */
     cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
     cv.n_folds++
+    self.n_folds = cv.n_folds
 
     /*	For debugging only
        matrices X_train = cv.X_train
@@ -643,42 +647,36 @@ function void get_moving_window_forecasts (bundle *self)
        endloop
     */
 
-    # Loop over training sets, run estimation and retrieve forecasts
-    matrix self.fc = zeros(cv.n_folds, self.horizon)
+    # Loop over training sets, run estimation and retrieve interval forecasts
+    matrices fc_and_sd_from_all_cv = get_cv_fc_and_sd_array(&cv, &self)
+    bundle bout = point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)	# stuff stored in bundle/ arrays
+    
+    # Retrieve moving-window point_forecasts from array,
+    # and compute and get associated intervals.
+    matrices pt_lb_up = ret_movwin_point_lb_up_matrices(&bout, &self)    
+    matrix forecasts_point = pt_lb_up[1]					# rows: horizon, cols: date based on which h-steap ahead forecast is made for
+    matrix forecasts_lower_bound = pt_lb_up[2]
+    matrix forecasts_upper_bound = pt_lb_up[3]
+    
+    delete cv							# free memory
+    delete bout
 
-    # Retrieve point forecasts and forecast standard errors
-    matrices fc_and_sd_from_all_cv = array(cv.n_folds)
-    loop lwin=1..cv.n_folds -q
-        mat = cv.X_train[lwin]
-        smpl minc(mat[,1]) maxc(mat[,1])		# read time index of the training set
-
-        # 1st obs being forecasted (h=1) based on information up to (self.initfc-1)
-        scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
-
-        fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
-    endloop
-
-    # TODO: Put into separate function
-    bundle bout = point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)
-    matrix forecasts_point = flatten(bout.point_forecasts)		# rows: horizon, cols: sample period
-    matrices get_movwin_low_up_matrices = get_movwin_low_up_matrices(forecasts_point, \
-      flatten(bout.factors))
-    matrix forecasts_lower_bound = get_movwin_low_up_matrices[1]
-    matrix forecasts_upper_bound = get_movwin_low_up_matrices[2]
-
-
-    # TODO: Put into separate function
+    # TODO: See attach_dates_to_rows() and attach_column_names()
+    # and try to use a common functionality for this!
+    *** HIER WEITERMACHEN ***
+    
     # Attach column names
     rnameset(forecasts_point, gen_row_names(self.horizon))
     rnameset(forecasts_lower_bound, gen_row_names(self.horizon))
     rnameset(forecasts_upper_bound, gen_row_names(self.horizon))
 
+
     # TODO: Put into separate function
     # Attach rownames: on rows we put date strings referring to
     # the information set (time/ date) based on which the h-step
     # ahead forecast is computed for.
-    strings self.fcperiods = array(cv.n_folds)
-    loop i=1..cv.n_folds -q
+    strings self.fcperiods = array(self.n_folds)
+    loop i=1..self.n_folds -q
         # NOTE: obslabel(self.initfc+$i-2): for i==1 the data refers to the 1st day
         # based on which the first h=1,...,H OoS-forecasts are made.
         self.fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-2) )
@@ -687,11 +685,53 @@ function void get_moving_window_forecasts (bundle *self)
     cnameset(forecasts_lower_bound, self.fcperiods)
     cnameset(forecasts_upper_bound, self.fcperiods)
 
-    *** HIER WEITERMACHEN *** 
-    Denke über das putput format nach und auch wie die Sachen geplottet werden!
+    self.forecasts_point
+    self.forecasts_point[1]
+    stop
+
+    # TODO Denke über das putput format nach und auch wie die Sachen geplottet werden!
 
 
 end function
+
+
+function matrices ret_movwin_point_lb_up_matrices (bundle *bout,
+                                                   bundle *self)
+    /* Retrieve miving-window point_forecasts from array,
+    and compute and get associated intervals. */
+    matrices out = array(3)
+
+    out[1] = flatten(bout.point_forecasts)		# rows: horizon, cols: sample period
+    matrices get_movwin_low_up_matrices = get_movwin_low_up_matrices(out[1], \
+      flatten(bout.factors))
+    out[2] = get_movwin_low_up_matrices[1]
+    out[3] = get_movwin_low_up_matrices[2]
+
+    return out
+end function
+
+
+function matrices get_cv_fc_and_sd_array (bundle *cv, bundle *self)
+    /* Loop over training sets, run estimation and retrieve
+    interval forecasts. */
+    
+    matrices fc_and_sd_from_all_cv = array(cv.n_folds)
+    
+    loop lwin=1..cv.n_folds -q
+        mat = cv.X_train[lwin]
+        smpl minc(mat[,1]) maxc(mat[,1])	# time index of the training set
+
+        # 1st obs being forecasted (h=1) based on information up
+        # to (self.initfc-1)
+        scalar self.initfc = (lwin==1) ? (1+maxc(mat[,1])) : self.initfc
+
+        fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
+    endloop
+
+    return fc_and_sd_from_all_cv
+end function
+
+
 
 
 function matrices get_movwin_low_up_matrices (const matrix point_forecasts,
@@ -861,7 +901,7 @@ function matrix GUI_naiveFC (const series y "Dependent variable",
     /* Helper function for GUI access. */
 
     # map integer value to string
-    strings methods = get_supported_methods()
+    strings methods = get_supported_nonseas_methods()
 
     bundle opts = null
     bundle self = null
