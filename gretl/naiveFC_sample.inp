@@ -9,7 +9,7 @@ scalar runEX = 1
 
 # Load data
 if runEX==1
-    open nysewk.gdt -q		# daily, 7d
+    open nysewk.gdt -q		# weekly
     series y = close
 elif runEX==2
     open AWM.gdt -q			# quarterly
@@ -114,11 +114,13 @@ opts.window_length = 500 #xmax($pd, 80) 			# moving window length (optional)
 #opts.verbose = 0					# Don't print details (optional)
 
 # Select methods 
-strings methods = defarray("snaiveFC") #, "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
+strings methods = defarray("meanFC") #, "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
 #  "snaivedriftFC", "ar1FC", "ar1trendFC")
 loop i=1..nelem(methods) -q
     bundle b = null
     bundle b = naiveFC(y, methods[i], opts)
+    eval b.t1_forecast_date
+    eval b.t2_forecast_date
     eval b.forecasts_point[1]
     stop
     

@@ -248,35 +248,52 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
         genr time
     endif
 
-    # Set the training set
+    # Seelect sample comprising both training and test set
     if self.type_moving_window=="static"
         catch smpl obsnum(self.t1_label) obsnum(self.t2_label)
-
     elif self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
-        *** HIER WEITERMACHEN ***
-        # Nutzer setzt window_length=500
-        # Vektor von y aus CvDataSplitter ist 500 zeilen lang
-        # Aber: Hier schränken wir auf 500-horizon ein!
-        # Wir wollen aber auf 500 obs fitten und weitere horizon forecasten!
-        catch smpl ; ($t2-self,horizon) # FIXME: <-- FALSCH
+        # Nutzer setzt z.B. window_length=500
+        # Vektor von y aus CvDataSplitter ist 500+horizon Zeilen lang
+        # Hier schränken wir auf T=500 um zu trainieren und die übrigen horizon
+        # Zeilen zu forecasten.
+#        catch smpl 1 (1+self.window_length-1) 		# before: smpl ; $t2
+#        eval $t1
+#        eval $t2
     endif
     if $error
        funcerr "Check your sample and window size."
     endif
+    
+    *** HIER WEITERMACHEN ***
+     Kläre welches sample hier eingeht
+     Ich will window_length Beobachtungen f d Trainingsset
+     und zusätzlich horizon Beobachtungen f d Testset
 
-    # Set up variables
-    series y = self.y
-
-    if method!="rwFC" && method!="rwdriftFC"
+    # Set target variable and xlist
+    series y = self.y					# has window_length + horizon observations
+#    print y -o
+#    stop
+    
+    if method != "rwFC" || method != "rwdriftFC"
         list xlist += const
     endif
     list xlist += self.xlist
+    
+    # Set training set
+    if self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
+        catch smpl 1 self.window_length
+        eval self.window_length
+        eval $t1
+        eval $t2
+                
+        #catch smpl ; -self.horizon
+    endif
 
     # Estimation
     scalar dynamic_fc = 0
 
     if method=="meanFC"
-        catch ols y xlist --quiet
+        catch ols y xlist #--quiet
 
     elif method=="medianFC"
         catch quantreg 0.5 y xlist --quiet
@@ -314,12 +331,12 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
           Forecast values are set to NA for the current sample.\n"
     else
         if dynamic_fc == 0
-            fcast ($t2+1) ($t2+self.horizon) --static --quiet
+            fcast ($t2+1) ($t2+self.horizon) --static #--quiet
         else
-            fcast ($t2+1) ($t2+self.horizon) --dynamic --quiet
+            fcast ($t2+1) ($t2+self.horizon) --dynamic #--quiet
         endif
     endif
-    
+
     if self.type_moving_window=="static"
         gen_t1_forecast_date($t2, &self)			# adds to self
         gen_t2_forecast_date($t2, &self)			# adds to self
@@ -435,7 +452,7 @@ function bundle naiveFC (const series y,
         dataset addobs self.obs_added
     endif
 
-    series self.y = y		# update
+    series self.y = y		# update as additional observations were attached
 
     do_naive_forecasting(&self)
    
@@ -681,19 +698,26 @@ function void get_moving_window_forecasts (bundle *self)
     bundle cv = null					# Tried to put this into a bundle, but git issues with index series
     list cv.X = 	y					# CvDataSplitter() expects a list
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
-    scalar cv.win_size = self.window_length
+    scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
     CvDataSplitter(&cv)
+
 
     # As CvDataSplitter() doesn't consider the very last obs in
     # the final training set for 'rolwin' and 'recwin', this must be added.
-    if rows(cv.X_train[1]) != self.window_length
-        eval cv.X_train[1]
-        stop
-    endif
-    # FIXME: Is the following still needed?
-#    cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
-#    cv.n_folds++
+    cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
+    cv.n_folds++
     self.n_folds = cv.n_folds
+    
+#    eval cv.n_folds							# 1608
+#    eval rows(cv.X_train[cv.n_folds])		# 511
+#    eval cv.X_train[cv.n_folds]
+#    stop
+
+    /*
+    if rows(cv.X_train[1]) != self.window_length + self.horizon			# FIXME: Clarify this
+        printf "\nError: The length of cv.X_train does not equal the length (T + horizon).\n"
+    endif
+    */
 
     /*	For debugging only
        matrices X_train = cv.X_train
@@ -709,6 +733,8 @@ function void get_moving_window_forecasts (bundle *self)
     # returns n_folds-dimensional array comprising h by 2 (point~sderr) matrices.
     matrices fc_and_sd_from_all_cv = get_cv_fc_and_sd_array(&cv, &self)
     bundle bout = point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)	# stuff stored in an array in bout
+    bout
+    stop
 
     # Retrieve moving-window point_forecasts from array,
     # and compute and get associated intervals.
@@ -722,30 +748,6 @@ function void get_moving_window_forecasts (bundle *self)
     matrices self.forecasts_lower_bound = defarray(pt_lb_up[2])
     matrices self.forecasts_upper_bound = defarray(pt_lb_up[3])
     
-    /*
-    # Attach column names
-    rnameset(forecasts_point, array_of_horizon_labels(self.horizon))
-    rnameset(forecasts_lower_bound, array_of_horizon_labels(self.horizon))
-    rnameset(forecasts_upper_bound, array_of_horizon_labels(self.horizon))
-
-    # TODO: Put into separate function
-    # Attach rownames: on rows we put date strings referring to
-    # the information set (time/ date) based on which the h-step
-    # ahead forecast is computed for.
-    strings self.fcperiods = array(self.n_folds)
-    loop i=1..self.n_folds -q
-        # NOTE: obslabel(self.initfc+$i-2): for i==1 the data refers to the 1st day
-        # based on which the first h=1,...,H OoS-forecasts are made.
-        self.fcperiods[i] = sprintf("%s", obslabel(self.initfc+$i-2) )
-    endloop
-    cnameset(forecasts_point, self.fcperiods)
-    cnameset(forecasts_lower_bound, self.fcperiods)
-    cnameset(forecasts_upper_bound, self.fcperiods)
-
-    self.forecasts_point
-    self.forecasts_point[1]
-    */
-
 end function
 
 
@@ -773,12 +775,16 @@ function matrices get_cv_fc_and_sd_array (bundle *cv, bundle *self)
     
     loop lwin=1..cv.n_folds -q
         mat = cv.X_train[lwin]
-        smpl minc(mat[,1]) maxc(mat[,1])	# time index of the training set
+        # Before we had smpl minc(mat[,1]) (maxc(mat[,1]))		# time index of the training set
+        smpl minc(mat[,1]) (maxc(mat[,1])+self.horizon)			# time index of the training set
 
         if lwin == 1
-            gen_t1_forecast_date($t2, &self)	# Date for which the 1st 1-step ahead forecast is made for
+            # Note: As the series for cross-validation holds "window_length+horizon" observations, we need to
+            # subtract "horizon" here.
+            gen_t1_forecast_date(1+$t2-self.horizon, &self)	# Date for which the 1st 1-step ahead forecast is made for
+            # TODO: or simply "gen_t1_forecast_date($t1+self.window_length-1, &self) ??
         elif lwin == cv.n_folds
-            gen_t2_forecast_date($t2, &self)	# Date for which the last h-step ahead forecast is made for
+            gen_t2_forecast_date($t2, &self)				# Date for which the last h-step ahead forecast is made for
         endif
         
         fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
