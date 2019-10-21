@@ -299,7 +299,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
     elif method=="rwFC" || method=="rwdriftFC"
         dynamic_fc++
         string arima_opt = (method=="rwFC") ? "--nc" : ""
-        catch arima 0 1 0 ; y xlist @arima_opt --quiet
+        catch arima 0 1 0 ; y xlist @arima_opt #--quiet
 
     elif method=="ar1FC" || method=="ar1trendFC"
         dynamic_fc++
