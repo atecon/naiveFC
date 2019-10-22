@@ -782,7 +782,7 @@ function list getNaiveForecastsList (bundle *self,
           Empty list returned.", minc(hor)
         return R
     endif
-    
+
     if self.obs_added > 0
         dataset addobs self.obs_added
     endif
@@ -799,13 +799,13 @@ function list getNaiveForecastsList (bundle *self,
             scalar start = obsnum(self.t1_forecast_date) + hor[i] - 1
             scalar ende = start + self.n_folds - 1
             smpl start ende
-            
+
             R += genseries(sprintf("fc_h_%d_%s%s", hor[i], methods_used[j], suffix), \
               self.forecasts_point[j][i,]')
             R += genseries(sprintf("fc_lo_h_%d_%s%s", hor[i], methods_used[j], suffix), \
               self.forecasts_lower_bound[j][i,]')
             R += genseries(sprintf("fc_up_h_%d_%s%s", hor[i], methods_used[j], suffix), \
-              self.forecasts_upper_bound[j][i,]')            
+              self.forecasts_upper_bound[j][i,]')
         endloop
     endloop
 
@@ -815,8 +815,8 @@ end function
 
 
 function void naivePlot (bundle *self "Bundle returned from naiveFC()",
-  const matrix horizons[null] "Select only specific horizons")
-  
+      const matrix horizons[null] "Select only specific horizons")
+
     /* Function for plotting actual and forecast values over time. */
 
     string out = self.filename
@@ -831,14 +831,14 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()",
     series y = self.y
     setinfo y --graph-name="Actuals"
     if self.obs_added > 0				# The last h observations were added and set to zero
-        # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.        
+        # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
         smpl (obsnum(self.t2_label)+1) $tmax
         series y = NA
         smpl full
     endif
 
     list forecasts = y
-    
+
     if exists(horizons)
         list forecasts += getNaiveForecastsList(&self, horizons)
     else
@@ -850,54 +850,54 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()",
     endif
 
     /*
-    if self.type_moving_window!="static"						# rolling/ recursive window
-        scalar start = self.initfc - 1
-        smpl start start
-        # Loop over diff. training sets; each produces h-step ahead forecasts
-        loop i=1..rows(self.fc) -q
-            start++
-            smpl start (start+self.horizon-1)
-            series fc_$i = fcmat[i,]
-            str = sprintf("TrainSet=%d", $i)
-            setinfo fc_$i --graph-name="@str"
-            lplot += fc_$i
-        endloop
+       if self.type_moving_window!="static"						# rolling/ recursive window
+       scalar start = self.initfc - 1
+       smpl start start
+       # Loop over diff. training sets; each produces h-step ahead forecasts
+       loop i=1..rows(self.fc) -q
+       start++
+       smpl start (start+self.horizon-1)
+       series fc_$i = fcmat[i,]
+       str = sprintf("TrainSet=%d", $i)
+       setinfo fc_$i --graph-name="@str"
+       lplot += fc_$i
+       endloop
 
-    elif self.type_moving_window=="static"
-        self.initfc = self.T+1
+       elif self.type_moving_window=="static"
+       self.initfc = self.T+1
 
-        loop i=1..cols(self.fc) -q
-            series fc_$i = fcmat[,i]
+       loop i=1..cols(self.fc) -q
+       series fc_$i = fcmat[,i]
 
-            if self.which=="avgFC"
-                if i!=2
-                    str = sprintf("%s", self.method_names[i])
-                    setinfo fc_$i --graph-name="@str"
-                endif
-            else
-                string meth = self.which
-                setinfo fc_$i --graph-name="@meth"	#"Point-Fc"
-                if cols(self.fc)==3
-                    if i==2
-                        string s = sprintf("%.1f", (1-self.level)/2*100 )
-                        setinfo fc_$i --graph-name="@s"
-                    elif i==3
-                        string s = sprintf("%.1f", (1-(1-self.level)/2)*100 )
-                        setinfo fc_$i --graph-name="@s"
-                    endif
-                endif
-            endif
-            lplot += fc_$i
-            if self.which=="avgFC" && i==2
-                lplot -= fc_$i		# drop cross-sectional std. statistics
-            endif
-        endloop
-    endif
+       if self.which=="avgFC"
+       if i!=2
+       str = sprintf("%s", self.method_names[i])
+       setinfo fc_$i --graph-name="@str"
+       endif
+       else
+       string meth = self.which
+       setinfo fc_$i --graph-name="@meth"	#"Point-Fc"
+       if cols(self.fc)==3
+       if i==2
+       string s = sprintf("%.1f", (1-self.level)/2*100 )
+       setinfo fc_$i --graph-name="@s"
+       elif i==3
+       string s = sprintf("%.1f", (1-(1-self.level)/2)*100 )
+       setinfo fc_$i --graph-name="@s"
+       endif
+       endif
+       endif
+       lplot += fc_$i
+       if self.which=="avgFC" && i==2
+       lplot -= fc_$i		# drop cross-sectional std. statistics
+       endif
+       endloop
+       endif
     */
 
     # incl. some pre-forecast periods obs. for plotting
     smpl xmax((obsnum(self.t2_forecast_date) - pre_fc_periods_to_plot), 1) $tmax
-    
+
     # y-range
     scalar mini = min(min(forecasts))
     scalar maxi = max(max(forecasts))
@@ -907,60 +907,60 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()",
     # only the k last forecasts
 
     /*
-    if cols(self.fc) != 3
-        plot lplot
-            options with-lp time-series single-yaxis
-            literal set linetype 1 lc rgb "black" lw 1 pt -1
-            literal set linetype 2 lc rgb "red" lw 1.25 pt 2 ps 0.5
-            literal set linetype 3 lc rgb "blue" lw 1#.25
-            literal set linetype 4 lc rgb "black" lw 1#.25
-            literal set linetype 5 lc rgb "grey" lw 1#.25
-            literal set linetype 6 lc rgb "violet" lw 1#.25 #pt 3 ps 0.5
-            literal set linetype 7 lc rgb "brown" lw 1#.25 #pt 4 ps 0.5
-            literal set linetype 8 lc rgb "yellow" lw 1#.25 #pt 5 ps 0.5
-            literal set linetype 9 lc rgb "red" lw 1#.25 #pt 1 ps 0.5
-            literal set linetype 10 lc rgb "green" lw 1#.25
-            literal set linetype 10 lc rgb "black" lw 1#.25
-            literal set key left bottom below
-            #literal set key inside left bottom
-            #put the border more to the background by applying it
-            # only on the left and bottom part and put it and the tics in gray
-            literal set style line 11 lc rgb "#808080" lt 1
-            literal set border 3 back ls 11			# get rid of upper + left border
-            literal set tics nomirror
-            #add a slight grid to make it easier to follow the exact position of the curves
-            literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
-            literal set grid back ls 12
-            printf "set yrange[%g:%g]", ylo, yup
-            printf "set ylabel \"%s\"", self.ylab
-            printf "set xlabel \"%s\"", self.xlab
-            printf "set title \"%s\"", self.title
-        end plot --output="@out"
+       if cols(self.fc) != 3
+       plot lplot
+       options with-lp time-series single-yaxis
+       literal set linetype 1 lc rgb "black" lw 1 pt -1
+       literal set linetype 2 lc rgb "red" lw 1.25 pt 2 ps 0.5
+       literal set linetype 3 lc rgb "blue" lw 1#.25
+       literal set linetype 4 lc rgb "black" lw 1#.25
+       literal set linetype 5 lc rgb "grey" lw 1#.25
+       literal set linetype 6 lc rgb "violet" lw 1#.25 #pt 3 ps 0.5
+       literal set linetype 7 lc rgb "brown" lw 1#.25 #pt 4 ps 0.5
+       literal set linetype 8 lc rgb "yellow" lw 1#.25 #pt 5 ps 0.5
+       literal set linetype 9 lc rgb "red" lw 1#.25 #pt 1 ps 0.5
+       literal set linetype 10 lc rgb "green" lw 1#.25
+       literal set linetype 10 lc rgb "black" lw 1#.25
+       literal set key left bottom below
+       #literal set key inside left bottom
+       #put the border more to the background by applying it
+       # only on the left and bottom part and put it and the tics in gray
+       literal set style line 11 lc rgb "#808080" lt 1
+       literal set border 3 back ls 11			# get rid of upper + left border
+       literal set tics nomirror
+       #add a slight grid to make it easier to follow the exact position of the curves
+       literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
+       literal set grid back ls 12
+       printf "set yrange[%g:%g]", ylo, yup
+       printf "set ylabel \"%s\"", self.ylab
+       printf "set xlabel \"%s\"", self.xlab
+       printf "set title \"%s\"", self.title
+       end plot --output="@out"
 
-    else
-        */
-        plot forecasts
-            options with-lp time-series single-yaxis
-            literal set linetype 1 lc rgb "black" lw 1.5 pt 7 ps 1
-            literal set linetype 2 lc rgb "red" lw 1.5 ps 0
-            literal set linetype 3 lc rgb "blue" lw 1.5 ps 0
-            literal set linetype 4 lc rgb "blue" lw 1.5 ps 0
-            literal set key left bottom below
-            #literal set key inside left bottom
-            #put the border more to the background by applying it
-            # only on the left and bottom part and put it and the tics in gray
-            literal set style line 11 lc rgb "#808080" lt 1
-            literal set border 3 back ls 11			# get rid of upper + left border
-            literal set tics nomirror
-            #add a slight grid to make it easier to follow the exact position of the curves
-            literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
-            literal set grid back ls 12
-            printf "set yrange[%g:%g]", ylo, yup
-            printf "set ylabel \"%s\"", self.ylab
-            printf "set xlabel \"%s\"", self.xlab
-            printf "set title \"%s\"", self.title
-        end plot --output="@out"
-#    endif
+       else
+    */
+    plot forecasts
+        options with-lp time-series single-yaxis
+        literal set linetype 1 lc rgb "black" lw 1.5 pt 7 ps 1
+        literal set linetype 2 lc rgb "red" lw 1.5 ps 0
+        literal set linetype 3 lc rgb "blue" lw 1.5 ps 0
+        literal set linetype 4 lc rgb "blue" lw 1.5 ps 0
+        literal set key left bottom below
+        #literal set key inside left bottom
+        #put the border more to the background by applying it
+        # only on the left and bottom part and put it and the tics in gray
+        literal set style line 11 lc rgb "#808080" lt 1
+        literal set border 3 back ls 11			# get rid of upper + left border
+        literal set tics nomirror
+        #add a slight grid to make it easier to follow the exact position of the curves
+        literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
+        literal set grid back ls 12
+        printf "set yrange[%g:%g]", ylo, yup
+        printf "set ylabel \"%s\"", self.ylab
+        printf "set xlabel \"%s\"", self.xlab
+        printf "set title \"%s\"", self.title
+    end plot --output="@out"
+    #    endif
 end function
 
 
