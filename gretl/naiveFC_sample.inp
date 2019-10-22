@@ -5,7 +5,7 @@ set verbose off
 
 # Select an example
 #==================
-scalar runEX = 2
+scalar runEX = 1
 
 # Load data
 if runEX==1
@@ -14,6 +14,7 @@ if runEX==1
 elif runEX==2
     open AWM.gdt -q			# quarterly
     series y = YGA
+    smpl y --no-missing --permanent
 elif runEX==3
     open hendry_jae.gdt -q	# annual
     series y = diff(gdp)
@@ -42,7 +43,7 @@ scalar opt.horizon = 10
 #list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
 bundle b = naiveFC(y, "avgFC", opt)
 matrix fc_avgfc_pt = b.forecasts_point[10]
-b.preobs_fc = 15					# optional: set no. of pre.-forecast periods obs. to plot
+b.pre_fc_periods_to_plot = 15					# optional: set no. of pre.-forecast periods obs. to plot
 naivePlot(&b)
 
 # Mean forecast
@@ -115,24 +116,28 @@ eval b.fc
 #=========================
 # Moving-window forecasts
 #=========================
+scalar horizon = 10
 bundle opts = null					# setup additional options
+opts.horizon = horizon
 opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
-opts.window_length = 500 #xmax($pd, 80) 			# moving window length (optional)
-catch list opts.xlist = D743 FDD			# optional additional regressors
+opts.window_length = xmax($pd, 90) 			# moving window length (optional)
+#catch list opts.xlist = D743 FDD			# optional additional regressors
 #opts.verbose = 0					# Don't print details (optional)
 
-# Select methods
-strings methods = defarray("meanFC") #, "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
-#  "snaivedriftFC", "ar1FC", "ar1trendFC")
-loop i=1..nelem(methods) -q
-    bundle b = null
-    bundle b = naiveFC(y, methods[i], opts)
-    eval b.forecasts_point[1]
-    stop
-    
-    # Plot (optional)
-    b.preobs_fc = 5					# set no. of pre.-forecast periods obs. to plot
-    naivePlot(&b)
-endloop
+# Select method
+string method = "ar1FC"#  "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
+  #  "snaivedriftFC", "ar1FC", "ar1trendFC")
+
+bundle b = null
+bundle b = naiveFC(y, method, opts)
+eval b.forecasts_point[1]
+
+# Get interval forecasts as series
+dataset addobs opts.horizon			# forecast may exceed current sample length
+list FC = getNaiveForecastsList(&b, {1,2}, "_suffix")
+
+# Plot (optional)
+#b.pre_fc_periods_to_plot = 20					# set no. of pre.-forecast periods obs. to plot
+naivePlot(&b, {11})
 
 */

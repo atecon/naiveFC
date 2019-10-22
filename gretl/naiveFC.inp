@@ -1,12 +1,12 @@
 function strings get_supported_seas_methods (void)
     /* List all seasonal supported methods here. */
-    
+
     return defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
 end function
 
 function strings get_supported_nonseas_methods (void)
     /* List all non-seasonal supported methods here. */
-    
+
     return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", \
       "ar1trendFC", "avgFC")
 end function
@@ -93,7 +93,7 @@ end function
 function strings array_of_horizon_labels (const int horizon)
     /* Construct string array for indicating the forecast horizons. */
 
-    strings r = array(horizon)    
+    strings r = array(horizon)
     loop i=1..horizon -q
         r[i] = sprintf(" h=%d", i)
     endloop
@@ -102,7 +102,7 @@ function strings array_of_horizon_labels (const int horizon)
 end function
 
 function strings array_of_forecast_dates (bundle *self)
-    /* Construct date strings refering to the date for which a the
+/* Construct date strings refering to the date for which a the
     h-step ahead forecast was made for. For 'static' forecasts only. */
 
     strings r = array(self.horizon)
@@ -126,7 +126,7 @@ function strings array_of_forecast_dates (bundle *self)
 end function
 
 function strings array_of_condition_dates (bundle *self)
-    /* Construct date strings refering to the date based on which a
+/* Construct date strings refering to the date based on which a
     forecasting model was estimated. */
 
     if self.type_moving_window == "static"
@@ -134,7 +134,7 @@ function strings array_of_condition_dates (bundle *self)
     else
         strings dates = array(self.n_folds)
     endif
-    
+
     # Here we explicitly consider the case when the last obs are missings
     # TODO: Check dates for correctness!
     scalar first_condition_date = obsnum(self.t1_forecast_date) - 1
@@ -147,11 +147,11 @@ function strings array_of_condition_dates (bundle *self)
     matrix conditioning_dates = {$obsdate}[first_condition_date:last_condition_date]
 
     strings r = array(rows(conditioning_dates))
-    
+
     # TODO: Consolidate with loop in array_of_forecast_dates()
     loop i=1..rows(conditioning_dates) -q
         string sdate = sprintf("%d", conditioning_dates[i])
-        
+
         if $pd==1
             r[i] = sprintf("%s", substr(sdate,1,4))
         elif $pd==4
@@ -194,6 +194,7 @@ function bundle get_default_values (const series y)
     string self.ylab = ""
     string self.xlab = ""
     string self.filename = "display"
+    scalar self.pre_fc_periods_to_plot = int(0.25*nobs(y))
 
     return self
 end function
@@ -253,23 +254,23 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
         catch smpl obsnum(self.t1_label) obsnum(self.t2_label)
     endif
     if $error
-       funcerr "Check your sample and window size."
+        funcerr "Check your sample and window size."
     endif
-    
+
     # Set target variable and xlist
     series y = self.y					# has window_length + horizon observations
-    
+
     if method != "rwFC" || method != "rwdriftFC"
         list xlist += const
     endif
     list xlist += self.xlist
-    
+
     # Set training set
     if self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
         scalar train_end = $t2 - self.horizon
-        scalar train_start = 1 + train_end - self.window_length        
+        scalar train_start = 1 + train_end - self.window_length
         smpl train_start train_end
-        
+
         if $nobs > self.window_length
             print "\nError: You training sample (T=%d) is longer than the specified window length (T=%d).", $nobs, self.window_length
             stop
@@ -299,7 +300,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
     elif method=="rwFC" || method=="rwdriftFC"
         dynamic_fc++
         string arima_opt = (method=="rwFC") ? "--nc" : ""
-        catch arima 0 1 0 ; y xlist @arima_opt #--quiet
+        catch arima 0 1 0 ; y xlist @arima_opt --quiet
 
     elif method=="ar1FC" || method=="ar1trendFC"
         dynamic_fc++
@@ -339,9 +340,9 @@ end function
 
 function void gen_t1_forecast_date (const int t2, bundle *self)
     /* Return the date for which the first 1-step ahead forecast is made for. */
-        string self.t1_forecast_date = obslabel(t2+1)
+    string self.t1_forecast_date = obslabel(t2+1)
 end function
-    
+
 function void gen_t2_forecast_date (const int t2, bundle *self)
     /* Return the date for which the last h-step ahead forecast is made for. */
     catch string self.t2_forecast_date = obslabel(t2+self.horizon)
@@ -438,7 +439,7 @@ function bundle naiveFC (const series y,
         dataset addobs self.obs_added
     endif
 
-    series self.y = misszero(y)		# update as additional observations were attached   
+    series self.y = misszero(y)		# update as additional observations were attached
 
     do_naive_forecasting(&self)
 
@@ -473,21 +474,21 @@ function void do_naive_forecasting (bundle *self)
     endif
 
     attach_column_labels(&self)
-    attach_row_labels(&self)    
+    attach_row_labels(&self)
 end function
 
 
 function void attach_row_labels (bundle *self)
-    /* Add date strings as row labels for 'static' forecasts,
-      or indicate the forecast horizon for moving-window
-      forecasts. */
+/* Add date strings as row labels for 'static' forecasts,
+   or indicate the forecast horizon for moving-window
+    forecasts. */
 
     if self.type_moving_window == "static"
         strings row_labels = array_of_forecast_dates(&self)
     else
         strings row_labels = array_of_horizon_labels(self.horizon)
     endif
-    
+
     loop i=1..nelem(self.forecasts_point) -q
         rnameset(self.forecasts_point[i], row_labels)
         rnameset(self.forecasts_lower_bound[i], row_labels)
@@ -497,16 +498,16 @@ end function
 
 
 function void attach_column_labels (bundle *self)
-    /* Add date strings as column labels for indicating the date on
+/* Add date strings as column labels for indicating the date on
     which the estimates are conditioned on. */
-    
+
     strings conditioning_dates = array_of_condition_dates(&self)
-    
+
     loop i=1..nelem(self.forecasts_point) -q
         cnameset(self.forecasts_point[i], conditioning_dates)
         cnameset(self.forecasts_lower_bound[i], conditioning_dates)
         cnameset(self.forecasts_upper_bound[i], conditioning_dates)
-    endloop    
+    endloop
 end function
 
 
@@ -669,7 +670,7 @@ function void get_moving_window_forecasts (bundle *self)
     endif
 
     series y = self.y			# y includes the additional n=horizon newly added observations for the very last cv-dataset
-   
+
     bundle cv = null					# Tried to put this into a bundle, but git issues with index series
     list cv.X = 	y					# CvDataSplitter() expects a list
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
@@ -689,7 +690,7 @@ function void get_moving_window_forecasts (bundle *self)
 
     # Retrieve moving-window point_forecasts from array,
     # and compute and get associated intervals.
-    matrices pt_lb_up = ret_movwin_point_lb_up_matrices(&bout, &self)    
+    matrices pt_lb_up = ret_movwin_point_lb_up_matrices(&bout, &self)
 
     # --> For the 'static' case, point, lower and upper bound results
     # are stored in separate matrix arrays, as multiple models can be
@@ -698,14 +699,14 @@ function void get_moving_window_forecasts (bundle *self)
     matrices self.forecasts_point = defarray(pt_lb_up[1])		# rows: horizon, cols: date based on which h-steap ahead forecast is made for
     matrices self.forecasts_lower_bound = defarray(pt_lb_up[2])
     matrices self.forecasts_upper_bound = defarray(pt_lb_up[3])
-    
+
 end function
 
 
 function matrices ret_movwin_point_lb_up_matrices (bundle *bout,
                                                    bundle *self)
     /* Retrieve miving-window point_forecasts from array,
-    and compute and get associated intervals. */
+      and compute and get associated intervals. */
     matrices out = array(3)
 
     out[1] = flatten(bout.point_forecasts)		# rows: horizon, cols: sample period
@@ -719,11 +720,11 @@ end function
 
 
 function matrices get_cv_fc_and_sd_array (bundle *cv, bundle *self)
-    /* Loop over training sets, run estimation and retrieve
+/* Loop over training sets, run estimation and retrieve
     interval forecasts. */
-    
+
     matrices fc_and_sd_from_all_cv = array(cv.n_folds)
-    
+
     loop lwin=1..cv.n_folds -q
         matrix mat = cv.X_train[lwin]
         smpl minc(mat[,1]) (maxc(mat[,1]))		# time index of the training set: T=self-window_length + self-horizon
@@ -735,14 +736,12 @@ function matrices get_cv_fc_and_sd_array (bundle *cv, bundle *self)
         elif lwin == cv.n_folds
             gen_t2_forecast_date(obsnum(self.t2_label), &self)				# Date for which the last h-step ahead forecast is made for
         endif
-        
+
         fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
     endloop
-    
+
     return fc_and_sd_from_all_cv
 end function
-
-
 
 
 function matrices get_movwin_low_up_matrices (const matrix point_forecasts,
@@ -758,37 +757,99 @@ function matrices get_movwin_low_up_matrices (const matrix point_forecasts,
 end function
 
 
+function list getNaiveForecastsList (bundle *self,
+                                     const matrix horizons[null] "Select only specific horizons",
+                                     const string suffix[null] "Suffix for series' names")
+    /* Transform interval forecasts into a list of series and return this. */
 
-function void naivePlot (bundle *self "Bundle returned from naiveFC()")
+    # Initial settings
+    list R = null
+    matrix hor = seq(1, self.horizon)'
+    hor = (exists(horizons)) ? horizons : hor
+    hor = vec(hor)
+    strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
+    strings methods_used = (inbundle(self, "methods_used")) ? self.methods_used : methods_used
+    if !exists(suffix)
+        string suffix = ""
+    endif
+
+    if maxc(hor) > self.horizon
+        printf "\nError: The maximum forecast horizon you selected (%d) does not exist.\n\
+          Empty list returned.", maxc(hor)
+        return R
+    elif minc(hor) <= 0
+        printf "\nError: The minimum forecast horizon you selected (%d) does not exist.\n\
+          Empty list returned.", minc(hor)
+        return R
+    endif
+    
+    if self.obs_added > 0
+        dataset addobs self.obs_added
+    endif
+
+    series y = self.y
+    if self.obs_added > 0				# The last h observations were added and set to zero
+        smpl (obsnum(self.t2_label)+1) $tmax
+        series y = NA
+        smpl full
+    endif
+
+    loop j=1..nelem(methods_used) -q
+        loop i=1..rows(hor) -q
+            scalar start = obsnum(self.t1_forecast_date) + hor[i] - 1
+            scalar ende = start + self.n_folds - 1
+            smpl start ende
+            
+            R += genseries(sprintf("fc_h_%d_%s%s", hor[i], methods_used[j], suffix), \
+              self.forecasts_point[j][i,]')
+            R += genseries(sprintf("fc_lo_h_%d_%s%s", hor[i], methods_used[j], suffix), \
+              self.forecasts_lower_bound[j][i,]')
+            R += genseries(sprintf("fc_up_h_%d_%s%s", hor[i], methods_used[j], suffix), \
+              self.forecasts_upper_bound[j][i,]')            
+        endloop
+    endloop
+
+    return R
+end function
+
+
+
+function void naivePlot (bundle *self "Bundle returned from naiveFC()",
+  const matrix horizons[null] "Select only specific horizons")
+  
     /* Function for plotting actual and forecast values over time. */
 
     string out = self.filename
 
-    # No. of pre-forecast obs. to plot - default 25pct. of total obs.
-    scalar preobs_fc = !inbundle(self,"preobs_fc") ? int(0.25*self.T) : self.preobs_fc
+    scalar pre_fc_periods_to_plot = inbundle(self, "pre_fc_periods_to_plot") ? \
+      self.pre_fc_periods_to_plot : pre_fc_periods_to_plot
 
-    # Augment the dataset
-    if self.obs_added>0
+    if self.obs_added > 0
         dataset addobs self.obs_added
     endif
-    # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
-    smpl obsnum(self.t1_label) $t2				# restrict back
-    series y = self.y
-    delete self.y
 
-    # Set up the fcmat matrix holding results
-    if self.type_moving_window=="static"
-        matrix fcmat = zeros(self.T, cols(self.fc))		# length equal to no, of obs. of the non-augmented sample
-        fcmat = (fcmat.=0) ? NA : fcmat
-        fcmat |= self.fc							# concatenate forecasts
-    else
-        matrix fcmat = self.fc
+    series y = self.y
+    setinfo y --graph-name="Actuals"
+    if self.obs_added > 0				# The last h observations were added and set to zero
+        # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.        
+        smpl (obsnum(self.t2_label)+1) $tmax
+        series y = NA
+        smpl full
     endif
 
-    # Prepare lists for plotting
-    setinfo y --graph-name="Actuals"
-    list lplot = y
+    list forecasts = y
+    
+    if exists(horizons)
+        list forecasts += getNaiveForecastsList(&self, horizons)
+    else
+        list forecasts += getNaiveForecastsList(&self)
+    endif
+    if nelem(forecasts)
+        printf "\nError: Received empty list from getNaiveForecastsList(). Stop.\n"
+        stop
+    endif
 
+    /*
     if self.type_moving_window!="static"						# rolling/ recursive window
         scalar start = self.initfc - 1
         smpl start start
@@ -832,21 +893,21 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
             endif
         endloop
     endif
+    */
 
-    # Setup and plot
-    #===============
     # incl. some pre-forecast periods obs. for plotting
-    smpl xmax((self.initfc-preobs_fc),1) $tmax
+    smpl xmax((obsnum(self.t2_forecast_date) - pre_fc_periods_to_plot), 1) $tmax
+    
     # y-range
-    scalar mini = min(min(lplot))
-    scalar maxi = max(max(lplot))
+    scalar mini = min(min(forecasts))
+    scalar maxi = max(max(forecasts))
     scalar ylo = mini-0.05*abs(mini)
     scalar yup = maxi+0.05*abs(maxi)
     # TODO: lplot may become A VERY long list -- think about a restriction showing
     # only the k last forecasts
 
-
-    if cols(self.fc)!=3
+    /*
+    if cols(self.fc) != 3
         plot lplot
             options with-lp time-series single-yaxis
             literal set linetype 1 lc rgb "black" lw 1 pt -1
@@ -877,12 +938,13 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
         end plot --output="@out"
 
     else
-        plot lplot
-            options with-lines time-series single-yaxis
-            literal set linetype 1 lc rgb "black" lw 1 pt -1
-            literal set linetype 2 lc rgb "red" lw 1.25 pt 2 ps 0.5
-            literal set linetype 3 lc rgb "blue" lw 1.25
-            literal set linetype 4 lc rgb "blue" lw 1.25
+        */
+        plot forecasts
+            options with-lp time-series single-yaxis
+            literal set linetype 1 lc rgb "black" lw 1.5 pt 7 ps 1
+            literal set linetype 2 lc rgb "red" lw 1.5 ps 0
+            literal set linetype 3 lc rgb "blue" lw 1.5 ps 0
+            literal set linetype 4 lc rgb "blue" lw 1.5 ps 0
             literal set key left bottom below
             #literal set key inside left bottom
             #put the border more to the background by applying it
@@ -898,7 +960,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()")
             printf "set xlabel \"%s\"", self.xlab
             printf "set title \"%s\"", self.title
         end plot --output="@out"
-    endif
+#    endif
 end function
 
 
