@@ -800,7 +800,7 @@ function list getNaiveForecastsList (bundle *self,
             scalar ende = start + self.n_folds - 1
             smpl start ende
 
-            R += genseries(sprintf("fc_h_%d_%s%s", hor[i], methods_used[j], suffix), \
+            R += genseries(sprintf("fc_pt_h_%d_%s%s", hor[i], methods_used[j], suffix), \
               self.forecasts_point[j][i,]')
             R += genseries(sprintf("fc_lo_h_%d_%s%s", hor[i], methods_used[j], suffix), \
               self.forecasts_lower_bound[j][i,]')

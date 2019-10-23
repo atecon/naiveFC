@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2019b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.7</version>
-<date>2019-06-18</date>
+<version>0.8</version>
+<date>2019-10-23</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
 <label>naive forecast(s)</label>
@@ -57,34 +57,39 @@ return self
 </code>
 </gretl-function>
 <gretl-function name="naivePlot" type="void">
- <params count="1">
+ <params count="2">
   <param name="self" type="bundleref">
 <description>Bundle returned from naiveFC()</description>
+  </param>
+  <param name="horizons" type="matrix" optional="true" const="true">
+<description>Select only specific horizons</description>
   </param>
  </params>
 <code>/* Function for plotting actual and forecast values over time. */
 string out = self.filename
-# No. of pre-forecast obs. to plot - default 25pct. of total obs.
-scalar preobs_fc = !inbundle(self,&quot;preobs_fc&quot;) ? int(0.25*self.T) : self.preobs_fc
-# Augment the dataset
-if self.obs_added&gt;0
+scalar pre_fc_periods_to_plot = inbundle(self, &quot;pre_fc_periods_to_plot&quot;) ? self.pre_fc_periods_to_plot : pre_fc_periods_to_plot
+if self.obs_added &gt; 0
   dataset addobs self.obs_added
 endif
-# Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
-smpl obsnum(self.t1_label) $t2				# restrict back
 series y = self.y
-delete self.y
-# Set up the fcmat matrix holding results
-if self.type_moving_window==&quot;static&quot;
-  matrix fcmat = zeros(self.T, cols(self.fc))		# length equal to no, of obs. of the non-augmented sample
-  fcmat = (fcmat.=0) ? NA : fcmat
-  fcmat |= self.fc							# concatenate forecasts
-else
-  matrix fcmat = self.fc
-endif
-# Prepare lists for plotting
 setinfo y --graph-name=&quot;Actuals&quot;
-list lplot = y
+if self.obs_added &gt; 0				# The last h observations were added and set to zero
+  # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
+  smpl (obsnum(self.t2_label)+1) $tmax
+  series y = NA
+  smpl full
+endif
+list forecasts = y
+if exists(horizons)
+  list forecasts += getNaiveForecastsList(&amp;self, horizons)
+else
+  list forecasts += getNaiveForecastsList(&amp;self)
+endif
+if nelem(forecasts)
+  printf &quot;\nError: Received empty list from getNaiveForecastsList(). Stop.\n&quot;
+  stop
+endif
+/*
 if self.type_moving_window!=&quot;static&quot;						# rolling/ recursive window
   scalar start = self.initfc - 1
   smpl start start
@@ -125,18 +130,18 @@ elif self.type_moving_window==&quot;static&quot;
     endif
   endloop
 endif
-# Setup and plot
-#===============
+*/
 # incl. some pre-forecast periods obs. for plotting
-smpl xmax((self.initfc-preobs_fc),1) $tmax
+smpl xmax((obsnum(self.t2_forecast_date) - pre_fc_periods_to_plot), 1) $tmax
 # y-range
-scalar mini = min(min(lplot))
-scalar maxi = max(max(lplot))
+scalar mini = min(min(forecasts))
+scalar maxi = max(max(forecasts))
 scalar ylo = mini-0.05*abs(mini)
 scalar yup = maxi+0.05*abs(maxi)
 # TODO: lplot may become A VERY long list -- think about a restriction showing
 # only the k last forecasts
-if cols(self.fc)!=3
+/*
+if cols(self.fc) != 3
   plot lplot
     options with-lp time-series single-yaxis
     literal set linetype 1 lc rgb &quot;black&quot; lw 1 pt -1
@@ -166,12 +171,13 @@ if cols(self.fc)!=3
     printf &quot;set title \&quot;%s\&quot;&quot;, self.title
   end plot --output=&quot;@out&quot;
 else
-  plot lplot
-    options with-lines time-series single-yaxis
-    literal set linetype 1 lc rgb &quot;black&quot; lw 1 pt -1
-    literal set linetype 2 lc rgb &quot;red&quot; lw 1.25 pt 2 ps 0.5
-    literal set linetype 3 lc rgb &quot;blue&quot; lw 1.25
-    literal set linetype 4 lc rgb &quot;blue&quot; lw 1.25
+  */
+  plot forecasts
+    options with-lp time-series single-yaxis
+    literal set linetype 1 lc rgb &quot;black&quot; lw 1.5 pt 7 ps 1
+    literal set linetype 2 lc rgb &quot;red&quot; lw 1.5 ps 0
+    literal set linetype 3 lc rgb &quot;blue&quot; lw 1.5 ps 0
+    literal set linetype 4 lc rgb &quot;blue&quot; lw 1.5 ps 0
     literal set key left bottom below
     #literal set key inside left bottom
     #put the border more to the background by applying it
@@ -187,7 +193,7 @@ else
     printf &quot;set xlabel \&quot;%s\&quot;&quot;, self.xlab
     printf &quot;set title \&quot;%s\&quot;&quot;, self.title
   end plot --output=&quot;@out&quot;
-endif
+  #    endif
 </code>
 </gretl-function>
 <gretl-function name="GUI_naiveFC" type="matrix" menu-only="1" pkg-role="gui-main">
@@ -224,6 +230,56 @@ if Plot
   naivePlot(&amp;self)
 endif
 return self.fc
+</code>
+</gretl-function>
+<gretl-function name="getNaiveForecastsList" type="list">
+ <params count="3">
+  <param name="self" type="bundleref"/>
+  <param name="horizons" type="matrix" optional="true" const="true">
+<description>Select only specific horizons</description>
+  </param>
+  <param name="suffix" type="string" optional="true" const="true">
+<description>Suffix for series' names</description>
+  </param>
+ </params>
+<code>/* Transform interval forecasts into a list of series and return this. */
+# Initial settings
+list R = null
+matrix hor = seq(1, self.horizon)'
+hor = (exists(horizons)) ? horizons : hor
+hor = vec(hor)
+strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
+strings methods_used = (inbundle(self, &quot;methods_used&quot;)) ? self.methods_used : methods_used
+if !exists(suffix)
+  string suffix = &quot;&quot;
+endif
+if maxc(hor) &gt; self.horizon
+  printf &quot;\nError: The maximum forecast horizon you selected (%d) does not exist.\n           Empty list returned.&quot;, maxc(hor)
+  return R
+elif minc(hor) &lt;= 0
+  printf &quot;\nError: The minimum forecast horizon you selected (%d) does not exist.\n           Empty list returned.&quot;, minc(hor)
+  return R
+endif
+if self.obs_added &gt; 0
+  dataset addobs self.obs_added
+endif
+series y = self.y
+if self.obs_added &gt; 0				# The last h observations were added and set to zero
+  smpl (obsnum(self.t2_label)+1) $tmax
+  series y = NA
+  smpl full
+endif
+loop j=1..nelem(methods_used) -q
+  loop i=1..rows(hor) -q
+    scalar start = obsnum(self.t1_forecast_date) + hor[i] - 1
+    scalar ende = start + self.n_folds - 1
+    smpl start ende
+    R += genseries(sprintf(&quot;fc_pt_h_%d_%s%s&quot;, hor[i], methods_used[j], suffix), self.forecasts_point[j][i,]')
+    R += genseries(sprintf(&quot;fc_lo_h_%d_%s%s&quot;, hor[i], methods_used[j], suffix), self.forecasts_lower_bound[j][i,]')
+    R += genseries(sprintf(&quot;fc_up_h_%d_%s%s&quot;, hor[i], methods_used[j], suffix), self.forecasts_upper_bound[j][i,]')
+  endloop
+endloop
+return R
 </code>
 </gretl-function>
 <gretl-function name="get_supported_seas_methods" type="strings" private="1">
@@ -410,6 +466,7 @@ string self.title = &quot;&quot;
 string self.ylab = &quot;&quot;
 string self.xlab = &quot;&quot;
 string self.filename = &quot;display&quot;
+scalar self.pre_fc_periods_to_plot = int(0.25*nobs(y))
 return self
 </code>
 </gretl-function>
@@ -907,7 +964,7 @@ set verbose off
 
 # Select an example
 #==================
-scalar runEX = 2
+scalar runEX = 1
 
 # Load data
 if runEX==1
@@ -916,6 +973,7 @@ if runEX==1
 elif runEX==2
     open AWM.gdt -q			# quarterly
     series y = YGA
+    smpl y --no-missing --permanent
 elif runEX==3
     open hendry_jae.gdt -q	# annual
     series y = diff(gdp)
@@ -944,7 +1002,7 @@ scalar opt.horizon = 10
 #list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
 bundle b = naiveFC(y, &quot;avgFC&quot;, opt)
 matrix fc_avgfc_pt = b.forecasts_point[10]
-b.preobs_fc = 15					# optional: set no. of pre.-forecast periods obs. to plot
+b.pre_fc_periods_to_plot = 15					# optional: set no. of pre.-forecast periods obs. to plot
 naivePlot(&amp;b)
 
 # Mean forecast
@@ -1017,25 +1075,29 @@ eval b.fc
 #=========================
 # Moving-window forecasts
 #=========================
+scalar horizon = 10
 bundle opts = null					# setup additional options
+opts.horizon = horizon
 opts.type_moving_window = &quot;rolling&quot; 			# &quot;rolling&quot; / &quot;recursive&quot; -&gt; type of moving-window forecasting  (optional)
-opts.window_length = 500 #xmax($pd, 80) 			# moving window length (optional)
-catch list opts.xlist = D743 FDD			# optional additional regressors
+opts.window_length = xmax($pd, 90) 			# moving window length (optional)
+#catch list opts.xlist = D743 FDD			# optional additional regressors
 #opts.verbose = 0					# Don't print details (optional)
 
-# Select methods
-strings methods = defarray(&quot;meanFC&quot;) #, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, \
-#  &quot;snaivedriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;)
-loop i=1..nelem(methods) -q
-    bundle b = null
-    bundle b = naiveFC(y, methods[i], opts)
-    eval b.forecasts_point[1]
-    stop
-    
-    # Plot (optional)
-    b.preobs_fc = 5					# set no. of pre.-forecast periods obs. to plot
-    naivePlot(&amp;b)
-endloop
+# Select method
+string method = &quot;ar1FC&quot;#  &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, \
+  #  &quot;snaivedriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;)
+
+bundle b = null
+bundle b = naiveFC(y, method, opts)
+eval b.forecasts_point[1]
+
+# Get interval forecasts as series
+dataset addobs opts.horizon			# forecast may exceed current sample length
+list FC = getNaiveForecastsList(&amp;b, {1,2}, &quot;_suffix&quot;)
+
+# Plot (optional)
+#b.pre_fc_periods_to_plot = 20					# set no. of pre.-forecast periods obs. to plot
+naivePlot(&amp;b, {11})
 
 */
 </sample-script>
