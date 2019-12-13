@@ -1,0 +1,178 @@
+set verbose off
+clear
+
+string WD = "/home/at/git/MwriteCsv"
+scalar N_ROWS = 3
+scalar N_COLS = 3
+string DELIMITER = ","
+string DELIMITER_2 = ";"
+string FILENAME = "foo.csv"		# dummy file
+
+set workdir @WD
+include "./src/MwriteCsv.inp" --force
+
+
+if add_non_existing_file_type("foo.csv") != "foo.csv"
+    stop
+endif
+
+if add_non_existing_file_type("csv.csv") != "csv.csv"
+    stop
+endif
+
+if add_non_existing_file_type("foo") != "foo.csv"
+    stop
+endif
+
+if add_non_existing_file_type("foo.CSV") != "foo.csv"
+    stop
+endif
+
+if add_non_existing_file_type("{].CSV") != "{].csv"
+    stop
+endif
+
+if add_non_existing_file_type("foo") != "foo.csv"
+    stop
+endif
+
+if add_non_existing_file_type("foo.csv") != "foo.csv"
+    stop
+endif
+
+if add_non_existing_file_type("csv") != "csv.csv"
+    stop
+endif
+
+if valid_matrix(zeros(0,0)) != 0
+    stop
+endif
+
+if valid_matrix(zeros(1,1)) != 1
+    stop
+endif
+
+
+if valid_filename(".csv") != 0
+    stop
+endif
+
+if valid_filename("") != 0
+    stop
+endif
+
+if valid_filename("___/") != 1
+    stop
+endif
+
+
+
+matrix m = mshape(seq(1,9), N_ROWS, N_COLS)
+cnameset(m, "A B C")
+strings rnam = array(N_ROWS)
+loop i=1..N_ROWS -q
+    rnam[i] = sprintf("R%d", $i)
+endloop
+rnameset(m, rnam)
+m[3,1] = NA
+
+scalar ret = MwriteCsv(m, FILENAME, DELIMITER)
+if ret != 0
+    stop
+endif
+set csv_delim comma
+open @FILENAME -p -q
+
+if nelem(dataset) != 4
+    stop
+endif
+
+if $nobs != 3
+    stop
+endif
+if nobs(A) != 2
+    stop
+endif
+if nobs(B) != 3
+    stop
+endif
+
+if varnames(dataset)[1] != "A"
+    stop
+endif
+if varnames(dataset)[2] != "B"
+    stop
+endif
+if varnames(dataset)[3] != "C"
+    stop
+endif
+if varnames(dataset)[4] != "row_labels"
+    stop
+endif
+   
+
+if nelem(strvals(row_labels)) != 3
+    stop
+endif
+
+if strvals(row_labels)[1] != "R1"
+    stop
+endif
+if strvals(row_labels)[2] != "R2"
+    stop
+endif
+if strvals(row_labels)[3] != "R3"
+    stop
+endif
+
+
+if sum(A) != 3
+    stop
+endif
+if sum(B) != 15
+    stop
+endif
+if sum(C) != 24
+    stop
+endif
+
+
+# without column and hence row labels
+cnameset(m, "")
+scalar ret = MwriteCsv(m, FILENAME, DELIMITER_2)
+if ret != 0
+    stop
+endif
+set csv_delim semicolon
+open @FILENAME -p -q
+
+if varnames(dataset)[1] != "v1"
+    stop
+endif
+if varnames(dataset)[2] != "v2"
+    stop
+endif
+if varnames(dataset)[3] != "v3"
+    stop
+endif
+if nelem(varnames(dataset)) != 3
+    stop
+endif
+if nelem(dataset) != 3
+    stop
+endif
+
+if $nobs != 3
+    stop
+endif
+if nobs(v1) != 2
+    stop
+endif
+if nobs(v2) != 3
+    stop
+endif
+
+
+printf "\nInfo: All tests passed.\n"
+
+
