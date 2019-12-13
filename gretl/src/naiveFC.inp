@@ -153,7 +153,7 @@ function strings array_of_condition_dates (bundle *self)
     loop i=1..rows(conditioning_dates) -q
         string sdate = sprintf("%d", conditioning_dates[i])
 
-        if $pd==1
+        if $pd == 1
             r[i] = sprintf("%s", substr(sdate,1,4))
         elif $pd==4
             r[i] = sprintf("%s:%s", substr(sdate,1,4),
