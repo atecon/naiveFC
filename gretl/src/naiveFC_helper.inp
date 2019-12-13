@@ -1,0 +1,172 @@
+function void printInfo (const string s)
+    printf "\nInfo: %s\n", s
+end function
+
+function void printWarning (const string s)
+    printf "\nWarning: %s\n", s
+end function
+
+function void printError (const string s)
+    printf "\nError: %s\n", s
+end function
+
+function bundle set_bundle (const series y,
+                            string which,
+                            bundle opts[null])
+    /* Compile self bundle by merging eventual information
+    from opts-bundle. */
+    
+    bundle self = default_values(y)
+    self = opts + self			# override defaults
+    self.which = tolower(which)
+    self.name_endo = argname(y)
+
+    return self
+end function
+
+function strings get_supported_seas_methods (void)
+    /* List all seasonal supported methods here. */
+
+    return defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
+end function
+
+function strings get_supported_nonseas_methods (void)
+    /* List all non-seasonal supported methods here. */
+
+    return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", \
+      "ar1trendFC", "avgFC")
+end function
+
+function scalar data_has_seasonality (void)
+    /* Flag seasonality of data set */
+
+    return ($pd > 1) ? 1 : 0
+end function
+
+function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
+                                   const scalar level[0.001:0.999:] "confidence level")
+    /* Compute width for a given condifdence level assuming standard normal. */
+
+    return fc_sd * critical(z, (1 - level) / 2 )
+end function
+
+
+
+function strings gen_column_names (bundle *self)
+    /* Construct column names */
+
+    strings s = defarray(self.which)
+    if self.which != "avgfc"
+        s += sprintf("Lo (%.1f)", (1-self.level) / 2 * 100 )
+        s += sprintf("Up (%.1f)", ( 1-(1-self.level)/2 ) * 100 )
+    endif
+
+    return s
+end function
+
+
+function strings array_of_horizon_labels (const int horizon[1::])
+    /* Construct string array for indicating the forecast horizons. */
+
+    strings r = array(horizon)
+    loop i=1..horizon -q
+        r[i] = sprintf(" h=%d", i)
+    endloop
+
+    return r
+end function
+
+
+# TODO: Drop funcerr, instead return error but don't stop
+function void print_no_bootstrap_support (void)
+    printError("Bootstrap confidence intervals are not supported, yet")
+end function
+
+
+function series get_period_series (const string method)
+    catch series period = $obsmicro
+    if $error
+        series period = $obsminor
+    endif
+
+    return period
+end function
+
+
+function void gen_t1_forecast_date (const int t2, bundle *self)
+    /* Return the date for which the first 1-step ahead forecast is made for. */
+    string self.t1_forecast_date = obslabel(t2+1)
+end function
+
+
+function void gen_t2_forecast_date (const int t2, bundle *self)
+    /* Return the date for which the last h-step ahead forecast is made for. */
+    catch string self.t2_forecast_date = obslabel(t2+self.horizon)
+end function
+
+
+# TODO: Will be part of extra.gfn in v0.51
+function matrix strpos (const strings S "Array of strings",
+                        const string str "String being searched for in S",
+                        const bool print_warnings[1] "Print eventual warnings")
+    # Returns the positional entries of string in S in a column vector
+    # if S contains string, 0 otherwise.
+
+    if nelem(S) == 0
+        if print_warnings
+            printf "Warning: String array '%s' is empty.\n", argname(S)
+        endif
+        return {0}
+    endif
+
+    matrix ret = {}
+    loop i=1..nelem(S) -q
+        if S[i] == str
+            ret |= $i
+        endif
+    endloop
+
+    if rows(ret) > 0
+        return ret
+    else
+        return {0}
+    endif
+end function
+
+
+
+function scalar nobs_to_add_to_dataset (const list y, bundle *self)
+    /* Determine the number of additional observations to add to the dataset. */
+
+    smpl y --contiguous
+    t2_new = $t2				# don't consider eventual missings in the data passed to naiveFC()
+
+    return self.horizon - ($tmax-t2_new)
+end function
+
+
+function strings drop_string_from_array (const strings S, const string drop_str)
+    /* Drop a specific string from string array. String may occur multiple times. */
+
+    strings ret = null
+    loop i=1..nelem(S) -q
+        if S[i] != drop_str
+            ret += S[i]
+        endif
+    endloop
+
+    return ret
+end function
+
+
+function matrices get_movwin_low_up_matrices (const matrix point_forecasts,
+                                              const matrix factors)
+    /* Compute for all horizons and moving windows the intervals
+    for the forecast. */
+
+    matrices lower_and_upper = array(2)
+    matrix lower_and_upper[1] = point_forecasts .- factors
+    matrix lower_and_upper[2] = point_forecasts .+ factors
+
+    return lower_and_upper
+end function

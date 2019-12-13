@@ -3,9 +3,14 @@ set verbose off
 
 #include naiveFC.gfn --force				# TODO:
 
+string WD = "/home/at/git/naiveFC/gretl"
+set workdir @WD
+include "./src/naiveFC.inp" --force
+
+
 # Select an example
 #==================
-scalar runEX = 1
+scalar runEX = 5
 
 # Load data
 if runEX==1
@@ -21,95 +26,100 @@ elif runEX==3
 elif runEX==4
     open hall.gdt -q		# monthly
     series y = ewr
+
+elif runEX == 5
+    string FILENAME = "opaf_daily.csv"
+    open "./tests/opaf_daily.gdt" -p -q
+    series y = ANSPRACHE_BEREINIGT
 endif
 
 #=======================
 # Static naive forecasts
 #=======================
 /*
-# Forecast combination
-# smpl ; -1					# FIXME: In case the dataset is restricted, internal addobs does not work!
-bundle b = null
-b = naiveFC(y, "avgFC")				# compute forecasts
-print b
-matrix fc_method1_lb = b.forecasts_lower_bound[2]
-fc_method1_lb
-naivePlot(&b)						# plot forecast results
-stop
+   # Forecast combination
+   # smpl ; -1					# FIXME: In case the dataset is restricted, internal addobs does not work!
+   bundle b = null
+   b = naiveFC(y, "avgFC")				# compute forecasts
+   print b
+   matrix fc_method1_lb = b.forecasts_lower_bound[2]
+   fc_method1_lb
+   naivePlot(&b)						# plot forecast results
+   stop
 
-# Forecast combination but up to h=15 forecast periods
-bundle opt = null					# set specific options
-scalar opt.horizon = 10
-#list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
-bundle b = naiveFC(y, "avgFC", opt)
-matrix fc_avgfc_pt = b.forecasts_point[10]
-b.pre_fc_periods_to_plot = 15					# optional: set no. of pre.-forecast periods obs. to plot
-naivePlot(&b)
+   # Forecast combination but up to h=15 forecast periods
+   bundle opt = null					# set specific options
+   scalar opt.horizon = 10
+   #list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
+   bundle b = naiveFC(y, "avgFC", opt)
+   matrix fc_avgfc_pt = b.forecasts_point[10]
+   b.pre_fc_periods_to_plot = 15					# optional: set no. of pre.-forecast periods obs. to plot
+   naivePlot(&b)
 
-# Mean forecast
-bundle opt = null					# set specific options
-scalar opt.horizon = 10
-bundle b = naiveFC(y, "meanFC", opt)
-print b
-eval b.forecasts_point[1]
-stop
-naivePlot(&b)
-eval b.fc
+   # Mean forecast
+   bundle opt = null					# set specific options
+   scalar opt.horizon = 10
+   bundle b = naiveFC(y, "meanFC", opt)
+   print b
+   eval b.forecasts_point[1]
+   stop
+   naivePlot(&b)
+   eval b.fc
 
-# Median forecast
-bundle b = naiveFC(y, "medianFC", opt)
-eval b.forecasts_point[1]
+   # Median forecast
+   bundle b = naiveFC(y, "medianFC", opt)
+   eval b.forecasts_point[1]
 
-naivePlot(&b)
-eval b.fc
+   naivePlot(&b)
+   eval b.fc
 
-# Random-Walk
-bundle b = naiveFC(y, "rwFC", opt)
-eval b.forecasts_point[1]
-naivePlot(&b)
-eval b.fc
+   # Random-Walk
+   bundle b = naiveFC(y, "rwFC", opt)
+   eval b.forecasts_point[1]
+   naivePlot(&b)
+   eval b.fc
 
-# Random-Walk + Drift
-bundle b = naiveFC(y, "rwdriftFC", opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&b)
-eval b.fc
+   # Random-Walk + Drift
+   bundle b = naiveFC(y, "rwdriftFC", opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&b)
+   eval b.fc
 
-# AR(1)
-bundle b = naiveFC(y, "ar1FC", opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&b)
-eval b.fc
+   # AR(1)
+   bundle b = naiveFC(y, "ar1FC", opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&b)
+   eval b.fc
 
-# AR(1) + Trend
-bundle b = naiveFC(y, "ar1trendFC", opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&b)
-eval b.fc
+   # AR(1) + Trend
+   bundle b = naiveFC(y, "ar1trendFC", opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&b)
+   eval b.fc
 
-# Seasonal mean
-bundle b = naiveFC(y, "smeanFC", opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&b)
-eval b.fc
+   # Seasonal mean
+   bundle b = naiveFC(y, "smeanFC", opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&b)
+   eval b.fc
 
-# Seasonal median
-bundle b = naiveFC(y, "smedianFC", opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&b)
-eval b.fc
+   # Seasonal median
+   bundle b = naiveFC(y, "smedianFC", opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&b)
+   eval b.fc
 
-# Seasonal naive without drift
-bundle b = naiveFC(y, "snaiveFC", opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&b)
-eval b.fc
+   # Seasonal naive without drift
+   bundle b = naiveFC(y, "snaiveFC", opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&b)
+   eval b.fc
 
-# Seasonal naive with drift
-bundle b = naiveFC(y, "snaivedriftFC", opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&b)
-eval b.fc
+   # Seasonal naive with drift
+   bundle b = naiveFC(y, "snaivedriftFC", opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&b)
+   eval b.fc
 */
 
 #/* ACTIVATE IF WANTED: may take a while
@@ -126,7 +136,7 @@ opts.window_length = xmax($pd, 90) 			# moving window length (optional)
 
 # Select method
 string method = "ar1FC"#  "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
-  #  "snaivedriftFC", "ar1FC", "ar1trendFC")
+#  "snaivedriftFC", "ar1FC", "ar1trendFC")
 
 bundle b = null
 bundle b = naiveFC(y, method, opts)

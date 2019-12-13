@@ -6,6 +6,7 @@ string FILENAME = "foo.csv"		# dummy file
 
 set workdir @WD
 include "./src/naiveFC.inp" --force
+include "./src/naiveFC_helper.inp" --force
 
 
 matrix m = ones(2,1)
@@ -70,25 +71,34 @@ endif
 
 strings Sin = defarray("A", "B", "C")
 strings S = drop_string_from_array(Sin, "A")
-if nelem(Sin) != 2
+if nelem(S) != 2
     stop
 endif
-if S[1] != "B" && S[2] != "C"
+if S[1] != "B" && S[3] != "C"
     stop
 endif
 
 
+bundle Bret = set_bundle(djclose, "avg", defbundle("horizon", 7, "level", \
+  0.05, "type_moving_window", "rolling"))
+if Bret.horizon != 7 || Bret.level != 0.05 || Bret.type_moving_window != "rolling" || \
+    Bret.name_endo != "djclose"
+    stop
+endif
+
+
+
+# drop_missing_values
+# nobs_to_add_to_dataset
+# summarize_naive_fc_results
+
+/* Function not finisched yet!
 matrix m = mshape(seq(1,9)',3,2)
 matrices M = defarray(m)
 bundle B = get_mean_fc_and_mean_sd(M)
 B
-
-stop
-# attach_row_labels
-# point_fc_and_factor_as_arrays
-# get_point_low_up_bound_arrays
-# avg_forecast_and_get_fc_sd
-
+eval B.fc_point_avg
+*/
 
 
 printf "\nInfo: All tests passed.\n"

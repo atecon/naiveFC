@@ -1,30 +1,3 @@
-function strings get_supported_seas_methods (void)
-    /* List all seasonal supported methods here. */
-
-    return defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
-end function
-
-function strings get_supported_nonseas_methods (void)
-    /* List all non-seasonal supported methods here. */
-
-    return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", \
-      "ar1trendFC", "avgFC")
-end function
-
-function scalar data_has_seasonality (void)
-    /* Flag seasonality of data set */
-
-    return ($pd > 1) ? 1 : 0
-end function
-
-function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
-                                   const scalar level[0.001:0.999:] "confidence level")
-    /* Compute width for a given condifdence level assuming standard normal. */
-
-    return fc_sd * critical(z, (1 - level) / 2 )
-end function
-
-
 function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
                                                bundle *self)
     /* Using each model's point forecast and standard error, compute
@@ -74,31 +47,6 @@ function void get_point_low_up_bound_arrays (bundle *bout, bundle *self)
         self.forecasts_upper_bound[i] = bout.point_forecasts[i] + bout.factors[i]
     endloop
 
-end function
-
-
-function strings gen_column_names (bundle *self)
-    /* Construct column names */
-
-    strings s = defarray(self.which)
-    if self.which != "avgfc"
-        s += sprintf("Lo (%.1f)", (1-self.level) / 2 * 100 )
-        s += sprintf("Up (%.1f)", ( 1-(1-self.level)/2 ) * 100 )
-    endif
-
-    return s
-end function
-
-
-function strings array_of_horizon_labels (const int horizon[1::])
-    /* Construct string array for indicating the forecast horizons. */
-
-    strings r = array(horizon)
-    loop i=1..horizon -q
-        r[i] = sprintf(" h=%d", i)
-    endloop
-
-    return r
 end function
 
 
@@ -163,16 +111,12 @@ function strings array_of_condition_dates (bundle *self)
 end function
 
 
-# TODO: Drop funcerr, instead return error but don't stop
-function void print_no_bootstrap_support (void)
-    funcerr "Bootstrap confidence intervals are not supported, yet"
-end function
 
-
-function bundle get_default_values (const series y)
+function bundle default_values (const series y)
     /* Set default values */
 
     bundle self = null
+    scalar self.error = 0
     list self.xlist = null
     scalar self.horizon = 10				# maximum forecast horizon
     scalar self.level = 0.9					# probability level for forecast interval
@@ -184,27 +128,18 @@ function bundle get_default_values (const series y)
 
     # For get_moving_window_forecasts()
     string self.type_moving_window = "static" 			# "static", "rolling" or "recursive"
-    scalar self.window_length = ceil(0.25*nobs(y))		# default window length
+    scalar self.window_length = ceil(0.25 * nobs(y))		# default window length
 
     # For naivePlot()
     string self.title = ""
     string self.ylab = ""
     string self.xlab = ""
     string self.filename = "display"
-    scalar self.pre_fc_periods_to_plot = int(0.25*nobs(y))
+    scalar self.pre_fc_periods_to_plot = int(0.25 * nobs(y))
 
     return self
 end function
 
-
-function series get_period_series (const string method)
-    catch series period = $obsmicro
-    if $error
-        series period = $obsminor
-    endif
-
-    return period
-end function
 
 
 function void get_static_forecasts (bundle *self)
@@ -336,44 +271,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
 end function
 
 
-function void gen_t1_forecast_date (const int t2, bundle *self)
-    /* Return the date for which the first 1-step ahead forecast is made for. */
-    string self.t1_forecast_date = obslabel(t2+1)
-end function
 
-function void gen_t2_forecast_date (const int t2, bundle *self)
-    /* Return the date for which the last h-step ahead forecast is made for. */
-    catch string self.t2_forecast_date = obslabel(t2+self.horizon)
-end function
-
-
-# TODO: Will be part of extra.gfn in v0.51
-function matrix strpos (const strings S "Array of strings",
-                        const string str "String being searched for in S",
-                        const bool print_warnings[1] "Print eventual warnings")
-    # Returns the positional entries of string in S in a column vector
-    # if S contains string, 0 otherwise.
-
-    if nelem(S) == 0
-        if print_warnings
-            printf "Warning: String array '%s' is empty.\n", argname(S)
-        endif
-        return {0}
-    endif
-
-    matrix ret = {}
-    loop i=1..nelem(S) -q
-        if S[i] == str
-            ret |= $i
-        endif
-    endloop
-
-    if rows(ret) > 0
-        return ret
-    else
-        return {0}
-    endif
-end function
 
 
 function void do_initial_checks (bundle *self)
@@ -384,28 +282,35 @@ function void do_initial_checks (bundle *self)
 
     # Check whether called method exists
     if sum(strpos(methods, self.which)) == 0 && sum(strpos(seas_methods, self.which)) == 0
-        funcerr "The forecasting method you selected does not exist."
+        printError("The forecasting method you selected does not exist.")
+        self.error = 1
     endif
 
     if self.is_seas==0 && sum(strpos(seas_methods, self.which)) > 0
-        funcerr "The method you requested is not available for non-seasonal data."
+        printError"The method you requested is not available for non-seasonal data.")
+        self.error = 1
     endif
 
     if self.window_length < $pd
-        printf "\nError: Problem with current periodicity.\n"
-        printf "Window size = %d\n", self.window_length
-        printf "Periodicity = %d\n", $pd
-        funcerr "The size of the moving window cannot be smaller than the underlying periodicity."
+        printError("Periodicity cannot be negative.")
+        printError(sprintf("Window size = %d", self.window_length))
+        printError(sprintf("Periodicity = %d\n", $pd))
+        printError("The size of the moving window cannot be smaller than the underlying periodicity.")
+        self.error = 1
     endif
 
-    if self.nboot>0
+    if self.nboot > 0
         print_no_bootstrap_support()
+        self.error = 1
     endif
 
-    if (self.type_moving_window=="rolling" || self.type_moving_window=="recursive") && self.which=="avgFC"
-        printf "Error: Automatic forecast averaging ('avgfc') is currently not compatible\n"
-        printf "with moving forecasts.\n"
-        funcerr "Re-specify."
+    if (self.type_moving_window == "rolling" || self.type_moving_window=="recursive") \
+      && self.which == "avgfc"
+      
+        printError("Automatic forecast averaging ('avgfc') is\n\
+          currently not compatible with moving forecasts.\n\
+          Re-specify")
+          self.error = 1
     endif
 end function
 
@@ -413,30 +318,27 @@ end function
 function bundle naiveFC (const series y,
                          string which "Select forecasting method",
                          bundle opts[null] "Bundle incl. optional parameters")
-
     /* Main package function */
 
-    # Set up the bundle
-    bundle self = get_default_values(y)
-    if exists(opts)
-        # TODO: Add a check on whether items in bundle opts actually exist in self
-        self = opts + self			# override defaults
+    if !exists(opts)
+        bundle opts = null
     endif
-    self.which = tolower(which)
-    self.name_endo = argname(y)
+    bundle self = set_bundle(y, which, opts)
 
-    # Check whether method is applicable
     do_initial_checks(&self)
+    if self.error
+        return self
+    endif
 
     # Drop missings + determine number of valid observations
     drop_missing_values(y, &self)
 
     # Add obs for forecasting
     self.obs_added = nobs_to_add_to_dataset(y, &self)
-    if self.obs_added>0
+    if self.obs_added > 0
         dataset addobs self.obs_added
+        printInfo(sprintf("Added %d additional observations at the sample end.", self.obs_added))
     endif
-
     series self.y = misszero(y)		# update as additional observations were attached
 
     do_naive_forecasting(&self)
@@ -535,16 +437,6 @@ function void summarize_naive_fc_results (bundle *self)
 end function
 
 
-function scalar nobs_to_add_to_dataset (const list y, bundle *self)
-    /* Determine the number of additional observations to add to the dataset. */
-
-    smpl y --contiguous
-    t2_new = $t2				# don't consider eventual missings in the data passed to naiveFC()
-
-    return self.horizon - ($tmax-t2_new)
-end function
-
-
 function void drop_missing_values (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
@@ -557,24 +449,26 @@ function void drop_missing_values (const series y, bundle *self)
         smpl full
         smpl xlist --contiguous
         scalar t2_xlist = $t2
-        scalar self.tdiff_xlist_y = t2_xlist - t2_y
+        scalar tdiff = t2_xlist - t2_y
 
-        if self.tdiff_xlist_y>0 && self.tdiff_xlist_y<self.horizon
-            printf "\nError: The last valid observation of series %s is %s.\n", self.name_endo, obslabel(t2_y)
-            printf "You requested a %d-step ahead sequence of forecasts.\n", self.horizon
-            printf "The last valid observation of the contiguous sample for the additional\n\
-              exogenous regressors is %s.\n", obslabel(t2_xlist)
-            printf "Thus, it is impossible to compute the requested h-steap ahead\n\
-              sequence of forecasts.\n"
-            printf "Either reduce the forecast horizon to h=%d or add future information\n\
-              for your 'xlist' variables.\n", (self.tdiff_xlist_y)
-            funcerr ""
+        if tdiff > 0 && tdiff < self.horizon
+            printError(sprintf("The last valid observation of series %s is %s.", self.name_endo, obslabel(t2_y))
+            printError(sprintf("You requested a %d-step ahead sequence of forecasts.", self.horizon))
+            printError(sprintf"The last valid observation of the contiguous sample\n\
+              for the additional regressors is %s.", obslabel(t2_xlist))
+            printError("It is not possible to compute the requested h-steap ahead\n\
+              sequence of forecasts.")
+            printError(sprintf("Either reduce the forecast horizon to h=%d\n\
+              or add future information for your 'xlist' variables.", tdiff))
+            
+            self.error = 1
+        elif tdiff <= 0
+            printError("The 'xlist' variables include no valid future observations\n\
+              but only missings.")
+            printError(sprintf("Last valid observation of additional exogenous\n\
+              regressors is %s", obslabel(t2_xlist))
 
-        elif self.tdiff_xlist_y<=0
-            printf "\nError: The 'xlist' variables include no valid future observations\n\
-              but only missings.\n"
-            printf "Last valid of additional exogenous regressors is %s\n", obslabel(t2_xlist)
-            funcerr "Re-specify."
+            self.error = 1
         endif
 
         smpl full
@@ -611,20 +505,6 @@ function matrices do_avgfcs_and_get_fc_sd_array (const strings methods, bundle *
 end function
 
 
-function strings drop_string_from_array (const strings S, const string drop_str)
-    /* Drop a specific string from string array. String may occur multiple times. */
-
-    strings ret = null
-    loop i=1..nelem(S) -q
-        if S[i] != drop_str
-            ret += S[i]
-        endif
-    endloop
-
-    return ret
-end function
-
-
 function matrices avg_forecast_and_get_fc_sd (bundle *self)
 /* Compute forecasts using different methods supported, and return array of point
     forecasts and associated standard errors. */
@@ -640,7 +520,7 @@ function matrices avg_forecast_and_get_fc_sd (bundle *self)
 end function
 
 
-# FIXME: Unfinished function
+# FIXME: Unfinished function and not used, yet!
 function bundle get_mean_fc_and_mean_sd (const matrices fc_and_sd)
     /* */
 
@@ -740,19 +620,6 @@ function matrices get_cv_fc_and_sd_array (bundle *cv, bundle *self)
     endloop
 
     return fc_and_sd_from_all_cv
-end function
-
-
-function matrices get_movwin_low_up_matrices (const matrix point_forecasts,
-                                              const matrix factors)
-    /* Compute for all horizons and moving windows the intervals
-    for the forecast. */
-
-    matrices lower_and_upper = array(2)
-    matrix lower_and_upper[1] = point_forecasts .- factors
-    matrix lower_and_upper[2] = point_forecasts .+ factors
-
-    return lower_and_upper
 end function
 
 
