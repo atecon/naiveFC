@@ -14,14 +14,14 @@ end function
 function scalar data_has_seasonality (void)
     /* Flag seasonality of data set */
 
-    return ($pd>1) ? 1 : 0
+    return ($pd > 1) ? 1 : 0
 end function
 
 function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
                                    const scalar level[0.001:0.999:] "confidence level")
     /* Compute width for a given condifdence level assuming standard normal. */
 
-    return fc_sd * critical(z, (1-level)/2)
+    return fc_sd * critical(z, (1 - level) / 2 )
 end function
 
 
@@ -82,15 +82,15 @@ function strings gen_column_names (bundle *self)
 
     strings s = defarray(self.which)
     if tolower(self.which) != "avgfc"
-        s += sprintf("Lo (%.1f)", (1-self.level)/2*100)
-        s += sprintf("Up (%.1f)", (1-(1-self.level)/2)*100)
+        s += sprintf("Lo (%.1f)", (1-self.level) / 2 * 100 )
+        s += sprintf("Up (%.1f)", ( 1-(1-self.level)/2 ) * 100 )
     endif
 
     return s
 end function
 
 
-function strings array_of_horizon_labels (const int horizon)
+function strings array_of_horizon_labels (const int horizon[1::])
     /* Construct string array for indicating the forecast horizons. */
 
     strings r = array(horizon)
@@ -100,6 +100,7 @@ function strings array_of_horizon_labels (const int horizon)
 
     return r
 end function
+
 
 function strings array_of_forecast_dates (bundle *self)
 /* Construct date strings refering to the date for which a the
@@ -111,9 +112,9 @@ function strings array_of_forecast_dates (bundle *self)
 
     loop i=1..self.horizon -q
         string sdate = sprintf("%d", date[i])
-        if $pd==1
+        if $pd == 1
             r[i] = sprintf("%s", substr(sdate,1,4))
-        elif $pd==4
+        elif $pd == 4
             r[i] = sprintf("%s:%s", substr(sdate,1,4),
               substr(sdate,5,6))
         else

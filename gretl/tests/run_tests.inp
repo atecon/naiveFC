@@ -1,17 +1,55 @@
 set verbose off
 clear
 
-string WD = "/home/at/git/MwriteCsv"
-scalar N_ROWS = 3
-scalar N_COLS = 3
-string DELIMITER = ","
-string DELIMITER_2 = ";"
+string WD = "/home/at/git/naiveFC/gretl"
 string FILENAME = "foo.csv"		# dummy file
 
 set workdir @WD
-include "./src/MwriteCsv.inp" --force
+include "./src/naiveFC.inp" --force
 
 
+matrix m = ones(2,1)
+m[1] = NA
+if ok(fc_interval_width(m, 0.9)[1]) != 0
+    stop
+endif
+if !(fc_interval_width(m, 0.9)[2] >= 1.644 && fc_interval_width(m, 0.9)[2] <= 1.6449)
+    # approximate exact floating number
+    stop
+endif
+
+
+bundle b = defbundle("which", "rw", "level", 0.9)
+strings S = gen_column_names(&b)
+if nelem(S) != 3
+    stop
+endif
+if S[1] != "rw" || S[2] != "Lo (5.0)" || S[3] != "Up (95.0)"
+    stop
+endif
+
+bundle b = defbundle("which", "avgfc", "level", 0.9)
+strings S = gen_column_names(&b)
+if nelem(S) != 1
+    stop
+endif
+if S[1] != "avgfc"
+    stop
+endif
+
+
+strings S = array_of_horizon_labels(2)
+if S[1] != " h=1" || S[2] != " h=2"
+    stop
+endif
+
+
+
+# point_fc_and_factor_as_arrays
+# get_point_low_up_bound_arrays
+
+
+stop
 if add_non_existing_file_type("foo.csv") != "foo.csv"
     stop
 endif
@@ -75,102 +113,6 @@ loop i=1..N_ROWS -q
 endloop
 rnameset(m, rnam)
 m[3,1] = NA
-
-scalar ret = MwriteCsv(m, FILENAME, DELIMITER)
-if ret != 0
-    stop
-endif
-set csv_delim comma
-open @FILENAME -p -q
-
-if nelem(dataset) != 4
-    stop
-endif
-
-if $nobs != 3
-    stop
-endif
-if nobs(A) != 2
-    stop
-endif
-if nobs(B) != 3
-    stop
-endif
-
-if varnames(dataset)[1] != "A"
-    stop
-endif
-if varnames(dataset)[2] != "B"
-    stop
-endif
-if varnames(dataset)[3] != "C"
-    stop
-endif
-if varnames(dataset)[4] != "row_labels"
-    stop
-endif
-   
-
-if nelem(strvals(row_labels)) != 3
-    stop
-endif
-
-if strvals(row_labels)[1] != "R1"
-    stop
-endif
-if strvals(row_labels)[2] != "R2"
-    stop
-endif
-if strvals(row_labels)[3] != "R3"
-    stop
-endif
-
-
-if sum(A) != 3
-    stop
-endif
-if sum(B) != 15
-    stop
-endif
-if sum(C) != 24
-    stop
-endif
-
-
-# without column and hence row labels
-cnameset(m, "")
-scalar ret = MwriteCsv(m, FILENAME, DELIMITER_2)
-if ret != 0
-    stop
-endif
-set csv_delim semicolon
-open @FILENAME -p -q
-
-if varnames(dataset)[1] != "v1"
-    stop
-endif
-if varnames(dataset)[2] != "v2"
-    stop
-endif
-if varnames(dataset)[3] != "v3"
-    stop
-endif
-if nelem(varnames(dataset)) != 3
-    stop
-endif
-if nelem(dataset) != 3
-    stop
-endif
-
-if $nobs != 3
-    stop
-endif
-if nobs(v1) != 2
-    stop
-endif
-if nobs(v2) != 3
-    stop
-endif
 
 
 printf "\nInfo: All tests passed.\n"
