@@ -6,6 +6,7 @@ set verbose off
 string WD = "/home/at/git/naiveFC/gretl"
 set workdir @WD
 include "./src/naiveFC.inp" --force
+include "./src/naiveFC_helper.inp" --force
 
 
 # Select an example
@@ -140,6 +141,8 @@ string method = "ar1FC"#  "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC
 
 bundle b = null
 bundle b = naiveFC(y, method, opts)
+b
+stop
 eval b.forecasts_point[1]
 
 # Get interval forecasts as series

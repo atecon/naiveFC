@@ -87,7 +87,8 @@ if Bret.horizon != 7 || Bret.level != 0.05 || Bret.type_moving_window != "rollin
 endif
 
 
-
+# prepare_result_matrices()
+# methods_to_apply()
 # drop_missing_values
 # nobs_to_add_to_dataset
 # summarize_naive_fc_results

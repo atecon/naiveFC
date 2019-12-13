@@ -213,29 +213,29 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
     # Estimation
     scalar dynamic_fc = 0
 
-    if method=="meanFC"
+    if method == "meanfc"
         catch ols y xlist --quiet
 
-    elif method=="medianFC"
+    elif method == "medianfc"
         catch quantreg 0.5 y xlist --quiet
 
-    elif method=="smeanFC"
+    elif method == "smeanfc"
         catch ols y xlist --quiet
 
-    elif method=="smedianFC"
+    elif method == "smedianfc"
         catch quantreg 0.5 y xlist --quiet
 
-    elif method=="snaiveFC" || method=="snaivedriftFC"
+    elif method == "snaivefc" || method == "snaivedriftfc"
         dynamic_fc++
-        string arima_opt = (method=="snaiveFC") ? "--nc" : ""
+        string arima_opt = (method=="snaive") ? "--nc" : ""
         catch arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet
 
-    elif method=="rwFC" || method=="rwdriftFC"
+    elif method == "rwfc" || method == "rwdriftfc"
         dynamic_fc++
-        string arima_opt = (method=="rwFC") ? "--nc" : ""
+        string arima_opt = (method=="rwfc") ? "--nc" : ""
         catch arima 0 1 0 ; y xlist @arima_opt --quiet
 
-    elif method=="ar1FC" || method=="ar1trendFC"
+    elif method == "ar1fc" || method == "ar1trendfc"
         dynamic_fc++
         # setup list of regressors
         list xlist += y(-1)
@@ -287,7 +287,7 @@ function void do_initial_checks (bundle *self)
     endif
 
     if self.is_seas==0 && sum(strpos(seas_methods, self.which)) > 0
-        printError"The method you requested is not available for non-seasonal data.")
+        printError("The method you requested is not available for non-seasonal data.")
         self.error = 1
     endif
 
@@ -324,7 +324,7 @@ function bundle naiveFC (const series y,
         bundle opts = null
     endif
     bundle self = set_bundle(y, which, opts)
-
+    
     do_initial_checks(&self)
     if self.error
         return self
@@ -358,10 +358,26 @@ function bundle naiveFC (const series y,
     return self
 end function
 
+function void prepare_result_matrices (bundle *self)
+    /* Prepare for each estimator an 3-D array for holding point 
+    interval forecast results. */
+
+    methods_to_apply(&self)
+    
+    loop i=1..nelem(self.methods_used) -q
+        string method_name = self.methods_used[i]
+        matrices self.fc_results_@method_name = array(3)
+    endloop       
+end function
+
 
 function void do_naive_forecasting (bundle *self)
 /* Wrapper function actually calling static or
     moving-window procedures. */
+
+    # Construct array foreach estimator
+    prepare_result_matrices(&self)
+    *** HIER WEITERMACHEN ***
 
     if self.type_moving_window == "static"
         get_static_forecasts(&self)
@@ -452,7 +468,7 @@ function void drop_missing_values (const series y, bundle *self)
         scalar tdiff = t2_xlist - t2_y
 
         if tdiff > 0 && tdiff < self.horizon
-            printError(sprintf("The last valid observation of series %s is %s.", self.name_endo, obslabel(t2_y))
+            printError(sprintf("The last valid observation of series %s is %s.", self.name_endo, obslabel(t2_y)))
             printError(sprintf("You requested a %d-step ahead sequence of forecasts.", self.horizon))
             printError(sprintf"The last valid observation of the contiguous sample\n\
               for the additional regressors is %s.", obslabel(t2_xlist))
@@ -466,7 +482,7 @@ function void drop_missing_values (const series y, bundle *self)
             printError("The 'xlist' variables include no valid future observations\n\
               but only missings.")
             printError(sprintf("Last valid observation of additional exogenous\n\
-              regressors is %s", obslabel(t2_xlist))
+              regressors is %s", obslabel(t2_xlist)))
 
             self.error = 1
         endif
@@ -490,33 +506,38 @@ function void drop_missing_values (const series y, bundle *self)
 end function
 
 
-function matrices do_avgfcs_and_get_fc_sd_array (const strings methods, bundle *self)
+function matrices do_avgfcs_and_get_fc_sd_array (bundle *self)
 /* Compute forecasts for each method. For each mezthod we obtain a matrix
     of size h by 2 holding point forecasts and associated standard errors. */
 
-    scalar m = nelem(methods)
+    scalar m = nelem(self.methods_used)
     matrices fc_and_sd = array(m)
 
     loop i=1..m -q
-        fc_and_sd[i] = forecast_and_get_fc_sd(&self, methods[i])
+        fc_and_sd[i] = forecast_and_get_fc_sd(&self, self.methods_used[i])
     endloop
 
     return fc_and_sd
 end function
 
 
-function matrices avg_forecast_and_get_fc_sd (bundle *self)
-/* Compute forecasts using different methods supported, and return array of point
-    forecasts and associated standard errors. */
-
-    # Models for both seasonal and non-seasonal frequencies
-    strings self.methods_used = drop_string_from_array(get_supported_nonseas_methods(), "avgFC")
+function void methods_to_apply (bundle *self)
+    /* Obtain names of methods going to apply. */
+    
+    strings self.methods_used = drop_string_from_array(get_supported_nonseas_methods(), "avgfc")
     if self.is_seas
         strings methods_seasonals = get_supported_seas_methods()
         self.methods_used += methods_seasonals
     endif
+end function
 
-    return do_avgfcs_and_get_fc_sd_array(self.methods_used, &self)
+function matrices avg_forecast_and_get_fc_sd (bundle *self)
+/* Compute forecasts using different methods supported, and return array of point
+    forecasts and associated standard errors. */
+
+    methods_to_apply(&self)
+    
+    return do_avgfcs_and_get_fc_sd_array(&self)
 end function
 
 
@@ -832,7 +853,8 @@ end function
 
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
-      int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
+                             int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
+                             "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
       int h[1::10] "Forecast horizon",
       bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */

@@ -27,14 +27,14 @@ end function
 function strings get_supported_seas_methods (void)
     /* List all seasonal supported methods here. */
 
-    return defarray("smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC")
+    return defarray("smeanfc", "smedianfc", "snaivefc", "snaivedriftfc")
 end function
 
 function strings get_supported_nonseas_methods (void)
     /* List all non-seasonal supported methods here. */
 
-    return defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", "ar1FC", \
-      "ar1trendFC", "avgFC")
+    return defarray("meanfc", "medianfc", "rwfc", "rwdriftfc", "ar1fc", \
+      "ar1trendfc", "avgfc")
 end function
 
 function scalar data_has_seasonality (void)
