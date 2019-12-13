@@ -44,6 +44,11 @@ if S[1] != " h=1" || S[2] != " h=2"
 endif
 
 
+open denmark.gdt -q -p
+bundle b = defbundle("horizon", 2, "t2_label", "1980:01")
+strings S = array_of_forecast_dates(&b)
+S
+
 
 # point_fc_and_factor_as_arrays
 # get_point_low_up_bound_arrays
