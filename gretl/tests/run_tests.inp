@@ -43,81 +43,52 @@ if S[1] != " h=1" || S[2] != " h=2"
     stop
 endif
 
-
 open denmark.gdt -q -p
-bundle b = defbundle("horizon", 2, "t2_label", "1980:01")
-strings S = array_of_forecast_dates(&b)
-S
+strings S = get_dates_forecasted("1980:1", 2)
+if S[1] != "1980:2" && S[2] != "1980:3"
+    stop
+endif
+
+open hendry_jae.gdt -q -p
+strings S = get_dates_forecasted("1899", 2)
+if S[1] != "1900" && S[2] != "1901"
+    stop
+endif
+
+open hamilton.gdt -q -p
+strings S = get_dates_forecasted("1982:07", 2)
+if S[1] != "1982:08" && S[2] != "1982:09"
+    stop
+endif
+
+open djclose.gdt -q -p
+strings S = get_dates_forecasted("1982-07-30", 2)
+if S[1] != "1982-08-02" && S[2] != "1982-08-02"
+    stop
+endif
 
 
-# point_fc_and_factor_as_arrays
-# get_point_low_up_bound_arrays
+strings Sin = defarray("A", "B", "C")
+strings S = drop_string_from_array(Sin, "A")
+if nelem(Sin) != 2
+    stop
+endif
+if S[1] != "B" && S[2] != "C"
+    stop
+endif
 
+
+matrix m = mshape(seq(1,9)',3,2)
+matrices M = defarray(m)
+bundle B = get_mean_fc_and_mean_sd(M)
+B
 
 stop
-if add_non_existing_file_type("foo.csv") != "foo.csv"
-    stop
-endif
+# attach_row_labels
+# point_fc_and_factor_as_arrays
+# get_point_low_up_bound_arrays
+# avg_forecast_and_get_fc_sd
 
-if add_non_existing_file_type("csv.csv") != "csv.csv"
-    stop
-endif
-
-if add_non_existing_file_type("foo") != "foo.csv"
-    stop
-endif
-
-if add_non_existing_file_type("foo.CSV") != "foo.csv"
-    stop
-endif
-
-if add_non_existing_file_type("{].CSV") != "{].csv"
-    stop
-endif
-
-if add_non_existing_file_type("foo") != "foo.csv"
-    stop
-endif
-
-if add_non_existing_file_type("foo.csv") != "foo.csv"
-    stop
-endif
-
-if add_non_existing_file_type("csv") != "csv.csv"
-    stop
-endif
-
-if valid_matrix(zeros(0,0)) != 0
-    stop
-endif
-
-if valid_matrix(zeros(1,1)) != 1
-    stop
-endif
-
-
-if valid_filename(".csv") != 0
-    stop
-endif
-
-if valid_filename("") != 0
-    stop
-endif
-
-if valid_filename("___/") != 1
-    stop
-endif
-
-
-
-matrix m = mshape(seq(1,9), N_ROWS, N_COLS)
-cnameset(m, "A B C")
-strings rnam = array(N_ROWS)
-loop i=1..N_ROWS -q
-    rnam[i] = sprintf("R%d", $i)
-endloop
-rnameset(m, rnam)
-m[3,1] = NA
 
 
 printf "\nInfo: All tests passed.\n"

@@ -81,7 +81,7 @@ function strings gen_column_names (bundle *self)
     /* Construct column names */
 
     strings s = defarray(self.which)
-    if tolower(self.which) != "avgfc"
+    if self.which != "avgfc"
         s += sprintf("Lo (%.1f)", (1-self.level) / 2 * 100 )
         s += sprintf("Up (%.1f)", ( 1-(1-self.level)/2 ) * 100 )
     endif
@@ -102,30 +102,25 @@ function strings array_of_horizon_labels (const int horizon[1::])
 end function
 
 
-function strings array_of_forecast_dates (bundle *self)
-/* Construct date strings refering to the date for which a the
+function strings get_dates_forecasted (const string t2_label,
+                                       const int horizon)
+    /* Construct date strings refering to the date for which a the
     h-step ahead forecast was made for. For 'static' forecasts only. */
 
-    strings r = array(self.horizon)
-    # Here we explicitly consider the case when the last obs are missings
-    matrix date = {$obsdate}[1+obsnum(self.t2_label):]
+    strings dates_forecasted = array(horizon)
 
-    loop i=1..self.horizon -q
-        string sdate = sprintf("%d", date[i])
-        if $pd == 1
-            r[i] = sprintf("%s", substr(sdate,1,4))
-        elif $pd == 4
-            r[i] = sprintf("%s:%s", substr(sdate,1,4),
-              substr(sdate,5,6))
-        else
-            r[i] = sprintf("%s-%s-%s", substr(sdate,1,4),
-              substr(sdate,5,6), substr(sdate,7,8))
-        endif
+    scalar init_day_forecasted = 1 + obsnum(t2_label)
+    scalar last_day_forecasted = init_day_forecasted + horizon - 1
+
+    loop i=1..horizon -q
+        smpl (init_day_forecasted+$i-1) (init_day_forecasted+$i-1)        
+        dates_forecasted[i] = obslabel($t1)
     endloop
-
-    return r
+    
+    return dates_forecasted
 end function
 
+# FIXME: Merge with get_dates_forecasted()
 function strings array_of_condition_dates (bundle *self)
 /* Construct date strings refering to the date based on which a
     forecasting model was estimated. */
@@ -149,7 +144,7 @@ function strings array_of_condition_dates (bundle *self)
 
     strings r = array(rows(conditioning_dates))
 
-    # TODO: Consolidate with loop in array_of_forecast_dates()
+    # TODO: Consolidate with loop in get_dates_forecasted()
     loop i=1..rows(conditioning_dates) -q
         string sdate = sprintf("%d", conditioning_dates[i])
 
@@ -168,6 +163,7 @@ function strings array_of_condition_dates (bundle *self)
 end function
 
 
+# TODO: Drop funcerr, instead return error but don't stop
 function void print_no_bootstrap_support (void)
     funcerr "Bootstrap confidence intervals are not supported, yet"
 end function
@@ -200,6 +196,7 @@ function bundle get_default_values (const series y)
     return self
 end function
 
+
 function series get_period_series (const string method)
     catch series period = $obsmicro
     if $error
@@ -225,7 +222,7 @@ function matrices call_method (bundle *self)
     standard errors. */
 
     # Returned array includes m matrices. Each matrix is of dimension h by 2 (point~sderr)
-    if tolower(self.which) != "avgfc"	# m=1
+    if self.which != "avgfc"	# m=1
         matrices fc_and_sd = defarray(forecast_and_get_fc_sd(&self, self.which))	# 1-dim array incl. single h by 2 matrix
     else								# currently m=10 incl. avg. forecast
         matrices fc_and_sd = avg_forecast_and_get_fc_sd(&self)	# function already transforms into array
@@ -425,7 +422,7 @@ function bundle naiveFC (const series y,
         # TODO: Add a check on whether items in bundle opts actually exist in self
         self = opts + self			# override defaults
     endif
-    self.which = which
+    self.which = tolower(which)
     self.name_endo = argname(y)
 
     # Check whether method is applicable
@@ -485,7 +482,7 @@ function void attach_row_labels (bundle *self)
     forecasts. */
 
     if self.type_moving_window == "static"
-        strings row_labels = array_of_forecast_dates(&self)
+        strings row_labels = get_dates_forecasted(self.t2_label, self.horizon)
     else
         strings row_labels = array_of_horizon_labels(self.horizon)
     endif
@@ -615,7 +612,7 @@ end function
 
 
 function strings drop_string_from_array (const strings S, const string drop_str)
-    /* Drop a specific string from string array. String yay occur multiple times. */
+    /* Drop a specific string from string array. String may occur multiple times. */
 
     strings ret = null
     loop i=1..nelem(S) -q
@@ -643,6 +640,7 @@ function matrices avg_forecast_and_get_fc_sd (bundle *self)
 end function
 
 
+# FIXME: Unfinished function
 function bundle get_mean_fc_and_mean_sd (const matrices fc_and_sd)
     /* */
 
@@ -653,7 +651,7 @@ function bundle get_mean_fc_and_mean_sd (const matrices fc_and_sd)
 
     loop i=1..n -q			# TODO: Future drill() may replace this
         point_fc_avg[,i] = fc_and_sd[i][,1]
-        sd_fc[,i] = fc_and_sd[i][,2]
+        sd_fc_avg[,i] = fc_and_sd[i][,2]
     endloop
 
     return defbundle("fc_point_avg", meanr(point_fc_avg), "fc_sd_avg", meanr(sd_fc_avg))
