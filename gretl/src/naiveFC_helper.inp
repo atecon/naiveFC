@@ -19,6 +19,7 @@ function bundle set_bundle (const series y,
     bundle self = default_values(y)
     self = opts + self			# override defaults
     self.which = tolower(which)
+    self.type_moving_window = tolower(self.type_moving_window)
     self.name_endo = argname(y)
 
     return self

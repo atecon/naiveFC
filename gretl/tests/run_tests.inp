@@ -87,8 +87,72 @@ if Bret.horizon != 7 || Bret.level != 0.05 || Bret.type_moving_window != "rollin
 endif
 
 
-# prepare_result_matrices()
-# methods_to_apply()
+if nelem(get_supported_nonseas_methods()) != 7
+    stop
+endif
+if get_supported_nonseas_methods()[1] != "meanfc" || \
+  get_supported_nonseas_methods()[2] != "medianfc" || \
+  get_supported_nonseas_methods()[3] != "rwfc" || \
+  get_supported_nonseas_methods()[4] != "rwdriftfc" || \
+  get_supported_nonseas_methods()[5] != "ar1fc" || \
+  get_supported_nonseas_methods()[6] != "ar1trendfc" || \
+  get_supported_nonseas_methods()[7] != "avgfc"
+  
+    stop
+endif
+
+
+if get_supported_seas_methods()[1] != "smeanfc" || \
+  get_supported_seas_methods()[2] != "smedianfc" || \
+  get_supported_seas_methods()[3] != "snaivefc" || \
+  get_supported_seas_methods()[4] != "snaivedriftfc" 
+  
+    stop
+endif
+
+
+bundle B = defbundle("is_seas", 0)
+methods_to_apply(&B)
+if nelem(B.methods_used) != 6
+    stop
+endif
+
+bundle B = defbundle("is_seas", 1)
+methods_to_apply(&B)
+if nelem(B.methods_used) != 10
+    stop
+endif
+
+
+
+bundle B = defbundle("is_seas", 0)
+prepare_result_matrices(&B)
+if nelem(B) != 8
+    stop
+endif
+if nelem(B.fc_results_medianfc) != 3
+    stop
+endif
+
+bundle B = defbundle("is_seas", 1)
+prepare_result_matrices(&B)
+if nelem(B) != 12
+    stop
+endif
+if nelem(B.fc_results_snaivefc) != 3
+    stop
+endif
+
+
+
+
+print "passed"
+stop
+
+
+
+
+
 # drop_missing_values
 # nobs_to_add_to_dataset
 # summarize_naive_fc_results

@@ -366,7 +366,7 @@ function void prepare_result_matrices (bundle *self)
     
     loop i=1..nelem(self.methods_used) -q
         string method_name = self.methods_used[i]
-        matrices self.fc_results_@method_name = array(3)
+        matrices self.fc_results_@method_name = array(3)	# hold point- and interval forecasts
     endloop       
 end function
 
@@ -375,9 +375,7 @@ function void do_naive_forecasting (bundle *self)
 /* Wrapper function actually calling static or
     moving-window procedures. */
 
-    # Construct array foreach estimator
     prepare_result_matrices(&self)
-    *** HIER WEITERMACHEN ***
 
     if self.type_moving_window == "static"
         get_static_forecasts(&self)
@@ -526,8 +524,7 @@ function void methods_to_apply (bundle *self)
     
     strings self.methods_used = drop_string_from_array(get_supported_nonseas_methods(), "avgfc")
     if self.is_seas
-        strings methods_seasonals = get_supported_seas_methods()
-        self.methods_used += methods_seasonals
+        strings self.methods_used += get_supported_seas_methods()
     endif
 end function
 
