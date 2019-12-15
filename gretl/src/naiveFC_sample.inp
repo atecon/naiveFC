@@ -132,7 +132,7 @@ bundle opts = null					# setup additional options
 opts.horizon = horizon
 opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
 #opts.window_length = xmax($pd, 90) 			# moving window length (optional)
-opts.window_length = $tmax
+# opts.window_length = $tmax
 #catch list opts.xlist = D743 FDD			# optional additional regressors
 #opts.verbose = 0					# Don't print details (optional)
 

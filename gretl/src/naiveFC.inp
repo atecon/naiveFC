@@ -61,10 +61,10 @@ function strings get_dates_forecasted (const string t2_label,
     scalar last_day_forecasted = init_day_forecasted + horizon - 1
 
     loop i=1..horizon -q
-        smpl (init_day_forecasted+$i-1) (init_day_forecasted+$i-1)        
+        smpl (init_day_forecasted+$i-1) (init_day_forecasted+$i-1)
         dates_forecasted[i] = obslabel($t1)
     endloop
-    
+
     return dates_forecasted
 end function
 
@@ -143,12 +143,14 @@ end function
 
 
 function void get_static_forecasts (bundle *self)
-    /* Estimate model 'static' and compute interval h-multistep forecast,
-    store results. */
+/* Estimate model 'static' and compute interval h-multistep forecast,
+      store results. */
 
     matrices fc_and_sd = call_method(&self)
-    bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &self)
-    get_point_low_up_bound_arrays(&bout, &self)
+    if !self.error
+        bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &self)
+        get_point_low_up_bound_arrays(&bout, &self)
+    endif
 end function
 
 
@@ -168,65 +170,48 @@ function matrices call_method (bundle *self)
 end function
 
 
-function list add_ohe_periods_to_list (const string method,
-                                     list xlist)
-    /* Add list of dummyfied frequency components to list. */
-
-    if method == "smeanfc" || method == "smedianfc"
-        series period = get_highest_period_series(method)
-        xlist += dummify(period)
-    endif
-
-    return xlist
-end function
-
-
 function matrix forecast_and_get_fc_sd (bundle *self, const string method)
     /* Compute point forecast and forecast standard errors. */
 
-    matrix fc_and_sd_matrix = zeros(self.horizon, 2) * NA
-    list xlist = null
-
-    if method=="smeanFC" || method=="smedianFC"
-        series period = get_highest_period_series(method)
-        xlist += dummify(period)
+    scalar dynamic_fc = 
+    if is_dynamic_model(method)
+        string fcast_arg = "--dynamic"
+    else
+        string fcast_arg = "--static"
     endif
+    matrix forecast_results = zeros(self.horizon, 2) * NA
+    list xlist = null
+    series y = self.y					# length: window_length + horizon
 
-    if method=="ar1trendFC" && (inbundle(self, "w_trend") && self.w_trend)
-        genr time
+    xlist += add_ohe_periods_to_list(method, xlist)
+    xlist += add_linear_trend_to_list(&self, method, xlist)
+    xlist += add_intercept_to_list(method, xlist)
+    xlist += self.xlist
+    if method == "ar1fc" || method == "ar1trendfc"
+        xlist += y(-1)
     endif
 
     # Select sample comprising both training and test set
-    if self.type_moving_window=="static"
-        catch smpl obsnum(self.t1_label) obsnum(self.t2_label)
-    endif
+    bundle train_obsnums = get_train_start_end_obsnums(&self)
+    catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+
     if $error
-        funcerr "Check your sample and window size."
+        printError("Failed to set training set. Check your sample and window size.")
+
+        scalar self.error = 1
+        return forecast_results
     endif
 
-    # Set target variable and xlist
-    series y = self.y					# has window_length + horizon observations
+    if self.type_moving_window != "static" && ($nobs > self.window_length)
+        printError(sprintf("You training sample (T=%d) is longer than the\n\
+          specified window length (T=%d).", $nobs, self.window_length))
 
-    if method != "rwFC" || method != "rwdriftFC"
-        list xlist += const
+        scalar self.error = 1
+        return forecast_results
     endif
-    list xlist += self.xlist
-
-    # Set training set
-    if self.type_moving_window=="rolling" || self.type_moving_window=="recursive"
-        scalar train_end = $t2 - self.horizon
-        scalar train_start = 1 + train_end - self.window_length
-        smpl train_start train_end
-
-        if $nobs > self.window_length
-            print "\nError: You training sample (T=%d) is longer than the specified window length (T=%d).", $nobs, self.window_length
-            stop
-        endif
-    endif
+  
 
     # Estimation
-    scalar dynamic_fc = 0
-
     if method == "meanfc"
         catch ols y xlist --quiet
 
@@ -240,36 +225,22 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
         catch quantreg 0.5 y xlist --quiet
 
     elif method == "snaivefc" || method == "snaivedriftfc"
-        dynamic_fc++
-        string arima_opt = (method=="snaive") ? "--nc" : ""
+        string arima_opt = (method == "snaive") ? "--nc" : ""
         catch arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet
 
     elif method == "rwfc" || method == "rwdriftfc"
-        dynamic_fc++
-        string arima_opt = (method=="rwfc") ? "--nc" : ""
+        string arima_opt = (method == "rwfc") ? "--nc" : ""
         catch arima 0 1 0 ; y xlist @arima_opt --quiet
 
     elif method == "ar1fc" || method == "ar1trendfc"
-        dynamic_fc++
-        # setup list of regressors
-        list xlist += y(-1)
-        if inbundle(self, "w_trend")
-            xlist += trend
-        endif
         catch ols y xlist --quiet
     endif
 
-    scalar model_error = $error
-
-    if model_error
-        printf "\nError: Model estimation failed. \n\
-          Forecast values are set to NA for the current sample.\n"
+    if $error
+        printError("Error: Model estimation failed.\n\
+        Forecast values are set to NA for the current sample.")
     else
-        if dynamic_fc == 0
-            fcast ($t2+1) ($t2+self.horizon) --static --quiet
-        else
-            fcast ($t2+1) ($t2+self.horizon) --dynamic --quiet
-        endif
+        fcast ($t2+1) ($t2+self.horizon) @fcast_arg --quiet
     endif
 
     if self.type_moving_window == "static"
@@ -319,12 +290,12 @@ function void do_initial_checks (bundle *self)
     endif
 
     if (self.type_moving_window == "rolling" || self.type_moving_window=="recursive") \
-      && self.which == "avgfc"
-      
+          && self.which == "avgfc"
+
         printError("Automatic forecast averaging ('avgfc') is\n\
           currently not compatible with moving forecasts.\n\
           Re-specify")
-          self.error = 1
+        self.error = 1
     endif
 end function
 
@@ -338,7 +309,7 @@ function bundle naiveFC (const series y,
         bundle opts = null
     endif
     bundle self = set_bundle(y, which, opts)
-    
+
     do_initial_checks(&self)
     if self.error
         return self
@@ -373,15 +344,15 @@ function bundle naiveFC (const series y,
 end function
 
 function void prepare_result_matrices (bundle *self)
-    /* Prepare for each estimator an 3-D array for holding point 
+/* Prepare for each estimator an 3-D array for holding point
     interval forecast results. */
 
     methods_to_apply(&self)
-    
+
     loop i=1..nelem(self.methods_used) -q
         string method_name = self.methods_used[i]
         matrices self.fc_results_@method_name = array(3)	# hold point- and interval forecasts
-    endloop       
+    endloop
 end function
 
 
@@ -488,7 +459,7 @@ function void drop_missing_values (const series y, bundle *self)
               sequence of forecasts.")
             printError(sprintf("Either reduce the forecast horizon to h=%d\n\
               or add future information for your 'xlist' variables.", tdiff))
-            
+
             self.error = 1
         elif tdiff <= 0
             printError("The 'xlist' variables include no valid future observations\n\
@@ -503,11 +474,11 @@ function void drop_missing_values (const series y, bundle *self)
     endif
 
     smpl y --contiguous
-    self.t1_label = obslabel($t1)
-    self.t2_label = obslabel($t2)
+    string self.t1_label = obslabel($t1)
+    string self.t2_label = obslabel($t2)
     self.T = $nobs		# no. of valid obs before adding obs. for forecasting purpose
 
-    if self.T<self.T_all && !self.verbose
+    if self.T < self.T_all && self.verbose != 0
         printf "\nWarning: The time-series sample has been restricted\n"
         printf "due to %d missing values in series %s.\n", (self.T_all-$nobs), self.name_endo
         printf "Information on the new contiguous set for series %s:\n", , self.name_endo
@@ -535,7 +506,7 @@ end function
 
 function void methods_to_apply (bundle *self)
     /* Obtain names of methods going to apply. */
-    
+
     strings self.methods_used = drop_string_from_array(get_supported_nonseas_methods(), "avgfc")
     if self.is_seas
         strings self.methods_used += get_supported_seas_methods()
@@ -547,7 +518,7 @@ function matrices avg_forecast_and_get_fc_sd (bundle *self)
     forecasts and associated standard errors. */
 
     methods_to_apply(&self)
-    
+
     return do_avgfcs_and_get_fc_sd_array(&self)
 end function
 
@@ -865,8 +836,8 @@ end function
 
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
-                             int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
-                             "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
+      int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
+      "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
       int h[1::10] "Forecast horizon",
       bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */

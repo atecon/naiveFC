@@ -15,7 +15,7 @@ function bundle set_bundle (const series y,
                             bundle opts[null])
     /* Compile self bundle by merging eventual information
     from opts-bundle. */
-    
+
     bundle self = default_values(y)
     self = opts + self			# override defaults
     self.which = tolower(which)
@@ -52,6 +52,20 @@ function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
 end function
 
 
+function scalar is_dynamic_model (const string method)
+    /* Flag dynamic models -- needed for 'fcast' command. */
+    # TODO: untested
+
+    if method == "snaivefc" || method == "snaivedriftfc" || \
+          method == "rwfc" || method == "rwdriftfc" || \
+          method == "ar1fc" || method == "ar1trendfc"
+
+        return 1
+    else
+        return 0
+    endif
+end function
+
 
 function strings gen_column_names (bundle *self)
     /* Construct column names */
@@ -84,9 +98,25 @@ function void print_no_bootstrap_support (void)
 end function
 
 
+function bundle get_train_start_end_obsnums (bundle *self)
+    /* Return obs. numbers for trainings set. */
+
+    bundle ret = null
+    if self.type_moving_window == "static"
+        ret.t1_obsnum = obsnum(self.t1_label)
+        ret.t2_obsnum = obsnum(self.t2_label)
+    else
+        scalar ret.t2_obsnum = $t2 - self.horizon
+        scalar ret.t1_obsnum = 1 + ret.t2_obsnum - self.window_length
+    endif
+
+    return ret
+end function
+
+
 function series get_highest_period_series (void)
     /* Return series holding highest available frequency. */
-    
+
     catch series period = $obsmicro
     if $error
         catch series period = $obsminor
@@ -96,6 +126,47 @@ function series get_highest_period_series (void)
     endif
 
     return period
+end function
+
+
+function list add_intercept_to_list (const string method,
+                                     list xlist)
+    /* Add intercept to list. */
+
+    if method != "rwFC" || method != "rwdriftfc"
+        list xlist += const
+    endif
+
+    return xlist
+end function
+
+
+function list add_ohe_periods_to_list (const string method,
+                                       list xlist)
+    /* Add list of dummyfied frequency components to list. */
+
+    if method == "smeanfc" || method == "smedianfc"
+        series period = get_highest_period_series()
+        xlist += dummify(period)
+    endif
+
+    return xlist
+end function
+
+
+function list add_linear_trend_to_list (bundle *self,
+                                        const string method,
+                                        list xlist)
+    /* Add 'time' to list. */
+
+    if method == "ar1trendfc" && inbundle(self, "with_linear_trend")
+        if self.with_linear_trend			# TODO: Is this necessary
+            genr time
+            xlist += time
+        endif
+    endif
+
+    return xlist
 end function
 
 

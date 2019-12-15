@@ -145,12 +145,145 @@ endif
 
 
 
+nulldata 24 -p
+setobs 1 1 --time-series
+if min(get_highest_period_series()) != 1 && max(get_highest_period_series()) != 24
+    stop
+endif
+
+nulldata 24 -p
+setobs 4 2000:1 --time-series
+if min(get_highest_period_series()) != 1 && max(get_highest_period_series()) != 4
+    stop
+endif
+
+nulldata 24 -p
+setobs 5 2000-01-01 --time-series
+if min(get_highest_period_series()) != 3 && max(get_highest_period_series()) != 31
+    stop
+endif
+
+nulldata 40 -p
+setobs 7 2000-01-01 --time-series
+if min(get_highest_period_series()) != 1 && max(get_highest_period_series()) != 31
+    stop
+endif
+
+nulldata 400 -p
+setobs 12 2000:01 --time-series
+if min(get_highest_period_series()) != 1 && max(get_highest_period_series()) != 12
+    stop
+endif
+
+
+
+nulldata 40 -p
+setobs 7 2000-01-01 --time-series
+list L = null
+if nelem(add_ohe_periods_to_list("smeanfc", L)) != 30 || \
+    nelem(add_ohe_periods_to_list("smedianfc", L)) != 30
+    
+    stop
+endif
+if nelem(add_ohe_periods_to_list("foo", L)) != 0
+    stop
+endif
+
+list L = null
+bundle B = defbundle("with_trend", 1)
+L = add_linear_trend_to_list(&B, "ar1trendfc", L)
+if nelem(L) != 0
+    stop
+endif
+
+list L = null
+bundle B = defbundle("with_linear_trend", 1)
+L = add_linear_trend_to_list(&B, "ar1trendfc", L)
+if nelem(L) != 1
+    stop
+endif
+
+list L = null
+bundle B = defbundle("with_linear_trend", 1)
+L = add_linear_trend_to_list(&B, "foo", L)
+if nelem(L) != 0
+    stop
+endif
+
+
+list L = null
+if nelem(add_intercept_to_list("rwfc", L)) != 1 || \
+  nelem(add_intercept_to_list("rwdriftfc", L)) != 1
+    stop
+endif
+if nelem(add_ohe_periods_to_list ("foo", L)) != 0
+    stop
+endif
+
+
+
+nulldata 40 -p
+setobs 7 2000-01-01 --time-series
+bundle B = null
+string B.t1_label = "2000-01-01"
+string B.t2_label = "2000-01-31"
+scalar B.horizon = 2
+string B.type_moving_window = "static"
+
+bundle Bret = get_train_start_end_obsnums(&B)
+if nelem(Bret) != 2
+    stop
+endif
+if !inbundle(Bret, "t1_obsnum") || !inbundle(Bret, "t2_obsnum")
+    stop
+endif
+if Bret.t1_obsnum != 1 || Bret.t2_obsnum != 31
+    stop
+endif
+
+string B.t1_label = "2000-01-02"
+string B.t2_label = "2000-02-03"
+bundle Bret = get_train_start_end_obsnums(&B)
+if Bret.t1_obsnum != 2 || Bret.t2_obsnum != 34
+    stop
+endif
+
+
+nulldata 7 -p
+setobs 7 2000-01-01 --time-series
+bundle B = null
+scalar B.horizon = 2
+string B.type_moving_window = "rolling"
+scalar B.window_length = 5
+bundle Bret = get_train_start_end_obsnums(&B)
+if nelem(Bret) != 2
+    stop
+endif
+if !inbundle(Bret, "t1_obsnum") || !inbundle(Bret, "t2_obsnum")
+    stop
+endif
+if Bret.t1_obsnum != 1 || Bret.t2_obsnum != 5
+    stop
+endif
+
+scalar B.window_length = 8
+bundle Bret = get_train_start_end_obsnums(&B)
+if Bret.t1_obsnum != -2 || Bret.t2_obsnum != 5
+    stop
+endif
+
+
+
+
 
 print "passed"
 stop
 
 
 
+eval $obsmajor
+eval $obsminor
+eval $obsmicro
 
 # do_naive_forecasting
 # drop_missing_values
