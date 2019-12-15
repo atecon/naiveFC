@@ -243,6 +243,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
         fcast ($t2+1) ($t2+self.horizon) @fcast_arg --quiet
     endif
 
+    *** HIER WEITERMACHEN
     if self.type_moving_window == "static"
         gen_t1_forecast_date($t2, &self)			# adds to self
         gen_t2_forecast_date($t2, &self)			# adds to self
