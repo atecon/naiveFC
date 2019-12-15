@@ -143,7 +143,8 @@ end function
 
 
 function void get_static_forecasts (bundle *self)
-    /* This function is called by naiveFC() and for 'static' forecasts only. */
+    /* Estimate model 'static' and compute interval h-multistep forecast,
+    store results. */
 
     matrices fc_and_sd = call_method(&self)
     bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &self)
@@ -167,6 +168,19 @@ function matrices call_method (bundle *self)
 end function
 
 
+function list add_ohe_periods_to_list (const string method,
+                                     list xlist)
+    /* Add list of dummyfied frequency components to list. */
+
+    if method == "smeanfc" || method == "smedianfc"
+        series period = get_highest_period_series(method)
+        xlist += dummify(period)
+    endif
+
+    return xlist
+end function
+
+
 function matrix forecast_and_get_fc_sd (bundle *self, const string method)
     /* Compute point forecast and forecast standard errors. */
 
@@ -174,7 +188,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
     list xlist = null
 
     if method=="smeanFC" || method=="smedianFC"
-        series period = get_period_series(method)
+        series period = get_highest_period_series(method)
         xlist += dummify(period)
     endif
 
@@ -380,9 +394,9 @@ function void do_naive_forecasting (bundle *self)
     if self.type_moving_window == "static"
         get_static_forecasts(&self)
     else
-        catch include CvDataSplitter.gfn		# load another external package
+        catch include CvDataSplitter.gfn		# load external package # FIXME: define dependency spec-file
         if !$error
-            printf "\nInfo: Necessary package 'CvDataSplitter' succesfully loaded.\n"
+            printInfo("Necessary package 'CvDataSplitter' succesfully loaded.")
         endif
         get_moving_window_forecasts(&self)
     endif
@@ -573,7 +587,8 @@ function void get_moving_window_forecasts (bundle *self)
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
     CvDataSplitter(&cv)
-
+    cv
+    stop
     # As CvDataSplitter() doesn't consider the very last obs in
     # the final training set for 'rolwin' and 'recwin', this must be added.
     cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})

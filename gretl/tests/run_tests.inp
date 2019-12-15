@@ -152,7 +152,7 @@ stop
 
 
 
-
+# do_naive_forecasting
 # drop_missing_values
 # nobs_to_add_to_dataset
 # summarize_naive_fc_results

@@ -84,10 +84,15 @@ function void print_no_bootstrap_support (void)
 end function
 
 
-function series get_period_series (const string method)
+function series get_highest_period_series (void)
+    /* Return series holding highest available frequency. */
+    
     catch series period = $obsmicro
     if $error
-        series period = $obsminor
+        catch series period = $obsminor
+        if $error
+            series period = $obsmajor
+        endif
     endif
 
     return period
