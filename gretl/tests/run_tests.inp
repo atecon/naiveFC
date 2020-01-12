@@ -75,88 +75,86 @@ assert_equal_str(S[1], "1982-08-02")
 assert_equal_str(S[2], "1982-08-03")
 
 
+function void test_set_bundle (const series djclose)
+    print "Start with set_bundle()"
+    
+    bundle Bret = set_bundle(djclose, "avg", \
+      defbundle("horizon", 7, "level", \
+      0.05, "type_moving_window", "rolling"))
+      
+    assert_equal_num(Bret.horizon, 7)
+    assert_equal_num(Bret.level, 0.05)
+    assert_equal_str(Bret.type_moving_window, "rolling")
+    assert_equal_str(Bret.name_endo, "djclose")
+end function
 
-strings Sin = defarray("A", "B", "C")
-strings S = drop_string_from_array(Sin, "A")
-if nelem(S) != 2
-    stop
-endif
-if S[1] != "B" && S[3] != "C"
-    stop
-endif
+
+function void test_get_supported_ns_methods (void)
+    print "Start with get_supported_nonseas_methods()"
+
+    strings S = get_supported_nonseas_methods()
+    assert_equal_num(nelem(S), 7)
+
+    assert_equal_str(S[1], "meanfc")
+    assert_equal_str(S[2], "medianfc")
+    assert_equal_str(S[3], "rwfc")
+    assert_equal_str(S[4], "rwdriftfc")
+    assert_equal_str(S[5], "ar1fc")
+    assert_equal_str(S[6], "ar1trendfc")
+    assert_equal_str(S[7], "avgfc")
+end function
+
+
+function void test_get_supported_seas_methods (void)
+    print "Start with get_supported_seas_methods()"
+
+    strings S = get_supported_seas_methods()
+    
+    assert_equal_str(S[1], "smeanfc")
+    assert_equal_str(S[2], "smedianfc")
+    assert_equal_str(S[3], "snaivefc")
+    assert_equal_str(S[4], "snaivedriftfc")
+end function
+
+
+function void test_methods_to_apply (void)
+    print "Start with methods_to_apply()"
+
+    bundle B = defbundle("is_seas", 0)
+    methods_to_apply(&B)
+    assert_equal_num(nelem(B.methods_used), 6)
+
+    bundle B = defbundle("is_seas", 1)
+    methods_to_apply(&B)
+    assert_equal_num(nelem(B.methods_used), 10)
+end function
+
+
+function void test_prepare_result_matrices (void)
+    print "Start with prepare_result_matrices()"
+
+    bundle B = defbundle("is_seas", 0)
+    prepare_result_matrices(&B)
+    assert_equal_num(nelem(B), 8)
+    assert_equal_num(nelem(B.fc_results_medianfc), 3)
+
+
+    bundle B = defbundle("is_seas", 1)
+    prepare_result_matrices(&B)
+    assert_equal_num(nelem(B), 12)
+    assert_equal_num(nelem(B.fc_results_snaivefc), 3)
+end function
 
 test_fc_interval_width()
 test_gen_column_names()
 test_array_of_horizon_labels()
+test_set_bundle(djclose)
+test_get_supported_ns_methods()
+test_get_supported_seas_methods()
+test_methods_to_apply()
+test_prepare_result_matrices()
 print "huhu"
 stop
-
-
-
-bundle Bret = set_bundle(djclose, "avg", defbundle("horizon", 7, "level", \
-  0.05, "type_moving_window", "rolling"))
-if Bret.horizon != 7 || Bret.level != 0.05 || Bret.type_moving_window != "rolling" || \
-      Bret.name_endo != "djclose"
-    stop
-endif
-
-
-if nelem(get_supported_nonseas_methods()) != 7
-    stop
-endif
-if get_supported_nonseas_methods()[1] != "meanfc" || \
-      get_supported_nonseas_methods()[2] != "medianfc" || \
-      get_supported_nonseas_methods()[3] != "rwfc" || \
-      get_supported_nonseas_methods()[4] != "rwdriftfc" || \
-      get_supported_nonseas_methods()[5] != "ar1fc" || \
-      get_supported_nonseas_methods()[6] != "ar1trendfc" || \
-      get_supported_nonseas_methods()[7] != "avgfc"
-
-    stop
-endif
-
-
-if get_supported_seas_methods()[1] != "smeanfc" || \
-      get_supported_seas_methods()[2] != "smedianfc" || \
-      get_supported_seas_methods()[3] != "snaivefc" || \
-      get_supported_seas_methods()[4] != "snaivedriftfc"
-
-    stop
-endif
-
-
-bundle B = defbundle("is_seas", 0)
-methods_to_apply(&B)
-if nelem(B.methods_used) != 6
-    stop
-endif
-
-bundle B = defbundle("is_seas", 1)
-methods_to_apply(&B)
-if nelem(B.methods_used) != 10
-    stop
-endif
-
-
-
-bundle B = defbundle("is_seas", 0)
-prepare_result_matrices(&B)
-if nelem(B) != 8
-    stop
-endif
-if nelem(B.fc_results_medianfc) != 3
-    stop
-endif
-
-bundle B = defbundle("is_seas", 1)
-prepare_result_matrices(&B)
-if nelem(B) != 12
-    stop
-endif
-if nelem(B.fc_results_snaivefc) != 3
-    stop
-endif
-
 
 
 nulldata 24 -p
