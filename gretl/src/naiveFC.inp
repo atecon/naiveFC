@@ -243,7 +243,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
         fcast ($t2+1) ($t2+self.horizon) @fcast_arg --quiet
     endif
 
-    *** HIER WEITERMACHEN
+#    *** HIER WEITERMACHEN
     if self.type_moving_window == "static"
         gen_t1_forecast_date($t2, &self)			# adds to self
         gen_t2_forecast_date($t2, &self)			# adds to self
@@ -508,7 +508,7 @@ end function
 function void methods_to_apply (bundle *self)
     /* Obtain names of methods going to apply. */
 
-    strings self.methods_used = drop_string_from_array(get_supported_nonseas_methods(), "avgfc")
+    strings self.methods_used = strdrop(get_supported_nonseas_methods(), "avgfc")
     if self.is_seas
         strings self.methods_used += get_supported_seas_methods()
     endif

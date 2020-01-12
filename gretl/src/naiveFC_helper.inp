@@ -182,36 +182,6 @@ function void gen_t2_forecast_date (const int t2, bundle *self)
 end function
 
 
-# TODO: Will be part of extra.gfn in v0.51
-function matrix strpos (const strings S "Array of strings",
-                        const string str "String being searched for in S",
-                        const bool print_warnings[1] "Print eventual warnings")
-    # Returns the positional entries of string in S in a column vector
-    # if S contains string, 0 otherwise.
-
-    if nelem(S) == 0
-        if print_warnings
-            printf "Warning: String array '%s' is empty.\n", argname(S)
-        endif
-        return {0}
-    endif
-
-    matrix ret = {}
-    loop i=1..nelem(S) -q
-        if S[i] == str
-            ret |= $i
-        endif
-    endloop
-
-    if rows(ret) > 0
-        return ret
-    else
-        return {0}
-    endif
-end function
-
-
-
 function scalar nobs_to_add_to_dataset (const list y, bundle *self)
     /* Determine the number of additional observations to add to the dataset. */
 
@@ -219,20 +189,6 @@ function scalar nobs_to_add_to_dataset (const list y, bundle *self)
     t2_new = $t2				# don't consider eventual missings in the data passed to naiveFC()
 
     return self.horizon - ($tmax-t2_new)
-end function
-
-
-function strings drop_string_from_array (const strings S, const string drop_str)
-    /* Drop a specific string from string array. String may occur multiple times. */
-
-    strings ret = null
-    loop i=1..nelem(S) -q
-        if S[i] != drop_str
-            ret += S[i]
-        endif
-    endloop
-
-    return ret
 end function
 
 
