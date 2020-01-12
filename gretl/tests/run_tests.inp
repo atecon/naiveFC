@@ -1,10 +1,8 @@
 set verbose off
 clear
 
-string WD = "/home/at/git/naiveFC/gretl"
-string FILENAME = "foo.csv"		# dummy file
+#string FILENAME = "foo.csv"		# dummy file
 
-set workdir @WD
 include "./src/naiveFC.inp" --force
 include "./src/naiveFC_helper.inp" --force
 
@@ -288,13 +286,6 @@ assert_equal_num(Bret.t2_obsnum, 5)
 
 
 printf "\nInfo: All tests passed.\n"
-stop
-
-
-
-eval $obsmajor
-eval $obsminor
-eval $obsmicro
 
 # do_naive_forecasting
 # drop_missing_values
@@ -308,8 +299,5 @@ eval $obsmicro
    B
    eval B.fc_point_avg
 */
-
-
-printf "\nInfo: All tests passed.\n"
 
 
