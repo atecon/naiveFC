@@ -443,12 +443,21 @@ function void summarize_naive_fc_results (bundle *self)
 end function
 
 
-#function void check_sample_validity (const series y, bundle *self)
-    
+function void check_sample_validity (const series y, bundle *self)
+    if smplspan(self.t1_label, self.t2_label) < self.window_length
+#    if $nobs < self.window_length
+        printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
+          number of valid observations.\n", self.window_length
+        funcerr "Re-specify."
+    endif
+end function    
+
+*** HIER WEITERMACHEN ***
 
 function void valid_sample_and_obs_details (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
+    # FIXME: put 1st part to check_sample_validity()
     if inbundle(self, "xlist")
         list xlist = self.xlist
     else
