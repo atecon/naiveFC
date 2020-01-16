@@ -16,6 +16,10 @@ function bundle set_bundle (const series y,
     /* Compile self bundle by merging eventual information
     from opts-bundle. */
 
+    if !exists(opts)
+        bundle opts = null
+    endif
+
     bundle self = default_values(y)
     self = opts + self			# override defaults
     self.which = tolower(which)
