@@ -182,7 +182,7 @@ function void gen_t2_forecast_date (const int t2, bundle *self)
 end function
 
 
-function scalar nobs_to_add_to_dataset (const list y, bundle *self)
+function scalar nobs_to_add_to_dataset (const list y)
     /* Determine the number of additional observations to add to the dataset. */
 
     smpl y --contiguous

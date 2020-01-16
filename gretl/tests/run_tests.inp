@@ -3,12 +3,13 @@ clear
 
 #string FILENAME = "foo.csv"		# dummy file
 
-include "./src/naiveFC.inp" --force
-include "./src/naiveFC_helper.inp" --force
+string dir = "/home/ninja/repo/naiveFC/gretl"
+
+include "@dir/src/naiveFC.inp" --force
+include "@dir/src/naiveFC_helper.inp" --force
 
 include string_utils.gfn
 include assertion.gfn
-
 
 
 function void test_fc_interval_width (void)
@@ -50,36 +51,56 @@ function void test_array_of_horizon_labels (void)
 end function
 
 
-print "Start with get_dates_forecasted()"
 # NOTE: 'open' cannot be used inside functions
 open denmark.gdt -q -p
-strings S = get_dates_forecasted("1980:1", 2)
-assert_equal_str(S[1], "1980:2")
-assert_equal_str(S[2], "1980:3")
+function void test_get_dates_forecasted_q (void)
+    print "Start with get_dates_forecasted() quarterly"
+
+    strings S = get_dates_forecasted("1980:1", 2)
+    assert_equal_str(S[1], "1980:2")
+    assert_equal_str(S[2], "1980:3")
+end function
+test_get_dates_forecasted_q()
 
 open hendry_jae.gdt -q -p
-strings S = get_dates_forecasted("1899", 2)
-assert_equal_str(S[1], "1900")
-assert_equal_str(S[2], "1901")
+function void test_get_dates_forecasted_a (void)
+    print "Start with get_dates_forecasted() annual"
+
+    strings S = get_dates_forecasted("1899", 2)
+    assert_equal_str(S[1], "1900")
+    assert_equal_str(S[2], "1901")
+end function
+test_get_dates_forecasted_a()
 
 open hamilton.gdt -q -p
-strings S = get_dates_forecasted("1982:07", 2)
-assert_equal_str(S[1], "1982:08")
-assert_equal_str(S[2], "1982:09")
+function void test_get_dates_forecasted_m (void)
+    print "Start with get_dates_forecasted() monthly"
+
+    strings S = get_dates_forecasted("1982:07", 2)
+    assert_equal_str(S[1], "1982:08")
+    assert_equal_str(S[2], "1982:09")
+end function
+test_get_dates_forecasted_m()
+
 
 open djclose.gdt -q -p
-strings S = get_dates_forecasted("1982-07-30", 2)
-assert_equal_str(S[1], "1982-08-02")
-assert_equal_str(S[2], "1982-08-03")
+function void test_get_dates_forecasted_d (void)
+    print "Start with get_dates_forecasted() daily"
+
+    strings S = get_dates_forecasted("1982-07-30", 2)
+    assert_equal_str(S[1], "1982-08-02")
+    assert_equal_str(S[2], "1982-08-03")
+end function
+test_get_dates_forecasted_d()
 
 
 function void test_set_bundle (const series djclose)
     print "Start with set_bundle()"
-    
+
     bundle Bret = set_bundle(djclose, "avg", \
       defbundle("horizon", 7, "level", \
       0.05, "type_moving_window", "rolling"))
-      
+
     assert_equal_num(Bret.horizon, 7)
     assert_equal_num(Bret.level, 0.05)
     assert_equal_str(Bret.type_moving_window, "rolling")
@@ -107,7 +128,7 @@ function void test_get_supported_seas_methods (void)
     print "Start with get_supported_seas_methods()"
 
     strings S = get_supported_seas_methods()
-    
+
     assert_equal_str(S[1], "smeanfc")
     assert_equal_str(S[2], "smedianfc")
     assert_equal_str(S[3], "snaivefc")
@@ -154,64 +175,89 @@ test_methods_to_apply()
 test_prepare_result_matrices()
 
 
-print "Start with get_highest_period_series()"
-nulldata 24 -p    
-
+nulldata 24 -p
 setobs 1 1 --time-series
-series ser = get_highest_period_series()
-assert_equal_num(min(ser), 1)
-assert_equal_num(max(ser), 24)
+function void test_get_highest_pd_series_a (void)
+    print "Start with get_highest_period_series() annual"
+
+    series ser = get_highest_period_series()
+    assert_equal_num(min(ser), 1)
+    assert_equal_num(max(ser), 24)
+end function
+test_get_highest_pd_series_a()
 
 setobs 4 2000:1 --time-series
-series ser = get_highest_period_series()
-assert_equal_num(min(ser), 1)
-assert_equal_num(max(ser), 4)
+function void test_get_highest_pd_series_q (void)
+    print "Start with get_highest_period_series() quarterly"
+
+    series ser = get_highest_period_series()
+    assert_equal_num(min(ser), 1)
+    assert_equal_num(max(ser), 4)
+end function
+test_get_highest_pd_series_q()
 
 setobs 5 2000-01-01 --time-series
-series ser = get_highest_period_series()
-assert_equal_num(ser[1], 3)
-assert_equal_num(min(ser), 1)
-assert_equal_num(max(ser), 31)
+function void test_get_highest_pd_series_bd (void)
+    print "Start with get_highest_period_series() bdaily"
+
+    series ser = get_highest_period_series()
+    assert_equal_num(ser[1], 3)
+    assert_equal_num(min(ser), 1)
+    assert_equal_num(max(ser), 31)
+end function
+test_get_highest_pd_series_bd()
 
 nulldata 40 -p
 setobs 7 2000-01-01 --time-series
-series ser = get_highest_period_series()
-assert_equal_num(min(ser), 1)
-assert_equal_num(max(ser), 31)
+function void test_get_highest_pd_series_d (void)
+    print "Start with get_highest_period_series() daily"
+
+    series ser = get_highest_period_series()
+    assert_equal_num(min(ser), 1)
+    assert_equal_num(max(ser), 31)
+end function
+test_get_highest_pd_series_d()
+
 
 nulldata 400 -p
 setobs 12 2000:01 --time-series
-series ser = get_highest_period_series()
-assert_equal_num(min(ser), 1)
-assert_equal_num(max(ser), 12)
+function void test_get_highest_pd_series_m (void)
+    print "Start with get_highest_period_series() monthly"
+    series ser = get_highest_period_series()
+    assert_equal_num(min(ser), 1)
+    assert_equal_num(max(ser), 12)
+end function
+test_get_highest_pd_series_m()
 
 
 print "Start with add_ohe_periods_to_list()"
 nulldata 40 -p
 setobs 7 2000-01-01 --time-series
-list L = null
+function void test_add_ohe_periods_to_list (void)
+    print "Start with add_ohe_periods_to_list()"
 
-list Lout = add_ohe_periods_to_list("smeanfc", L)
-assert_equal_num(nelem(Lout), 30)
-list Lout = add_ohe_periods_to_list("smedianfc", L)
-assert_equal_num(nelem(Lout), 30)
-list Lout = add_ohe_periods_to_list("foo", L)
-assert_false(nelem(Lout))
-
+    list L = null
+    list Lout = add_ohe_periods_to_list("smeanfc", L)
+    assert_equal_num(nelem(Lout), 30)
+    list Lout = add_ohe_periods_to_list("smedianfc", L)
+    assert_equal_num(nelem(Lout), 30)
+    list Lout = add_ohe_periods_to_list("foo", L)
+    assert_false(nelem(Lout))
+end function
 
 function void test_add_linear_trend_to_list (void)
     print "Start with add_linear_trend_to_list()"
 
-    list Lout = null    
+    list Lout = null
     bundle B = defbundle("with_trend", 1)
     list Lout = add_linear_trend_to_list(&B, "ar1trendfc", Lout)
     assert_false(nelem(Lout))
-    
+
     list Lout = null
     bundle B = defbundle("with_linear_trend", 1)
     list Lout = add_linear_trend_to_list(&B, "ar1trendfc", Lout)
     assert_equal_num(nelem(Lout), 1)
-    
+
     list Lout = null
     bundle B = defbundle("with_linear_trend", 1)
     Lout = add_linear_trend_to_list(&B, "foo", Lout)
@@ -225,64 +271,73 @@ function void test_add_intercept_to_list (void)
     list L = null
     L = add_intercept_to_list("rwfc", L)
     assert_equal_num(nelem(L), 1)
-    
+
     list L = null
     L = add_intercept_to_list("rwdriftfc", L)
     assert_equal_num(nelem(L), 1)
-    
+
     list L = null
     L = add_intercept_to_list("foo", L)
     assert_equal_num(nelem(L), 1)
 end function
 
+test_add_ohe_periods_to_list()
 test_add_linear_trend_to_list()
 test_add_intercept_to_list()
 
 
-print "Start with get_train_start_end_obsnums()"
 nulldata 40 -p
 setobs 7 2000-01-01 --time-series
-bundle B = null
-string B.t1_label = "2000-01-01"
-string B.t2_label = "2000-01-31"
-scalar B.horizon = 2
-string B.type_moving_window = "static"
+function void test_get_train_start_end_obs_d (void)
+    print "Start with get_train_start_end_obsnums() daily"
 
-bundle Bret = get_train_start_end_obsnums(&B)
+    bundle B = null
+    string B.t1_label = "2000-01-01"
+    string B.t2_label = "2000-01-31"
+    scalar B.horizon = 2
+    string B.type_moving_window = "static"
 
-assert_equal_num(nelem(Bret), 2)
-assert_true(inbundle(Bret, "t1_obsnum"))
-assert_true(inbundle(Bret, "t2_obsnum"))
-assert_equal_num(Bret.t1_obsnum, 1)
-assert_equal_num(Bret.t2_obsnum, 31)
+    bundle Bret = get_train_start_end_obsnums(&B)
 
-string B.t1_label = "2000-01-02"
-string B.t2_label = "2000-02-03"
-bundle Bret = get_train_start_end_obsnums(&B)
-assert_equal_num(Bret.t1_obsnum, 2)
-assert_equal_num(Bret.t2_obsnum, 34)
+    assert_equal_num(nelem(Bret), 2)
+    assert_true(inbundle(Bret, "t1_obsnum"))
+    assert_true(inbundle(Bret, "t2_obsnum"))
+    assert_equal_num(Bret.t1_obsnum, 1)
+    assert_equal_num(Bret.t2_obsnum, 31)
+
+    string B.t1_label = "2000-01-02"
+    string B.t2_label = "2000-02-03"
+    bundle Bret = get_train_start_end_obsnums(&B)
+    assert_equal_num(Bret.t1_obsnum, 2)
+    assert_equal_num(Bret.t2_obsnum, 34)
+end function
+test_get_train_start_end_obs_d()
 
 
 nulldata 7 -p
 setobs 7 2000-01-01 --time-series
-bundle B = null
-scalar B.horizon = 2
-string B.type_moving_window = "rolling"
-scalar B.window_length = 5
+function void test_get_train_start_end_obs_dd (void)
+    print "Start with get_train_start_end_obsnums() daily"
 
-bundle Bret = get_train_start_end_obsnums(&B)
+    bundle B = null
+    scalar B.horizon = 2
+    string B.type_moving_window = "rolling"
+    scalar B.window_length = 5
 
-assert_equal_num(nelem(Bret), 2)
-assert_true(inbundle(Bret, "t1_obsnum"))
-assert_true(inbundle(Bret, "t2_obsnum"))
-assert_equal_num(Bret.t1_obsnum, 1)
-assert_equal_num(Bret.t2_obsnum, 5)
+    bundle Bret = get_train_start_end_obsnums(&B)
 
-scalar B.window_length = 8
-bundle Bret = get_train_start_end_obsnums(&B)
-assert_equal_num(Bret.t1_obsnum, -2)
-assert_equal_num(Bret.t2_obsnum, 5)
+    assert_equal_num(nelem(Bret), 2)
+    assert_true(inbundle(Bret, "t1_obsnum"))
+    assert_true(inbundle(Bret, "t2_obsnum"))
+    assert_equal_num(Bret.t1_obsnum, 1)
+    assert_equal_num(Bret.t2_obsnum, 5)
 
+    scalar B.window_length = 8
+    bundle Bret = get_train_start_end_obsnums(&B)
+    assert_equal_num(Bret.t1_obsnum, -2)
+    assert_equal_num(Bret.t2_obsnum, 5)
+end function
+test_get_train_start_end_obs_dd()
 
 
 printf "\nInfo: All tests passed.\n"
