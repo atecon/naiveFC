@@ -318,15 +318,16 @@ function bundle naiveFC (const series y,
     endif
 
     # Drop missings + determine number of valid observations
-    drop_missing_values(y, &self)
+    contiguous_data_set(y, &self)
 
     # Add obs for forecasting
     self.obs_added = nobs_to_add_to_dataset(y, self.horizon)
-    if self.obs_added > 0
+    if self.obs_added
         dataset addobs self.obs_added
-        printInfo(sprintf("Added %d additional observations at the sample end.", self.obs_added))
+        series self.y = misszero(y)		# new obs are set as NA
+        printInfo(sprintf("Added %d additional observations at the sample end.", \
+          self.obs_added))
     endif
-    series self.y = misszero(y)		# update as additional observations were attached
 
     do_naive_forecasting(&self)
 
@@ -438,7 +439,7 @@ function void summarize_naive_fc_results (bundle *self)
 end function
 
 
-function void drop_missing_values (const series y, bundle *self)
+function void contiguous_data_set (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
     self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
