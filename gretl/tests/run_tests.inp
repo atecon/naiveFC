@@ -10,6 +10,21 @@ include string_utils.gfn
 include assertion.gfn
 
 
+function void test_prepare_forecast_bundles (void)
+    print "Start with prepare_forecast_bundles()"
+    
+    bundle b = defbundle("is_seas", 1)
+    methods_to_apply(&b)
+    prepare_forecast_bundles(&b)
+    bundle fc = b.forecast_results
+    bundle fc1 = fc.snaivefc
+    
+    assert_true(inbundle(fc,   snaivefc))
+    assert_equal_num(nelem(fc), 10)
+    assert_equal_num(nelem(fc1), 3)
+end function
+
+
 function void test_fc_interval_width (void)
     print "Start with fc_interval_width()"
 
@@ -153,22 +168,21 @@ function void test_methods_to_apply (void)
 end function
 
 
-function void test_prepare_result_matrices (void)
+function void test_prepare_forecast_bundles (void)
     print "Start with prepare_result_matrices()"
 
-    bundle B = defbundle("is_seas", 0)
-    prepare_result_matrices(&B)
-    assert_equal_num(nelem(B), 8)
-    assert_equal_num(nelem(B.fc_results_medianfc), 3)
+    bundle B = defbundle("is_seas", 0, \
+      "methods_used", get_supported_nonseas_methods())
+      prepare_forecast_bundles(&B)
 
-
-    bundle B = defbundle("is_seas", 1)
-    prepare_result_matrices(&B)
-    assert_equal_num(nelem(B), 12)
-    assert_equal_num(nelem(B.fc_results_snaivefc), 3)
+    assert_equal_num(nelem(B), 3)
+    assert_equal_num(nelem(B.forecast_results), 7)
+    assert_equal_num(nelem(B.forecast_results.rwfc), 3)
 end function
 
+
 # As 'nulldata' command is applied below, we call some tests already here
+test_prepare_forecast_bundles()
 test_fc_interval_width()
 test_gen_column_names()
 test_array_of_horizon_labels()
@@ -176,7 +190,6 @@ test_set_bundle(djclose)
 test_get_supported_ns_methods()
 test_get_supported_seas_methods()
 test_methods_to_apply()
-test_prepare_result_matrices()
 
 
 nulldata 24 -p
@@ -411,8 +424,6 @@ function void test_diff_t2_of_y_and_x (void)
     assert_equal_num(s, 0)
 end function
 test_diff_t2_of_y_and_x()
-
-
 
 
 printf "\nInfo: All tests passed.\n"

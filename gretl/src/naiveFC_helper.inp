@@ -1,5 +1,16 @@
-function bundle obslabels_and_nobs_to_bundle (const series y,
-                                              bundle *self)
+function void methods_to_apply (bundle *self)
+    /* Obtain names of methods going to apply. */
+
+    strings self.methods_used = strdrop(get_supported_nonseas_methods(), "avgfc")
+    if self.is_seas
+        self.methods_used += get_supported_seas_methods()
+    endif
+end function
+
+
+
+function void obslabels_and_nobs_to_bundle (const list y,
+                                            bundle *self)
     smpl y --contiguous
     string self.t1_label = obslabel($t1)
     string self.t2_label = obslabel($t2)
@@ -7,17 +18,21 @@ function bundle obslabels_and_nobs_to_bundle (const series y,
 end function
 
 
-function scalar diff_t2_of_y_and_x (const series y, const list x)
+function scalar diff_t2_of_y_and_x (const series y, const list xlist)
     /* Compute difference of valid obs in y and x. */
 
     scalar tdiff = NA
 
-    if nelem(x)
-        smpl y --contiguous
-        scalar t2_y = $t2
-        smpl full
-        smpl x --contiguous
-        scalar t2_x = $t2
+    if nelem(xlist)
+        bundle b = null
+        list L = y
+        obslabels_and_nobs_to_bundle(L, &b)
+        scalar t2_y = obsnum(b.t2_label)
+        
+        bundle b = null
+        obslabels_and_nobs_to_bundle(xlist, &b)
+        scalar t2_x = obsnum(b.t2_label)
+
         scalar tdiff = t2_x - t2_y
     endif
 

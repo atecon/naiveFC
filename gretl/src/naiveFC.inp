@@ -259,7 +259,6 @@ end function
 
 
 
-# TODO: untested
 # TODO: put checks into separate functions
 function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
@@ -315,10 +314,16 @@ function bundle naiveFC (const series y,
     do_initial_checks(&self)
     if self.error
         return self
+    else
+        catch include CvDataSplitter.gfn
+        if !$error
+            printInfo("Necessary package 'CvDataSplitter' succesfully loaded.")
+        endif
     endif
 
     # Drop missings + determine number of valid observations
-    contiguous_data_set(y, &self)
+    valid_sample_and_obs_details(y, &self)
+
 
     # Add obs for forecasting
     self.obs_added = nobs_to_add_to_dataset(y, self.horizon)
@@ -329,6 +334,7 @@ function bundle naiveFC (const series y,
           self.obs_added))
     endif
 
+    methods_to_apply(&self)
     do_naive_forecasting(&self)
 
     if self.verbose
@@ -346,15 +352,17 @@ function bundle naiveFC (const series y,
     return self
 end function
 
-function void prepare_result_matrices (bundle *self)
-/* Prepare for each estimator an 3-D array for holding point
-    interval forecast results. */
 
-    methods_to_apply(&self)
+function void prepare_forecast_bundles (bundle *self)
+/* Prepare for each estimator a dictionary for point
+    interval forecast results to be stored in matrices. */
+
+    bundle self.forecast_results = null
 
     loop i=1..nelem(self.methods_used) -q
         string method_name = self.methods_used[i]
-        matrices self.fc_results_@method_name = array(3)	# hold point- and interval forecasts
+        bundle self.forecast_results[self.methods_used[i]] \
+          = defbundle("point_fc", {}, "lower_fc", {}, "upper_fc", {})
     endloop
 end function
 
@@ -363,15 +371,11 @@ function void do_naive_forecasting (bundle *self)
 /* Wrapper function actually calling static or
     moving-window procedures. */
 
-    prepare_result_matrices(&self)
+    prepare_forecast_bundles(&self)
 
     if self.type_moving_window == "static"
         get_static_forecasts(&self)
     else
-        catch include CvDataSplitter.gfn		# load external package # FIXME: define dependency spec-file
-        if !$error
-            printInfo("Necessary package 'CvDataSplitter' succesfully loaded.")
-        endif
         get_moving_window_forecasts(&self)
     endif
 
@@ -439,16 +443,21 @@ function void summarize_naive_fc_results (bundle *self)
 end function
 
 
-function void contiguous_data_set (const series y, bundle *self)
+#function void check_sample_validity (const series y, bundle *self)
+    
+
+function void valid_sample_and_obs_details (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
-    self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
-
+    if inbundle(self, "xlist")
+        list xlist = self.xlist
+    else
+        list xlist = null
+    endif
+    self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings    
     scalar tdiff = diff_t2_of_y_and_x(y, xlist)
 
     if ok(tdiff)
-        list xlist = self.xlist
-        
         if tdiff > && (tdiff < self.horizon)
             printError(sprintf("The last valid observation of series %s is %s.", \
               self.name_endo, obslabel(t2_y)))
@@ -502,20 +511,9 @@ function matrices do_avgfcs_and_get_fc_sd_array (bundle *self)
 end function
 
 
-function void methods_to_apply (bundle *self)
-    /* Obtain names of methods going to apply. */
-
-    strings self.methods_used = strdrop(get_supported_nonseas_methods(), "avgfc")
-    if self.is_seas
-        strings self.methods_used += get_supported_seas_methods()
-    endif
-end function
-
 function matrices avg_forecast_and_get_fc_sd (bundle *self)
 /* Compute forecasts using different methods supported, and return array of point
     forecasts and associated standard errors. */
-
-    methods_to_apply(&self)
 
     return do_avgfcs_and_get_fc_sd_array(&self)
 end function
@@ -543,6 +541,7 @@ function void get_moving_window_forecasts (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores sequences of interval forecasts. */
 
+    # TODO: to initial checks??
     if $nobs < self.window_length
         printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
           number of valid observations.\n", self.window_length
