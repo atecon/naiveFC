@@ -1,3 +1,12 @@
+function bundle obslabels_and_nobs_to_bundle (const series y,
+                                              bundle *self)
+    smpl y --contiguous
+    string self.t1_label = obslabel($t1)
+    string self.t2_label = obslabel($t2)
+    scalar self.T = $nobs
+end function
+
+
 function scalar diff_t2_of_y_and_x (const series y, const list x)
     /* Compute difference of valid obs in y and x. */
 
@@ -27,6 +36,7 @@ end function
 function void printError (const string s)
     printf "\nError: %s\n", s
 end function
+
 
 function bundle set_bundle (const series y,
                             string which,

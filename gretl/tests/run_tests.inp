@@ -415,7 +415,6 @@ test_diff_t2_of_y_and_x()
 
 
 
-
 printf "\nInfo: All tests passed.\n"
 
 # do_naive_forecasting

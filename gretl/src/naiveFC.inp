@@ -448,7 +448,7 @@ function void drop_missing_values (const series y, bundle *self)
     if ok(tdiff)
         list xlist = self.xlist
         
-        if tdiff > 0 && tdiff < self.horizon
+        if tdiff > && (tdiff < self.horizon)
             printError(sprintf("The last valid observation of series %s is %s.", \
               self.name_endo, obslabel(t2_y)))
             printError(sprintf("You requested a %d-step ahead sequence of forecasts.", \
@@ -473,18 +473,15 @@ function void drop_missing_values (const series y, bundle *self)
         smpl full
     endif
 
-    smpl y --contiguous
-    string self.t1_label = obslabel($t1)
-    string self.t2_label = obslabel($t2)
-    self.T = $nobs		# no. of valid obs before adding obs. for forecasting purpose
+    obslabels_and_nobs_to_bundle(y, &self)	# no. of valid obs before adding obs. for forecasting purpose
 
-    if self.T < self.T_all && self.verbose
-        printf "\nWarning: The time-series sample has been restricted\n"
-        printf "due to %d missing values in series %s.\n", (self.T_all-$nobs), self.name_endo
-        printf "Information on the new contiguous set for series %s:\n", , self.name_endo
-        printf "Start date: %s\n", obslabel($t1)
-        printf "End date: %s\n", obslabel($t2)
-        printf "\n"
+    if (self.T < self.T_all) && self.verbose
+        printWarning(sprintf("The time-series sample has been restricted\n\
+        due to %d missing values in series %s.", (self.T_all-self.T), self.name_endo))
+        printWarning(sprintf("Information on the new contiguous \n\
+          set for series '%s':\n\
+          Start date: %s\n\
+          End date: %s", self.name_endo, self.t1_label, self.t2_label))
     endif
 end function
 
