@@ -182,13 +182,11 @@ function void gen_t2_forecast_date (const int t2, bundle *self)
 end function
 
 
-function scalar nobs_to_add_to_dataset (const list y)
+function scalar nobs_to_add_to_dataset (const list y, const scalar horizon "maximal forecast horizon")
     /* Determine the number of additional observations to add to the dataset. */
 
-    smpl y --contiguous
-    t2_new = $t2				# don't consider eventual missings in the data passed to naiveFC()
-
-    return self.horizon - ($tmax-t2_new)
+    smpl y --contiguous		# don't consider eventual missings in the data passed to naiveFC()
+    return horizon - ($tmax - $t2)
 end function
 
 

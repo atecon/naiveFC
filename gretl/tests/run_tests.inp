@@ -340,6 +340,40 @@ end function
 test_get_train_start_end_obs_dd()
 
 
+
+nulldata 7 -p
+setobs 7 2000-01-01 --time-series
+function void test_nobs_to_add_to_dataset (void)
+    print "Start with nobs_to_add_to_dataset()"
+    
+    series s1 = normal()
+    series s2 = s1
+    series s3 = s1
+    series s4 = s1
+    s2[1] = NA
+    s3[7] = NA
+    s4[1] = NA
+    s4[7] = NA
+    bundle B = defbundle("horizon", 2)
+    
+    list L = s1
+    assert_equal_num(nobs_to_add_to_dataset(L, &B), 2)
+    
+    list L = s2
+    assert_equal_num(nobs_to_add_to_dataset(L, &B), 2)
+    
+    list L = s3
+    assert_equal_num(nobs_to_add_to_dataset(L, &B), 1)
+
+    list L = s4
+    assert_equal_num(nobs_to_add_to_dataset(L, &B), 1)
+end function
+test_nobs_to_add_to_dataset()
+
+
+
+
+
 printf "\nInfo: All tests passed.\n"
 
 # do_naive_forecasting

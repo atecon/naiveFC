@@ -320,7 +320,7 @@ function bundle naiveFC (const series y,
     drop_missing_values(y, &self)
 
     # Add obs for forecasting
-    self.obs_added = nobs_to_add_to_dataset(y, &self)
+    self.obs_added = nobs_to_add_to_dataset(y, self.horizon)
     if self.obs_added > 0
         dataset addobs self.obs_added
         printInfo(sprintf("Added %d additional observations at the sample end.", self.obs_added))
