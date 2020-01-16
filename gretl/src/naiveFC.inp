@@ -259,7 +259,8 @@ end function
 
 
 
-
+# TODO: untested
+# TODO: put checks into separate functions
 function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
@@ -442,18 +443,16 @@ function void drop_missing_values (const series y, bundle *self)
 
     self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
 
-    if nelem(self.xlist) > 0
-        list xlist = self.xlist
-        smpl y --contiguous
-        scalar t2_y = $t2
-        smpl full
-        smpl xlist --contiguous
-        scalar t2_xlist = $t2
-        scalar tdiff = t2_xlist - t2_y
+    scalar tdiff = diff_t2_of_y_and_x(y, xlist)
 
+    if ok(tdiff)
+        list xlist = self.xlist
+        
         if tdiff > 0 && tdiff < self.horizon
-            printError(sprintf("The last valid observation of series %s is %s.", self.name_endo, obslabel(t2_y)))
-            printError(sprintf("You requested a %d-step ahead sequence of forecasts.", self.horizon))
+            printError(sprintf("The last valid observation of series %s is %s.", \
+              self.name_endo, obslabel(t2_y)))
+            printError(sprintf("You requested a %d-step ahead sequence of forecasts.", \
+              self.horizon))
             printError(sprintf"The last valid observation of the contiguous sample\n\
               for the additional regressors is %s.", obslabel(t2_xlist))
             printError("It is not possible to compute the requested h-steap ahead\n\
@@ -479,7 +478,7 @@ function void drop_missing_values (const series y, bundle *self)
     string self.t2_label = obslabel($t2)
     self.T = $nobs		# no. of valid obs before adding obs. for forecasting purpose
 
-    if self.T < self.T_all && self.verbose != 0
+    if self.T < self.T_all && self.verbose
         printf "\nWarning: The time-series sample has been restricted\n"
         printf "due to %d missing values in series %s.\n", (self.T_all-$nobs), self.name_endo
         printf "Information on the new contiguous set for series %s:\n", , self.name_endo

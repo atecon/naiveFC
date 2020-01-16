@@ -3,10 +3,8 @@ clear
 
 #string FILENAME = "foo.csv"		# dummy file
 
-string dir = "/home/ninja/repo/naiveFC/gretl"
-
-include "@dir/src/naiveFC.inp" --force
-include "@dir/src/naiveFC_helper.inp" --force
+include "./src/naiveFC.inp" --force
+include "./src/naiveFC_helper.inp" --force
 
 include string_utils.gfn
 include assertion.gfn
@@ -378,11 +376,50 @@ test_nobs_to_add_to_dataset()
 
 
 
+nulldata 7 -p
+setobs 7 2000-01-01 --time-series
+function void test_diff_t2_of_y_and_x (void)
+    print "Start with diff_nobs_of_y_and_x()"
+
+    series s1 = normal()    
+    series s2 = s1
+    series s3 = s1
+    series s4 = s1
+    s2[1] = NA
+    s3[7] = NA
+    s4[1] = NA
+    s4[7] = NA
+    
+    list L = s1
+    scalar s = diff_t2_of_y_and_x(s1, L)
+    assert_equal_num(s, 0)
+    
+    list L = s2
+    scalar s = diff_t2_of_y_and_x(s1, L)
+    assert_equal_num(s, 0)
+
+    list L = s3
+    scalar s = diff_t2_of_y_and_x(s1, L)
+    assert_equal_num(s, -1)
+    
+    list L = s4
+    scalar s = diff_t2_of_y_and_x(s1, L)
+    assert_equal_num(s, -1)
+
+    list L = s4
+    scalar s = diff_t2_of_y_and_x(s3, L)
+    assert_equal_num(s, 0)
+end function
+test_diff_t2_of_y_and_x()
+
+
+
 
 
 printf "\nInfo: All tests passed.\n"
 
 # do_naive_forecasting
+# do_initial_checks
 # drop_missing_values
 # nobs_to_add_to_dataset
 # summarize_naive_fc_results

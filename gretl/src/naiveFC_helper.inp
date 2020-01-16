@@ -1,3 +1,21 @@
+function scalar diff_t2_of_y_and_x (const series y, const list x)
+    /* Compute difference of valid obs in y and x. */
+
+    scalar tdiff = NA
+
+    if nelem(x)
+        smpl y --contiguous
+        scalar t2_y = $t2
+        smpl full
+        smpl x --contiguous
+        scalar t2_x = $t2
+        scalar tdiff = t2_x - t2_y
+    endif
+
+    return tdiff
+end function
+
+
 function void printInfo (const string s)
     printf "\nInfo: %s\n", s
 end function
