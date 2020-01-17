@@ -289,7 +289,11 @@ function scalar nobs_to_add_to_dataset (const list y,
     /* Determine the number of additional observations to add to the dataset. */
 
     smpl y --contiguous		# don't consider eventual missings in the data passed to naiveFC()
-    return horizon - ($tmax - $t2)
+    add_n_new_obs = horizon - ($tmax - $t2)
+
+    printInfo(sprintf("Added %d additional observations at the sample end.", add_n_new_obs))
+
+    return add_n_new_obs
 end function
 
 

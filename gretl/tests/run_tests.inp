@@ -169,15 +169,14 @@ end function
 
 
 function void test_prepare_forecast_bundles (void)
-    print "Start with prepare_result_matrices()"
+    print "Start with prepare_forecast_bundles()"
 
     bundle B = defbundle("is_seas", 0, \
       "estimator_names", get_supported_nonseas_methods())
-      prepare_forecast_bundles(&B)
+    bundle Bout = prepare_forecast_bundles(&B)
 
-    assert_equal_num(nelem(B), 3)
-    assert_equal_num(nelem(B.forecast_results), 7)
-    assert_equal_num(nelem(B.forecast_results.rwfc), 3)
+    assert_equal_num(nelem(Bout), 7)
+    assert_equal_num(nelem(Bout.rwfc), 3)
 end function
 
 

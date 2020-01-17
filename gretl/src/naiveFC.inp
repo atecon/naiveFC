@@ -258,8 +258,6 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
 end function
 
 
-
-
 # TODO: put checks into separate functions
 function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
@@ -275,6 +273,12 @@ function void do_initial_checks (bundle *self)
     
     if !self.is_seas && nelem(strpos(seas_methods, self.which))
         printError("The method you requested is not available for non-seasonal data.")
+        self.error = 1
+    endif
+
+    if $nobs < self.window_length
+        printError(sprintf("Select window size (wsize=%d) exceeds the\n\
+          number of valid observations (T=%d).", self.window_length, $nobs))
         self.error = 1
     endif
 
@@ -323,16 +327,12 @@ function bundle naiveFC (const series y,
         return self
     endif
     
-    # Add obs for forecasting
-    self.obs_added = nobs_to_add_to_dataset(y, self.horizon)
-    if self.obs_added
-        dataset addobs self.obs_added	# TODO: check that this can be done in a function
+    self.add_n_new_obs = nobs_to_add_to_dataset(y, self.horizon)
+    if self.add_n_new_obs > 0
+        dataset addobs self.add_n_new_obs
         series self.y = misszero(y)		# new obs are set as NA
-        printInfo(sprintf("Added %d additional observations at the sample end.", \
-          self.obs_added))
     endif
     
-    ** HIER WEITERMACHEN **
     do_naive_forecasting(&self)
 
     if self.verbose
@@ -351,16 +351,18 @@ function bundle naiveFC (const series y,
 end function
 
 
-function void prepare_forecast_bundles (bundle *self)
+function bundle prepare_forecast_bundles (bundle *self)
 /* Prepare for each estimator a dictionary for point
     interval forecast results to be stored in matrices. */
 
-    bundle self.forecast_results = null
-eval self
+    bundle forecast_results = null
+
     loop i=1..nelem(self.estimator_names) -q
-        bundle self.forecast_results[self.estimator_names[i]] \
+        bundle forecast_results[self.estimator_names[i]] \
           = defbundle("point_fc", {}, "lower_fc", {}, "upper_fc", {})
     endloop
+    
+    return forecast_results
 end function
 
 
@@ -368,7 +370,7 @@ function void do_naive_forecasting (bundle *self)
 /* Wrapper function actually calling static or
     moving-window procedures. */
 
-    prepare_forecast_bundles(&self)
+    self.forecast_results = prepare_forecast_bundles(&self)
 
     if self.type_moving_window == "static"
         get_static_forecasts(&self)
@@ -521,13 +523,6 @@ function void get_moving_window_forecasts (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores sequences of interval forecasts. */
 
-    # TODO: to initial checks??
-    if $nobs < self.window_length
-        printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
-          number of valid observations.\n", self.window_length
-        funcerr "Re-specify."
-    endif
-
     series y = self.y			# y includes the additional n=horizon newly added observations for the very last cv-dataset
 
     bundle cv = null					# Tried to put this into a bundle, but git issues with index series
@@ -632,12 +627,12 @@ function list getNaiveForecastsList (bundle *self,
         return R
     endif
 
-    if self.obs_added > 0
-        dataset addobs self.obs_added
+    if self.add_n_new_obs > 0
+        dataset addobs self.add_n_new_obs
     endif
 
     series y = self.y
-    if self.obs_added > 0				# The last h observations were added and set to zero
+    if self.add_n_new_obs > 0				# The last h observations were added and set to zero
         smpl (obsnum(self.t2_label)+1) $tmax
         series y = NA
         smpl full
@@ -673,13 +668,13 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()",
     scalar pre_fc_periods_to_plot = inbundle(self, "pre_fc_periods_to_plot") ? \
       self.pre_fc_periods_to_plot : pre_fc_periods_to_plot
 
-    if self.obs_added > 0
-        dataset addobs self.obs_added
+    if self.add_n_new_obs > 0
+        dataset addobs self.add_n_new_obs
     endif
 
     series y = self.y
     setinfo y --graph-name="Actuals"
-    if self.obs_added > 0				# The last h observations were added and set to zero
+    if self.add_n_new_obs > 0				# The last h observations were added and set to zero
         # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
         smpl (obsnum(self.t2_label)+1) $tmax
         series y = NA
