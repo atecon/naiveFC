@@ -23,7 +23,6 @@ function strings array_of_condition_dates (bundle *self)
 
     strings r = array(rows(conditioning_dates))
 
-    # TODO: Consolidate with loop in get_dates_forecasted()
     loop i=1..rows(conditioning_dates) -q
         string sdate = sprintf("%d", conditioning_dates[i])
 

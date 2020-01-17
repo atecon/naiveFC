@@ -6,7 +6,7 @@ function void attach_row_labels (bundle *interval_forecasts,
     forecasts. */
    
     if self.type_moving_window == "static"
-        strings row_labels = get_dates_forecasted(self.t2_label, self.horizon)
+        strings row_labels = future_date_strings(self.t2_label, self.horizon)
     else
         strings row_labels = array_of_horizon_labels(self.horizon)
     endif
@@ -30,19 +30,19 @@ function strings array_of_horizon_labels (const int horizon[1::])
 end function
 
 
-function strings get_dates_forecasted (const string date_of_information_str "Obs. before 1st h=1 forecast",
-                                       const int max_horizon[1::])
+function strings future_date_strings (const string date_of_information_str "Obs. before 1st h=1 forecast",
+                                       const int n_future_periods[0::])
     /* Construct date strings refering to the date for which a the
     h-step ahead forecast was made for.*/
 
-    strings dates_forecasted = array(max_horizon)
+    strings future_dates = array(n_future_periods)
     scalar date_of_information_num = obsnum(date_of_information_str)
 
-    loop i=1..max_horizon -q
-        dates_forecasted[i] = date_plus_x_as_obslabel(date_of_information_num, $i)
+    loop i=1..n_future_periods -q
+        future_dates[i] = date_plus_x_as_obslabel(date_of_information_num, $i)
     endloop
 
-    return dates_forecasted
+    return future_dates
 end function
 
 
