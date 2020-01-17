@@ -1,30 +1,3 @@
-function void get_point_low_up_bound_arrays (bundle *bout, bundle *self)
-/* Generate for each model based on respective point forecasts and
-    estimated standard derrors, arrays holding the interval forecasts. */
-
-    if !inbundle(bout, "point_forecasts")
-        funcerr "Could not find item 'point_forecasts' in bundle"
-    endif
-    if !inbundle(bout, "factors")
-        funcerr "Could not find item 'factors' in bundle"
-    endif
-
-    scalar n = nelem(bout.point_forecasts)
-    if n != nelem(bout.factors)
-        funcerr "Number of matrices does not equal.
-    endif
-
-    matrices self.forecasts_point = array(n)
-    matrices self.forecasts_lower_bound = array(n)
-    matrices self.forecasts_upper_bound = array(n)
-
-    loop i=1..n -q
-        self.forecasts_point[i] = bout.point_forecasts[i]
-        self.forecasts_lower_bound[i] = bout.point_forecasts[i] - bout.factors[i]
-        self.forecasts_upper_bound[i] = bout.point_forecasts[i] + bout.factors[i]
-    endloop
-
-end function
 
 
 function strings get_dates_forecasted (const string t2_label,
@@ -624,34 +597,43 @@ function void get_moving_window_forecasts (bundle *self)
     # Retrieve moving-window point_forecasts from array,
     # compute forecast intervals and put stuff to bundle
     bundle interval_forecasts = \
-      put_intval_fc_to_bundle(forecasts_and_factors, self)
-
-    # --> For the 'static' case, point, lower and upper bound results
-    # are stored in separate matrix arrays, as multiple models can be
-    # estimated 'at once' in case the avgFC is called.
-    # For compatibility reasons, we do the same here.
-    matrices self.forecasts_point = defarray(pt_lb_up[1])		# rows: horizon, cols: date based on which h-steap ahead forecast is made for
-    matrices self.forecasts_lower_bound = defarray(pt_lb_up[2])
-    matrices self.forecasts_upper_bound = defarray(pt_lb_up[3])
-
+      comp_intval_fc_and_to_bundle(forecasts_and_factors)
 end function
 
 
-function bundle put_intval_fc_to_bundle (const bundle forecasts_and_factors,
-                                                 const bundle self)
-    /* Retrieve miving-window point_forecasts from array,
-      and compute and get associated intervals. */
+# TODO: untested
+function bundle comp_intval_fc_and_to_bundle (const bundle forecasts_and_factors)
+/* Generate for each model based on respective point forecasts and
+    estimated standard derrors, arrays holding interval forecasts. */
+
+    if !inbundle(forecasts_and_factors, "point_forecasts")
+        funcerr "Could not find item 'point_forecasts' in bundle"
+    endif
+    if !inbundle(forecasts_and_factors, "factors")
+        funcerr "Could not find item 'factors' in bundle"
+    endif
+
+    scalar n = nelem(forecasts_and_factors.point_forecasts)
+    if n != nelem(forecasts_and_factors.factors)
+        funcerr "Number of matrices does not equal.
+    endif
+
     bundle interval_forecasts
-    out = flatten(bout.point_forecasts)		# rows: horizon, cols: sample period
-    out
-    stop 
-    matrices get_movwin_low_up_matrices = get_movwin_low_up_matrices(out[1], \
-      flatten(bout.factors))
-    out[2] = get_movwin_low_up_matrices[1]
-    out[3] = get_movwin_low_up_matrices[2]
 
-    return out
+    matrix interval_forecasts.forecasts_point = \
+      flatten(forecasts_and_factors.point_forecasts)	# rows: horizons, cols: sample period
+
+    matrix factors_flattened = flatten(forecasts_and_factors.factors)
+    
+    matrix interval_forecasts.forecasts_lower_bound = \
+      interval_forecasts.forecasts_point .- factors_flattened      
+
+    matrix interval_forecasts.forecasts_upper_bound = \
+      interval_forecasts.forecasts_point .+ factors_flattened
+
+    return interval_forecasts
 end function
+
 
 
 # TODO: untested
