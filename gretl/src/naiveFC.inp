@@ -299,6 +299,10 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
     bundle model_settings = dict_models()["@estimator"]
     string fcast_arg = model_settings.forecast_arg
     string command = model_settings.command
+    # TODO: consider 3 verbose levels: silent, normal, detailed
+    if self.verbose < 1 #2
+        command += " --quiet"	# estimation details only for detailed verbosity level
+    endif
 
     matrix forecast_results = zeros(self.horizon, 2) * NA
     series y = self.y					# length: window_length + horizon
@@ -307,20 +311,20 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
     if model_settings.add_first_lag
         xlist += y(-1)
     endif
-    print xlist -o
-    stop
     
-    # Select sample comprising both training and test set
     bundle train_obsnums = get_train_start_end_obsnums(&self)
+    # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
+    # is not the effective sample length
+    # but (window_length-max(lags))
     catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 
     if $error
         printError("Failed to set training set. Check your sample and window size.")
-
         scalar self.error = 1
         return forecast_results
     endif
 
+    # TODO: Can this happen, and if yes, why?
     if self.type_moving_window != "static" && ($nobs > self.window_length)
         printError(sprintf("You training sample (T=%d) is longer than the\n\
           specified window length (T=%d).", $nobs, self.window_length))
@@ -329,50 +333,28 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
         return forecast_results
     endif
 
-
     # Estimation
-    if estimator == "meanfc"
-        catch ols y xlist --quiet
-
-    elif estimator == "medianfc"
-        catch quantreg 0.5 y xlist --quiet
-
-    elif estimator == "smeanfc"
-        catch ols y xlist --quiet
-
-    elif estimator == "smedianfc"
-        catch quantreg 0.5 y xlist --quiet
-
-    elif estimator == "snaivefc" || estimator == "snaivedriftfc"
-        string arima_opt = (estimator == "snaive") ? "--nc" : ""
-        catch arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet
-
-    elif estimator == "rwfc" || estimator == "rwdriftfc"
-        string arima_opt = (estimator == "rwfc") ? "--nc" : ""
-        catch arima 0 1 0 ; y xlist @arima_opt --quiet
-
-    elif estimator == "ar1fc" || estimator == "ar1trendfc"
-        catch ols y xlist --quiet
-    endif
-
-    if $error
+    catch @command
+    model_error = $error
+    if model_error
         printError("Error: Model estimation failed.\n\
           Forecast values are set to NA for the current sample.")
+        
+        return forecast_results
     else
-        fcast ($t2+1) ($t2+self.horizon) @fcast_arg --quiet
+        fcast ($t2+1) ($t2+self.horizon) @fcast_arg #--quiet
     endif
 
-    #    *** HIER WEITERMACHEN
     if self.type_moving_window == "static"
         self.t1_forecast_date = date_plus_x_as_obslabel($t2, 1)
         self.t2_forecast_date = date_plus_x_as_obslabel($t2, self.horizon)
     endif
 
     if !model_error
-        fc_and_sd_matrix = $fcast ~ $fcse
+        forecast_results = $fcast ~ $fcse
     endif
 
-    return fc_and_sd_matrix
+    return forecast_results
 end function
 
 
