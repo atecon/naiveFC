@@ -541,7 +541,7 @@ function void get_moving_window_forecasts (bundle *self)
 
     # Loop over training sets, run estimation and retrieve interval forecasts.
     # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.
-    matrices fc_and_sd_from_all_cv = get_cv_fc_and_sd_array(&cv, &self)
+    matrices fc_and_sd_from_all_cv = run_movwin_forecasts(&cv, &self)
     bundle bout = point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)	# stuff stored in an array in bout
 
     # Retrieve moving-window point_forecasts from array,
@@ -576,7 +576,7 @@ end function
 
 
 # TODO: untested
-function matrices compute_cv_fc_and_sd_array (bundle *cv, bundle *self)
+function matrices run_movwin_forecasts (bundle *cv, bundle *self)
 /* Loop over training sets, run estimation and retrieve
     interval forecasts. */
 
@@ -588,7 +588,7 @@ function matrices compute_cv_fc_and_sd_array (bundle *cv, bundle *self)
 
         if lwin == 1
             # CV series holds "window_length+horizon" observations: subtract "horizon"
-            self.t1_forecast_date = date_plus_x_as_obslabel(($t2-self.horizon), 1)	# Date of 1st h=1 ahead forecast
+            self.t1_forecast_date = date_plus_x_as_obslabel(($t2 - self.horizon), 1)	# Date of 1st h=1 ahead forecast
         elif lwin == cv.n_folds
             self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_label), self.horizon)	# Date of last h-step ahead forecast
         endif
