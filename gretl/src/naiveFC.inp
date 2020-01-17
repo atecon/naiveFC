@@ -80,7 +80,6 @@ function bundle default_values (const series y)
     genr index
     series self.index = index
 
-    # For get_moving_window_forecasts()
     string self.type_moving_window = "static" 			# "static", "rolling" or "recursive"
     scalar self.window_length = ceil(0.25 * nobs(y))		# default window length
 
@@ -417,6 +416,8 @@ function bundle prepare_forecast_bundles (bundle *self)
 end function
 
 
+# TODO: This function looks to me as the ideal one 
+# where to call various model via a loop!
 function void do_naive_forecasting (bundle *self)
 /* Wrapper function actually calling static or
     moving-window procedures. */
@@ -426,7 +427,10 @@ function void do_naive_forecasting (bundle *self)
     if self.type_moving_window == "static"
         get_static_forecasts(&self)
     else
-        get_moving_window_forecasts(&self)
+        # TODO: later 'interval_forecasts' is a container
+        # holding a bundle with interval_forecasts for each 
+        # model
+        bundle interval_forecasts = get_moving_window_forecasts(&self)
     endif
 
     attach_column_labels(&self)
@@ -580,7 +584,7 @@ function void add_last_xtrain_fold (const series y, 	bundle *cv)
 end function
 
 
-function void get_moving_window_forecasts (bundle *self)
+function bundle get_moving_window_forecasts (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores sequences of interval forecasts. */
 
@@ -596,8 +600,7 @@ function void get_moving_window_forecasts (bundle *self)
 
     # Retrieve moving-window point_forecasts from array,
     # compute forecast intervals and put stuff to bundle
-    bundle interval_forecasts = \
-      comp_intval_fc_and_to_bundle(forecasts_and_factors)
+    return comp_intval_fc_and_to_bundle(forecasts_and_factors)
 end function
 
 
@@ -605,18 +608,6 @@ end function
 function bundle comp_intval_fc_and_to_bundle (const bundle forecasts_and_factors)
 /* Generate for each model based on respective point forecasts and
     estimated standard derrors, arrays holding interval forecasts. */
-
-    if !inbundle(forecasts_and_factors, "point_forecasts")
-        funcerr "Could not find item 'point_forecasts' in bundle"
-    endif
-    if !inbundle(forecasts_and_factors, "factors")
-        funcerr "Could not find item 'factors' in bundle"
-    endif
-
-    scalar n = nelem(forecasts_and_factors.point_forecasts)
-    if n != nelem(forecasts_and_factors.factors)
-        funcerr "Number of matrices does not equal.
-    endif
 
     bundle interval_forecasts
 
