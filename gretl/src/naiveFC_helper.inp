@@ -1,18 +1,19 @@
-# TODO: untested
-function bundle prep_cv_bundle (bundle *self)
-    /* Prepare bundle for CvDataSplitter(). */
+# TODO: untested -- however, rather CvDataSplitter() should be tested!
+function bundle prep_and_get_cv_folds (bundle *self)
+    /* Prepare bundle for CvDataSplitter() and compute folds. */
 
     bundle cv					# Tried to put this into a bundle, but git issues with index series
-    
-    # NOTE: list X is not properly passed to cv struct which is used in get_moving_window_forecasts()
-    #    list X = y
-    #    list cv.X = X				# CvDataSplitter() expects a list
+    series y = self.y		# This assignment is needed!
+    list X = y				# y includes the additional n=horizon newly added observations for the very last cv-dataset   
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
+    list cv.X = X
+
+    CvDataSplitter(&cv)
+    add_last_xtrain_fold(y, &cv)
 
     return cv
 end function
-
 
 # TODO: untested
 function scalar samples_for_y_and_xlist_match (const series y, const list xlist, bundle *self)
@@ -288,15 +289,10 @@ function list add_linear_trend_to_list (bundle *self,
 end function
 
 
-function void gen_t1_forecast_date (const int t2, bundle *self)
+function string date_plus_x_as_obslabel (const int obs_num[1::] "Obs-number",
+                                         const int x "days to add")
     /* Return the date for which the first 1-step ahead forecast is made for. */
-    string self.t1_forecast_date = obslabel(t2+1)
-end function
-
-
-function void gen_t2_forecast_date (const int t2, bundle *self)
-    /* Return the date for which the last h-step ahead forecast is made for. */
-    catch string self.t2_forecast_date = obslabel(t2+self.horizon)
+    return obslabel(obs_num + x)
 end function
 
 

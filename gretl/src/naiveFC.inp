@@ -249,8 +249,8 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
 
     #    *** HIER WEITERMACHEN
     if self.type_moving_window == "static"
-        gen_t1_forecast_date($t2, &self)			# adds to self
-        gen_t2_forecast_date($t2, &self)			# adds to self
+        self.t1_forecast_date = date_plus_x_as_obslabel($t2, 1)
+        self.t2_forecast_date = date_plus_x_as_obslabel($t2, self.horizon)
     endif
 
     if !model_error
@@ -536,17 +536,10 @@ function void get_moving_window_forecasts (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores sequences of interval forecasts. */
 
-    series y = self.y		# This assignment is needed!
-    list X = y				# y includes the additional n=horizon newly added observations for the very last cv-dataset   
-    bundle cv = prep_cv_bundle(&self)
-    list cv.X = X
-    #    smpl obsnum(self.t1_label) obsnum(self.t2_label) # FIXME: needed?
-
-    CvDataSplitter(&cv)
-    add_last_xtrain_fold(y, &cv)
+    bundle cv = prep_and_get_cv_folds(&self)
     self.n_folds = cv.n_folds
 
-    # Loop over training sets, run estimation and retrieve interval forecasts
+    # Loop over training sets, run estimation and retrieve interval forecasts.
     # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.
     matrices fc_and_sd_from_all_cv = get_cv_fc_and_sd_array(&cv, &self)
     bundle bout = point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)	# stuff stored in an array in bout
@@ -582,22 +575,22 @@ function matrices ret_movwin_point_lb_up_matrices (bundle *bout,
 end function
 
 
-function matrices get_cv_fc_and_sd_array (bundle *cv, bundle *self)
+# TODO: untested
+function matrices compute_cv_fc_and_sd_array (bundle *cv, bundle *self)
 /* Loop over training sets, run estimation and retrieve
     interval forecasts. */
 
     matrices fc_and_sd_from_all_cv = array(cv.n_folds)
 
     loop lwin=1..cv.n_folds -q
-        matrix mat = cv.X_train[lwin]
-        smpl minc(mat[,1]) (maxc(mat[,1]))		# time index of the training set: T=self-window_length + self-horizon
+        matrix date_idx = cv.X_train[lwin]
+        smpl minc(date_idx[,1]) (maxc(date_idx[,1]))		# time index of the training set: T=self.window_length + self-horizon
 
         if lwin == 1
-            # Note: As the series for cross-validation holds "window_length+horizon" observations, we need to
-            # subtract "horizon" here.
-            gen_t1_forecast_date($t2-self.horizon, &self)	# Date for which the 1st 1-step ahead forecast is made for
+            # CV series holds "window_length+horizon" observations: subtract "horizon"
+            self.t1_forecast_date = date_plus_x_as_obslabel(($t2-self.horizon), 1)	# Date of 1st h=1 ahead forecast
         elif lwin == cv.n_folds
-            gen_t2_forecast_date(obsnum(self.t2_label), &self)				# Date for which the last h-step ahead forecast is made for
+            self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_label), self.horizon)	# Date of last h-step ahead forecast
         endif
 
         fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
