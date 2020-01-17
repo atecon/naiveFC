@@ -421,26 +421,6 @@ function void do_naive_forecasting (bundle *self)
 end function
 
 
-# TODO: untested
-function void attach_row_labels (bundle *interval_forecasts,
-                                 bundle self)
-/* Add date strings as row labels for 'static' forecasts,
-   or indicate the forecast horizon for moving-window
-    forecasts. */
-   
-    if self.type_moving_window == "static"
-        strings row_labels = get_dates_forecasted(self.t2_label, self.horizon)
-    else
-        strings row_labels = array_of_horizon_labels(self.horizon)
-    endif
-
-    strings keys = getkeys(interval_forecasts)
-    loop i=1..nelem(keys) -q
-        rnameset(interval_forecasts[keys[i]], row_labels)
-    endloop
-end function
-
-
 function void attach_column_labels (bundle *self)
 /* Add date strings as column labels for indicating the date on
     which the estimates are conditioned on. */

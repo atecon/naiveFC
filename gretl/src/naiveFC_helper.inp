@@ -1,3 +1,23 @@
+# TODO: untested
+function void attach_row_labels (bundle *interval_forecasts,
+                                 bundle self)
+/* Add date strings as row labels for 'static' forecasts,
+   or indicate the forecast horizon for moving-window
+    forecasts. */
+   
+    if self.type_moving_window == "static"
+        strings row_labels = get_dates_forecasted(self.t2_label, self.horizon)
+    else
+        strings row_labels = array_of_horizon_labels(self.horizon)
+    endif
+
+    strings keys = getkeys(interval_forecasts)
+    loop i=1..nelem(keys) -q
+        rnameset(interval_forecasts[keys[i]], row_labels)
+    endloop
+end function
+
+
 function strings array_of_horizon_labels (const int horizon[1::])
     /* Construct string array for indicating the forecast horizons. */
 
