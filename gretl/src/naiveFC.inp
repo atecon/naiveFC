@@ -165,16 +165,16 @@ function matrices call_method (bundle *self)
 
     # Returned array includes m matrices. Each matrix is of dimension h by 2 (point~sderr)
     if self.which != "avgfc"	# m=1
-        matrices fc_and_sd = defarray(forecast_and_get_fc_sd(&self, self.which))	# 1-dim array incl. single h by 2 matrix
+        matrices fc_and_sd = defarray(set_xlist_and_forecast(&self, self.which))	# 1-dim array incl. single h by 2 matrix
     else								# currently m=10 incl. avg. forecast
-        matrices fc_and_sd = avg_forecast_and_get_fc_sd(&self)	# function already transforms into array
+        matrices fc_and_sd = avg_set_xlist_and_forecast(&self)	# function already transforms into array
     endif
 
     return fc_and_sd
 end function
 
 
-function matrix forecast_and_get_fc_sd (bundle *self, const string method)
+function matrix set_xlist_and_forecast (bundle *self, const string method)
     /* Compute point forecast and forecast standard errors. */
 
     scalar dynamic_fc =
@@ -489,14 +489,14 @@ function matrices do_avgfcs_and_get_fc_sd_array (bundle *self)
     matrices fc_and_sd = array(m)
 
     loop i=1..m -q
-        fc_and_sd[i] = forecast_and_get_fc_sd(&self, self.estimator_names[i])
+        fc_and_sd[i] = set_xlist_and_forecast(&self, self.estimator_names[i])
     endloop
 
     return fc_and_sd
 end function
 
 
-function matrices avg_forecast_and_get_fc_sd (bundle *self)
+function matrices avg_set_xlist_and_forecast (bundle *self)
 /* Compute forecasts using different methods supported, and return array of point
     forecasts and associated standard errors. */
 
