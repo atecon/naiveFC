@@ -175,49 +175,83 @@ end function
 
 
 function bundle dict_models (void)
-    /* Dictionary including stuff for calling estimation
+/* Dictionary including stuff for calling estimation
     command and fcast command. */
-    
-    bundle dict_models
-    
-    dict_models.meanfc = defbundle( \
-        "forecast_arg", "--static", \
-        "command", "ols y xlist" \
-    )
-    dict_models.medianfc = defbundle( \
-        "forecast_arg", "--static", \
-        "command", "quantreg 0.5 y xlist" \
-    )
 
+    bundle dict_models
+
+    dict_models.meanfc = defbundle( \
+      "forecast_arg", "--static", \
+      "command", "ols y xlist", \
+      "includes_linear_trend", 0, \
+      "add_first_lag", 0 \
+      )
+    dict_models.medianfc = defbundle( \
+      "forecast_arg", "--static", \
+      "command", "quantreg 0.5 y xlist", \
+      "includes_linear_trend", 0, \
+      "add_first_lag", 0 \
+      )
     dict_models.smeanfc = defbundle( \
-        "forecast_arg", "--static", \
-        "command", "ols y xlist" \
-    )
+      "forecast_arg", "--static", \
+      "command", "ols y xlist", \
+      "includes_linear_trend", 0, \
+      "add_first_lag", 0 \
+      )
     dict_models.smedianfc = defbundle( \
-        "forecast_arg", "--static", \
-        "command", "quantreg 0.5 y xlist" \
-    )
+      "forecast_arg", "--static", \
+      "command", "quantreg 0.5 y xlist", \
+      "includes_linear_trend", 0, \
+      "add_first_lag", 0 \
+      )
     dict_models.snaivefc = defbundle( \
-        "forecast_arg", "--dynamic", \
-        "command", "arima 0 0 0 ; 0 1 0 ; y xlist --nc" \
-    )
+      "forecast_arg", "--dynamic", \
+      "command", "arima 0 0 0 ; 0 1 0 ; y xlist --nc", \
+      "includes_linear_trend", 0, \
+      "add_first_lag", 0 \
+      )
     dict_models.snaivedriftfc = defbundle( \
-        "forecast_arg", "--dynamic", \
-        "command", "arima 0 0 0 ; 0 1 0 ; y xlist" \
-    )
+      "forecast_arg", "--dynamic", \
+      "command", "arima 0 0 0 ; 0 1 0 ; y xlist", \
+      "includes_linear_trend", 0, \
+      "add_first_lag", 0 \
+      )
     dict_models.ar1fc = defbundle( \
-        "forecast_arg", "--dynamic", \
-        "command", "ols y xlist" \
-    )
+      "forecast_arg", "--dynamic", \
+      "command", "ols y xlist", \
+      "includes_linear_trend", 0, \
+      "add_first_lag", 1 \
+      )
     dict_models.ar1trendfc = defbundle( \
-        "forecast_arg", "--dynamic", \
-        "command", "ols y xlist" \
-    )
+      "forecast_arg", "--dynamic", \
+      "command", "ols y xlist", \
+      "includes_linear_trend", 1, \
+      "add_first_lag", 1 \
+      )
 
     return dict_models
 end function
 
 
+# TODO: untested
+function list prepare_xlist (const string estimator,
+                             const bundle model_settings,
+                             const bundle self)
+    /* Prepare list of additional regressors. */
+         
+    list xlist = null
+    
+    xlist += add_ohe_periods_to_list(estimator)
+    xlist += add_intercept_to_list(estimator)
+    if model_settings.includes_linear_trend == 1
+        xlist += add_linear_trend_to_list(estimator)
+    endif
+    if inbundle(self, "xlist")
+        xlist += self.xlist
+    endif
+        
+    return xlist
+end function
 
 
 function matrix set_xlist_and_forecast (bundle *self, const string estimator)
@@ -226,16 +260,14 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
     bundle model_settings = dict_models()["@estimator"]
     string fcast_arg = model_settings.forecast_arg
     string command = model_settings.command
-    
+
     matrix forecast_results = zeros(self.horizon, 2) * NA
-    list xlist = null
     series y = self.y					# length: window_length + horizon
 
-    xlist += add_ohe_periods_to_list(estimator, xlist)
-    xlist += add_linear_trend_to_list(&self, estimator, xlist)
-    xlist += add_intercept_to_list(estimator, xlist)
-    xlist += self.xlist
-    if estimator == "ar1fc" || estimator == "ar1trendfc"
+    list xlist = null
+    xlist += prepare_xlist(estimator, model_settings, self)
+
+    if model_settings.add_first_lag == 1
         xlist += y(-1)
     endif
 
@@ -317,7 +349,7 @@ function void do_initial_checks (bundle *self)
         printError("The forecasting method you selected does not exist.")
         self.error = 1
     endif
-    
+
     if !self.is_seas && nelem(strpos(seas_methods, self.which))
         printError("The method you requested is not available for non-seasonal data.")
         self.error = 1
@@ -373,13 +405,13 @@ function bundle naiveFC (const series y,
     if self.error
         return self
     endif
-    
+
     self.add_n_new_obs = nobs_to_add_to_dataset(y, self.horizon)
     if self.add_n_new_obs > 0
         dataset addobs self.add_n_new_obs
         series self.y = misszero(y)		# new obs are set as NA
     endif
-    
+
     do_naive_forecasting(&self)
 
     if self.verbose
@@ -408,7 +440,7 @@ function bundle prepare_forecast_bundles (bundle *self)
         bundle forecast_results[self.estimator_names[i]] \
           = defbundle("point_fc", {}, "lower_fc", {}, "upper_fc", {})
     endloop
-    
+
     return forecast_results
 end function
 
@@ -568,7 +600,7 @@ end function
 
 # TODO: untested
 function void add_last_xtrain_fold (const series y, 	bundle *cv)
-    /* As CvDataSplitter() doesn't consider the very last obs in
+/* As CvDataSplitter() doesn't consider the very last obs in
     the final training set for 'rolwin' and 'recwin', this must be added. */
 
     cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
@@ -654,10 +686,10 @@ function list getNaiveForecastsList (bundle *self,
     matrix hor = seq(1, self.horizon)'
     hor = (exists(horizons)) ? horizons : hor
     hor = vec(hor)
-    
-    # FIXME: 'methods_used' still needed? All names stored in self.estimator_names    
-#    strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
-#    strings methods_used = (inbundle(self, "methods_used")) ? self.estimator_names : methods_used
+
+    # FIXME: 'methods_used' still needed? All names stored in self.estimator_names
+    #    strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
+    #    strings methods_used = (inbundle(self, "methods_used")) ? self.estimator_names : methods_used
 
     if !exists(suffix)
         string suffix = ""

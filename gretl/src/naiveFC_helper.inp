@@ -263,12 +263,8 @@ function list add_linear_trend_to_list (bundle *self,
     /* Add 'time' to list. */
 
     list xlist = null
-    if method == "ar1trendfc" && inbundle(self, "with_linear_trend")
-        if self.with_linear_trend			# TODO: Is this necessary
-            genr time
-            list xlist += time
-        endif
-    endif
+    genr time
+    list xlist += time
 
     return xlist
 end function
