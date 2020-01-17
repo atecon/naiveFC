@@ -274,13 +274,13 @@ function list prepare_xlist (const string estimator,
     list xlist = null
 
     if model_settings.add_ohe_periods
-        xlist += add_ohe_periods_to_list(estimator)
+        xlist += add_ohe_periods_to_list()
     endif
-    if model_settings.intercept
-        xlist += add_intercept_to_list(estimator)
+    if model_settings.add_intercept
+        xlist += add_intercept_to_list()
     endif
     if model_settings.add_linear_trend
-        xlist += add_linear_trend_to_list(estimator)
+        xlist += add_linear_trend_to_list()
     endif
 
     if inbundle(self, "xlist")
@@ -303,13 +303,13 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
     matrix forecast_results = zeros(self.horizon, 2) * NA
     series y = self.y					# length: window_length + horizon
 
-    list xlist = null
-    xlist += prepare_xlist(estimator, model_settings, self)
-
-    if model_settings.add_first_lag == 1
+    list xlist = prepare_xlist(estimator, model_settings, self)
+    if model_settings.add_first_lag
         xlist += y(-1)
     endif
-
+    print xlist -o
+    stop
+    
     # Select sample comprising both training and test set
     bundle train_obsnums = get_train_start_end_obsnums(&self)
     catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
