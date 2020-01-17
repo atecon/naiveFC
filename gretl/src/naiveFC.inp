@@ -124,6 +124,7 @@ function bundle default_values (const series y)
     scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
     scalar self.blength = 4					# Block length bootstrap  (not supported yet)
     scalar self.is_seas = data_has_seasonality()
+    strings self.estimator_names = get_estimator_names(self.is_seas)
     scalar self.verbose = 1
 
     # For get_moving_window_forecasts()
@@ -330,13 +331,12 @@ function bundle naiveFC (const series y,
     # Add obs for forecasting
     self.obs_added = nobs_to_add_to_dataset(y, self.horizon)
     if self.obs_added
-        dataset addobs self.obs_added
+        dataset addobs self.obs_added	# TODO: check that this can be done in a function
         series self.y = misszero(y)		# new obs are set as NA
         printInfo(sprintf("Added %d additional observations at the sample end.", \
           self.obs_added))
     endif
-
-    methods_to_apply(&self)
+    
     do_naive_forecasting(&self)
 
     if self.verbose
@@ -360,10 +360,9 @@ function void prepare_forecast_bundles (bundle *self)
     interval forecast results to be stored in matrices. */
 
     bundle self.forecast_results = null
-
-    loop i=1..nelem(self.methods_used) -q
-        string method_name = self.methods_used[i]
-        bundle self.forecast_results[self.methods_used[i]] \
+eval self
+    loop i=1..nelem(self.estimator_names) -q
+        bundle self.forecast_results[self.estimator_names[i]] \
           = defbundle("point_fc", {}, "lower_fc", {}, "upper_fc", {})
     endloop
 end function
@@ -485,11 +484,11 @@ function matrices do_avgfcs_and_get_fc_sd_array (bundle *self)
 /* Compute forecasts for each method. For each mezthod we obtain a matrix
     of size h by 2 holding point forecasts and associated standard errors. */
 
-    scalar m = nelem(self.methods_used)
+    scalar m = nelem(self.estimator_names)
     matrices fc_and_sd = array(m)
 
     loop i=1..m -q
-        fc_and_sd[i] = forecast_and_get_fc_sd(&self, self.methods_used[i])
+        fc_and_sd[i] = forecast_and_get_fc_sd(&self, self.estimator_names[i])
     endloop
 
     return fc_and_sd
@@ -619,8 +618,11 @@ function list getNaiveForecastsList (bundle *self,
     matrix hor = seq(1, self.horizon)'
     hor = (exists(horizons)) ? horizons : hor
     hor = vec(hor)
-    strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
-    strings methods_used = (inbundle(self, "methods_used")) ? self.methods_used : methods_used
+    
+    # FIXME: 'methods_used' still needed? All names stored in self.estimator_names    
+#    strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
+#    strings methods_used = (inbundle(self, "methods_used")) ? self.estimator_names : methods_used
+
     if !exists(suffix)
         string suffix = ""
     endif

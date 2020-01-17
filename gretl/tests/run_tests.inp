@@ -12,9 +12,9 @@ include assertion.gfn
 
 function void test_prepare_forecast_bundles (void)
     print "Start with prepare_forecast_bundles()"
-    
-    bundle b = defbundle("is_seas", 1)
-    methods_to_apply(&b)
+
+    scalar is_seas = 1    
+    bundle b = defbundle("estimator_names", get_estimator_names(is_seas))
     prepare_forecast_bundles(&b)
     bundle fc = b.forecast_results
     bundle fc1 = fc.snaivefc
@@ -155,16 +155,16 @@ function void test_get_supported_seas_methods (void)
 end function
 
 
-function void test_methods_to_apply (void)
-    print "Start with methods_to_apply()"
+function void test_get_estimator_names (void)
+    print "Start with get_estimator_names()"
 
-    bundle B = defbundle("is_seas", 0)
-    methods_to_apply(&B)
-    assert_equal_num(nelem(B.methods_used), 6)
+    scalar is_seas = 0
+    strings S = get_estimator_names(is_seas)
+    assert_equal_num(nelem(S), 6)
 
-    bundle B = defbundle("is_seas", 1)
-    methods_to_apply(&B)
-    assert_equal_num(nelem(B.methods_used), 10)
+    scalar is_seas = 1
+    strings S = get_estimator_names(is_seas)
+    assert_equal_num(nelem(S), 10)
 end function
 
 
@@ -172,7 +172,7 @@ function void test_prepare_forecast_bundles (void)
     print "Start with prepare_result_matrices()"
 
     bundle B = defbundle("is_seas", 0, \
-      "methods_used", get_supported_nonseas_methods())
+      "estimator_names", get_supported_nonseas_methods())
       prepare_forecast_bundles(&B)
 
     assert_equal_num(nelem(B), 3)
@@ -189,7 +189,7 @@ test_array_of_horizon_labels()
 test_set_bundle(djclose)
 test_get_supported_ns_methods()
 test_get_supported_seas_methods()
-test_methods_to_apply()
+test_get_estimator_names()
 
 
 nulldata 24 -p

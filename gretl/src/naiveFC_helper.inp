@@ -51,13 +51,15 @@ function scalar valid_window_length (bundle *self)
 end function
 
 
-function void methods_to_apply (bundle *self)
+function strings get_estimator_names (const bool is_seas "0=data has no seasonality, 1=it has")
     /* Obtain names of methods going to apply. */
 
-    strings self.methods_used = strdrop(get_supported_nonseas_methods(), "avgfc")
-    if self.is_seas
-        self.methods_used += get_supported_seas_methods()
+    strings methods = strdrop(get_supported_nonseas_methods(), "avgfc")
+    if is_seas
+        methods += get_supported_seas_methods()
     endif
+
+    return methods
 end function
 
 
