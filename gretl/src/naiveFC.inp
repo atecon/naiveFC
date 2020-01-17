@@ -1,47 +1,3 @@
-
-# FIXME: Merge with get_dates_forecasted()
-function strings array_of_condition_dates (bundle *self)
-/* Construct date strings refering to the date based on which a
-    forecasting model was estimated. */
-
-    if self.type_moving_window == "static"
-        strings dates = array(1)		# for 'static' case, only on a single date is conditioned
-    else
-        strings dates = array(self.n_folds)
-    endif
-
-    # Here we explicitly consider the case when the last obs are missings
-    # TODO: Check dates for correctness!
-    scalar first_condition_date = obsnum(self.t1_forecast_date) - 1
-    if self.type_moving_window == "static"
-        #scalar first_condition_date = obsnum(self.t2_label)
-        scalar last_condition_date = first_condition_date
-    else
-        scalar last_condition_date = first_condition_date + self.n_folds - 1	# TODO: -1 ???
-    endif
-    matrix conditioning_dates = {$obsdate}[first_condition_date:last_condition_date]
-
-    strings r = array(rows(conditioning_dates))
-
-    loop i=1..rows(conditioning_dates) -q
-        string sdate = sprintf("%d", conditioning_dates[i])
-
-        if $pd == 1
-            r[i] = sprintf("%s", substr(sdate,1,4))
-        elif $pd==4
-            r[i] = sprintf("%s:%s", substr(sdate,1,4),
-              substr(sdate,5,6))
-        else
-            r[i] = sprintf("%s-%s-%s", substr(sdate,1,4),
-              substr(sdate,5,6), substr(sdate,7,8))
-        endif
-    endloop
-
-    return r
-end function
-
-
-
 function bundle default_values (const series y)
     /* Set default values */
 
@@ -415,21 +371,21 @@ function void do_naive_forecasting (bundle *self)
     endif
 
     attach_row_labels(&interval_forecasts, self)
-    
-    attach_column_labels(&self)
+    attach_column_labels(&interval_forecasts, self)
 end function
 
 
-function void attach_column_labels (bundle *self)
+function void attach_column_labels (bundle *interval_forecasts,
+                                    bundle self)
 /* Add date strings as column labels for indicating the date on
     which the estimates are conditioned on. */
 
-    strings conditioning_dates = array_of_condition_dates(&self)
+    string date_first_train_end = date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -1)    
+    strings date_strings = future_date_strings(date_first_train_end, self.n_folds)
 
-    loop i=1..nelem(self.forecasts_point) -q
-        cnameset(self.forecasts_point[i], conditioning_dates)
-        cnameset(self.forecasts_lower_bound[i], conditioning_dates)
-        cnameset(self.forecasts_upper_bound[i], conditioning_dates)
+    strings keys = getkeys(interval_forecasts)
+    loop i=1..nelem(keys) -q
+        cnameset(interval_forecasts[keys[i]], date_strings)
     endloop
 end function
 

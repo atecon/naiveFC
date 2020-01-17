@@ -31,7 +31,7 @@ end function
 
 
 function strings future_date_strings (const string date_of_information_str "Obs. before 1st h=1 forecast",
-                                       const int n_future_periods[0::])
+                                      const int n_future_periods[1::])
     /* Construct date strings refering to the date for which a the
     h-step ahead forecast was made for.*/
 
