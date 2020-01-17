@@ -18,7 +18,7 @@ include "./src/naiveFC_helper.inp" --force
 
 # Select an example
 #==================
-scalar runEX = 1
+scalar runEX = 2
 
 # Load data
 if runEX==1

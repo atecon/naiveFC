@@ -127,6 +127,9 @@ function bundle default_values (const series y)
     strings self.estimator_names = get_estimator_names(self.is_seas)
     scalar self.verbose = 1
 
+    genr index
+    series self.index = index
+
     # For get_moving_window_forecasts()
     string self.type_moving_window = "static" 			# "static", "rolling" or "recursive"
     scalar self.window_length = ceil(0.25 * nobs(y))		# default window length
@@ -519,26 +522,28 @@ function bundle get_mean_fc_and_mean_sd (const matrices fc_and_sd)
 end function
 
 
+# TODO: untested
+function void add_last_xtrain_fold (const series y, 	bundle *cv)
+    /* As CvDataSplitter() doesn't consider the very last obs in
+    the final training set for 'rolwin' and 'recwin', this must be added. */
+
+    cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
+    cv.n_folds++
+end function
+
+
 function void get_moving_window_forecasts (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores sequences of interval forecasts. */
 
-    series y = self.y			# y includes the additional n=horizon newly added observations for the very last cv-dataset
-
-    
+    series y = self.y		# This assignment is needed!
+    list X = y				# y includes the additional n=horizon newly added observations for the very last cv-dataset   
     bundle cv = prep_cv_bundle(&self)
-    cv
-    bundle cv = null					# Tried to put this into a bundle, but git issues with index series
-    list cv.X = 	y					# CvDataSplitter() expects a list
-    string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
-    scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
-    */
-    CvDataSplitter(&cv)
+    list cv.X = X
+    #    smpl obsnum(self.t1_label) obsnum(self.t2_label) # FIXME: needed?
 
-    # As CvDataSplitter() doesn't consider the very last obs in
-    # the final training set for 'rolwin' and 'recwin', this must be added.
-    cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
-    cv.n_folds++
+    CvDataSplitter(&cv)
+    add_last_xtrain_fold(y, &cv)
     self.n_folds = cv.n_folds
 
     # Loop over training sets, run estimation and retrieve interval forecasts

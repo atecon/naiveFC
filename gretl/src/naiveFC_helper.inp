@@ -1,10 +1,12 @@
+# TODO: untested
 function bundle prep_cv_bundle (bundle *self)
     /* Prepare bundle for CvDataSplitter(). */
 
-    series y = self.y			# y includes the additional n=horizon newly added observations for the very last cv-dataset
     bundle cv					# Tried to put this into a bundle, but git issues with index series
     
-    list cv.X = 	y					# CvDataSplitter() expects a list
+    # NOTE: list X is not properly passed to cv struct which is used in get_moving_window_forecasts()
+    #    list X = y
+    #    list cv.X = X				# CvDataSplitter() expects a list
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
 
