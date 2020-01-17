@@ -9,6 +9,10 @@ include "./src/naiveFC_helper.inp" --force
 include string_utils.gfn
 include assertion.gfn
 
+function void test_attach_row_labels (void)
+    print "Start with attach_row_labels()"
+
+end function
 
 function void test_prepare_forecast_bundles (void)
     print "Start with prepare_forecast_bundles()"

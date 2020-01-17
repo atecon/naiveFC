@@ -104,7 +104,6 @@ function strings get_estimator_names (const bool is_seas "0=data has no seasonal
 end function
 
 
-
 function void obslabels_and_nobs_to_bundle (const list y,
                                             bundle *self)
     smpl y --contiguous

@@ -1,22 +1,19 @@
-
-
-function strings get_dates_forecasted (const string t2_label,
-                                       const int horizon)
+function strings get_dates_forecasted (const string date_of_information_str,
+                                       const int max_horizon[1::])
     /* Construct date strings refering to the date for which a the
     h-step ahead forecast was made for. For 'static' forecasts only. */
 
-    strings dates_forecasted = array(horizon)
+    strings dates_forecasted = array(max_horizon)
 
-    scalar init_day_forecasted = 1 + obsnum(t2_label)
-    scalar last_day_forecasted = init_day_forecasted + horizon - 1
+    scalar date_of_information_num = obsnum(date_of_information_str)
 
-    loop i=1..horizon -q
-        smpl (init_day_forecasted+$i-1) (init_day_forecasted+$i-1)
-        dates_forecasted[i] = obslabel($t1)
+    loop i=1..max_horizon -q
+        dates_forecasted[i] = date_plus_x_as_obslabel(date_of_information_num, $i)
     endloop
 
     return dates_forecasted
 end function
+
 
 # FIXME: Merge with get_dates_forecasted()
 function strings array_of_condition_dates (bundle *self)
@@ -235,7 +232,7 @@ function list prepare_xlist (const string estimator,
     if inbundle(self, "xlist")
         xlist += self.xlist
     endif
-    
+
     # TODO: check for duplicates in xlist
 
     return xlist
@@ -243,7 +240,7 @@ end function
 
 
 function matrix set_xlist_and_forecast (bundle *self, const string estimator)
-    /* Set list of regressors, estimate model and compute
+/* Set list of regressors, estimate model and compute
     point forecast and forecast standard errors. */
 
     bundle model_settings = dict_models()["@estimator"]
@@ -261,7 +258,7 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
     if model_settings.add_first_lag
         xlist += y(-1)
     endif
-    
+
     bundle train_obsnums = get_train_start_end_obsnums(&self)
     # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
     # is not the effective sample length
@@ -289,7 +286,7 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
     if model_error
         printError("Error: Model estimation failed.\n\
           Forecast values are set to NA for the current sample.")
-        
+
         return forecast_results
     else
         fcast ($t2+1) ($t2+self.horizon) @fcast_arg #--quiet
@@ -384,10 +381,11 @@ function bundle naiveFC (const series y,
     endif
 
     do_naive_forecasting(&self)
-
     if self.verbose
         summarize_naive_fc_results(&self)
     endif
+
+stop
 
     # Drop some elements from self
     delete self.fan
@@ -416,7 +414,7 @@ function bundle prepare_forecast_bundles (bundle *self)
 end function
 
 
-# TODO: This function looks to me as the ideal one 
+# TODO: This function looks to me as the ideal one
 # where to call various model via a loop!
 function void do_naive_forecasting (bundle *self)
 /* Wrapper function actually calling static or
@@ -428,16 +426,19 @@ function void do_naive_forecasting (bundle *self)
         get_static_forecasts(&self)
     else
         # TODO: later 'interval_forecasts' is a container
-        # holding a bundle with interval_forecasts for each 
+        # holding a bundle with interval_forecasts for each
         # model
         bundle interval_forecasts = get_moving_window_forecasts(&self)
     endif
 
+    interval_forecasts
     attach_column_labels(&self)
+        stop
+
     attach_row_labels(&self)
 end function
 
-
+# TODO: untested
 function void attach_row_labels (bundle *self)
 /* Add date strings as row labels for 'static' forecasts,
    or indicate the forecast horizon for moving-window
@@ -473,6 +474,7 @@ end function
 
 function void summarize_naive_fc_results (bundle *self)
     /* Print summarising information */
+
     printf "****************************************************\n"
     printf "\t\tNaive Forecasting Method\n"
     printf "\nEndogenous: \t\t\t\t%s\n", self.name_endo
@@ -480,14 +482,14 @@ function void summarize_naive_fc_results (bundle *self)
     printf "Forecasting method: \t\t\t%s\n", self.which
     printf "Start valid data set: \t\t\t%s\n", self.t1_label
     printf "End valid data set: \t\t\t%s\n", self.t2_label
-    printf "Number of observations: \t\t%d\n", obsnum(self.t2_label)-obsnum(self.t1_label)
+    printf "Number of observations: \t\t%d\n", obsnum(self.t2_label) - obsnum(self.t1_label)
     printf "Forecast horizon: \t\t\t%d\n", self.horizon
     printf "First observation forecasted (h=1): \t%s\n", self.t1_forecast_date
     printf "Last observation forecasted (h=%d): \t%s\n", self.horizon, self.t2_forecast_date
     if self.type_moving_window == "static"
-        if self.which != "avgFC"
-            printf "Width forecast interval: \t\t%d pct.\n", self.level*100
-        endif
+#        if self.which != "avgFC"
+            printf "Width forecast interval: \t\t%d pct.\n", self.level * 100
+#        endif
     else
         printf "Moving window length: \t\t\t%d\n", self.window_length
         printf "Number of %s forecasts: \t\t%d\n", self.type_moving_window, self.n_folds
@@ -594,7 +596,7 @@ function bundle get_moving_window_forecasts (bundle *self)
     # Loop over training sets, run estimation and retrieve interval forecasts.
     # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.
     matrices fc_and_sd_from_all_cv = run_movwin_forecasts(&cv, &self)
-    
+
     bundle forecasts_and_factors = \
       point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)
 
@@ -615,9 +617,9 @@ function bundle comp_intval_fc_and_to_bundle (const bundle forecasts_and_factors
       flatten(forecasts_and_factors.point_forecasts)	# rows: horizons, cols: sample period
 
     matrix factors_flattened = flatten(forecasts_and_factors.factors)
-    
+
     matrix interval_forecasts.forecasts_lower_bound = \
-      interval_forecasts.forecasts_point .- factors_flattened      
+      interval_forecasts.forecasts_point .- factors_flattened
 
     matrix interval_forecasts.forecasts_upper_bound = \
       interval_forecasts.forecasts_point .+ factors_flattened
@@ -647,7 +649,7 @@ function matrices run_movwin_forecasts (bundle *cv, bundle *self)
 
         fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
     endloop
-    
+
     return fc_and_sd_from_all_cv
 end function
 
