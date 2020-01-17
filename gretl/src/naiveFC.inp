@@ -173,7 +173,7 @@ end function
 function matrix forecast_and_get_fc_sd (bundle *self, const string method)
     /* Compute point forecast and forecast standard errors. */
 
-    scalar dynamic_fc = 
+    scalar dynamic_fc =
     if is_dynamic_model(method)
         string fcast_arg = "--dynamic"
     else
@@ -209,7 +209,7 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
         scalar self.error = 1
         return forecast_results
     endif
-  
+
 
     # Estimation
     if method == "meanfc"
@@ -238,12 +238,12 @@ function matrix forecast_and_get_fc_sd (bundle *self, const string method)
 
     if $error
         printError("Error: Model estimation failed.\n\
-        Forecast values are set to NA for the current sample.")
+          Forecast values are set to NA for the current sample.")
     else
         fcast ($t2+1) ($t2+self.horizon) @fcast_arg --quiet
     endif
 
-#    *** HIER WEITERMACHEN
+    #    *** HIER WEITERMACHEN
     if self.type_moving_window == "static"
         gen_t1_forecast_date($t2, &self)			# adds to self
         gen_t2_forecast_date($t2, &self)			# adds to self
@@ -267,12 +267,12 @@ function void do_initial_checks (bundle *self)
     strings seas_methods = get_supported_seas_methods()
 
     # Check whether called method exists
-    if sum(strpos(methods, self.which)) == 0 && sum(strpos(seas_methods, self.which)) == 0
+    if !nelem(strpos(methods, self.which)) && !nelem(strpos(seas_methods, self.which))
         printError("The forecasting method you selected does not exist.")
         self.error = 1
     endif
-
-    if self.is_seas==0 && sum(strpos(seas_methods, self.which)) > 0
+    
+    if !self.is_seas && nelem(strpos(seas_methods, self.which))
         printError("The method you requested is not available for non-seasonal data.")
         self.error = 1
     endif
@@ -285,7 +285,7 @@ function void do_initial_checks (bundle *self)
         self.error = 1
     endif
 
-    if self.nboot > 0
+    if self.nboot
         print_no_bootstrap_support()
         self.error = 1
     endif
@@ -314,17 +314,19 @@ function bundle naiveFC (const series y,
     do_initial_checks(&self)
     if self.error
         return self
-    else
-        catch include CvDataSplitter.gfn
-        if !$error
-            printInfo("Necessary package 'CvDataSplitter' succesfully loaded.")
-        endif
+    endif
+
+    catch include CvDataSplitter.gfn
+    if !$error
+        printInfo("Necessary package 'CvDataSplitter' succesfully loaded.")
     endif
 
     # Drop missings + determine number of valid observations
     valid_sample_and_obs_details(y, &self)
-
-
+    if self.error
+        return self
+    endif
+    
     # Add obs for forecasting
     self.obs_added = nobs_to_add_to_dataset(y, self.horizon)
     if self.obs_added
@@ -443,65 +445,39 @@ function void summarize_naive_fc_results (bundle *self)
 end function
 
 
-function void check_sample_validity (const series y, bundle *self)
-    if smplspan(self.t1_label, self.t2_label) < self.window_length
-#    if $nobs < self.window_length
-        printf "\nError: The window size you selected (wsize=%d) exceeds the\n\
-          number of valid observations.\n", self.window_length
-        funcerr "Re-specify."
-    endif
-end function    
 
-*** HIER WEITERMACHEN ***
 
+# TODO: untested
 function void valid_sample_and_obs_details (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
-    # FIXME: put 1st part to check_sample_validity()
+    self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
+
     if inbundle(self, "xlist")
         list xlist = self.xlist
     else
         list xlist = null
     endif
-    self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings    
-    scalar tdiff = diff_t2_of_y_and_x(y, xlist)
 
-    if ok(tdiff)
-        if tdiff > && (tdiff < self.horizon)
-            printError(sprintf("The last valid observation of series %s is %s.", \
-              self.name_endo, obslabel(t2_y)))
-            printError(sprintf("You requested a %d-step ahead sequence of forecasts.", \
-              self.horizon))
-            printError(sprintf"The last valid observation of the contiguous sample\n\
-              for the additional regressors is %s.", obslabel(t2_xlist))
-            printError("It is not possible to compute the requested h-steap ahead\n\
-              sequence of forecasts.")
-            printError(sprintf("Either reduce the forecast horizon to h=%d\n\
-              or add future information for your 'xlist' variables.", tdiff))
+    self.error = samples_for_y_and_xlist_match(y, xlist, &self)
 
-            self.error = 1
-        elif tdiff <= 0
-            printError("The 'xlist' variables include no valid future observations\n\
-              but only missings.")
-            printError(sprintf("Last valid observation of additional exogenous\n\
-              regressors is %s", obslabel(t2_xlist)))
+    if self.error == 0
+        obslabels_and_nobs_to_bundle(y, &self)		# add labels of valid dates to self
 
-            self.error = 1
+        scalar tdiff = self.T_all - self.T
+
+        if tdiff > 0 && self.verbose
+            printWarning(sprintf("The time-series sample has been restricted\n\
+              due to %d missing values in series %s.", tdiff, self.name_endo))
+
+            printWarning(sprintf("Information on the new contiguous \n\
+              set for series '%s':\n\
+              Start date: %s\n\
+              End date: %s", self.name_endo, self.t1_label, self.t2_label))
         endif
-
-        smpl full
     endif
 
-    obslabels_and_nobs_to_bundle(y, &self)	# no. of valid obs before adding obs. for forecasting purpose
-
-    if (self.T < self.T_all) && self.verbose
-        printWarning(sprintf("The time-series sample has been restricted\n\
-        due to %d missing values in series %s.", (self.T_all-self.T), self.name_endo))
-        printWarning(sprintf("Information on the new contiguous \n\
-          set for series '%s':\n\
-          Start date: %s\n\
-          End date: %s", self.name_endo, self.t1_label, self.t2_label))
-    endif
+    self.error = valid_window_length(&self)
 end function
 
 

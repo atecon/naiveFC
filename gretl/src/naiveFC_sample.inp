@@ -5,13 +5,19 @@ set verbose off
 
 string WD = "/home/at/git/naiveFC/gretl"
 set workdir @WD
+
+# TODO: put external packages to spec-config
+include string_utils.gfn
+
+
 include "./src/naiveFC.inp" --force
 include "./src/naiveFC_helper.inp" --force
 
 
+
 # Select an example
 #==================
-scalar runEX = 5
+scalar runEX = 1
 
 # Load data
 if runEX==1

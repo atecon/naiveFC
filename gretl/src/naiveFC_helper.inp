@@ -1,3 +1,56 @@
+# TODO: untested
+function scalar samples_for_y_and_xlist_match (const series y, const list xlist, bundle *self)
+    /* Returns zero if samples of y and xlist are ok. */
+
+    if nelem(xlist) == 0
+        return 0
+    endif
+    bundle obsdetails_y
+    bundle obsdetails_x
+
+    obslabels_and_nobs_to_bundle(y, &obsdetails_y)	# no. of valid obs before adding obs. for forecasting purpose
+    obslabels_and_nobs_to_bundle(x, &obsdetails_x)	# no. of valid obs before adding obs. for forecasting purpose
+    scalar tdiff = diff_t2_of_y_and_x(y, xlist)
+
+    if tdiff > && (tdiff < self.horizon)
+        printError(sprintf("The last valid observation of series %s is %s.", \
+          self.name_endo, obsdetails_y.t2_label))
+        printError(sprintf("You requested a %d-step ahead sequence of forecasts.", \
+          self.horizon))
+        printError(sprintf"The last valid observation of the contiguous sample\n\
+          for the additional regressors is %s.", obsdetails_x.t2_label)
+        printError("It is not possible to compute the requested h-steap ahead\n\
+          sequence of forecasts.")
+        printError(sprintf("Either reduce the forecast horizon to h=%d\n\
+          or add future information for your 'xlist' variables.", tdiff))
+
+        return 1
+    elif tdiff <= 0
+        printError("The 'xlist' variables include no valid future observations\n\
+          but only missings.")
+        printError(sprintf("Last valid observation of additional exogenous\n\
+          regressors is %s", obsdetails_x.t2_label))
+
+        return 1
+    endif
+
+    return 0
+end function
+
+
+function scalar valid_window_length (bundle *self)
+    /* Returns zero of window_length is valid. */
+
+    if smplspan(self.t1_label, self.t2_label, $pd) < self.window_length
+        printError(sprintf("The window size you selected (wsize=%d) exceeds the\n\
+          number of valid observations in '%s'.", self.window_length, self.name_endo))
+
+        return 1
+    endif
+    return 0
+end function
+
+
 function void methods_to_apply (bundle *self)
     /* Obtain names of methods going to apply. */
 
