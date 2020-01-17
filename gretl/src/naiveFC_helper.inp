@@ -1,3 +1,27 @@
+# TODO: untested
+function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
+                                               bundle *self)
+    /* Using each model's point forecast and standard error, compute
+    the forecast interval assuming standard normal. */
+
+    bundle bout
+
+    scalar m = nelem(fc_and_sd)
+    matrices point_forecasts = array(m)
+    matrices factors = array(m)
+
+    loop i=1..m -q
+        point_forecasts[i] = fc_and_sd[i][,1]
+        factors[i] = fc_interval_width(fc_and_sd[i][,1], self.level)
+    endloop
+
+    bout.point_forecasts = point_forecasts
+    bout.factors = factors
+
+    return bout
+end function
+
+
 # TODO: untested -- however, rather CvDataSplitter() should be tested!
 function bundle prep_and_get_cv_folds (bundle *self)
     /* Prepare bundle for CvDataSplitter() and compute folds. */

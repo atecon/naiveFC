@@ -1,26 +1,3 @@
-function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
-                                               bundle *self)
-    /* Using each model's point forecast and standard error, compute
-    the forecast interval assuming standard normal. */
-
-    bundle bout = null
-
-    scalar m = nelem(fc_and_sd)
-    matrices point_forecasts = array(m)
-    matrices factors = array(m)
-
-    loop i=1..m -q
-        point_forecasts[i] = fc_and_sd[i][,1]
-        factors[i] = fc_interval_width(fc_and_sd[i][,1], self.level)
-    endloop
-
-    bout.point_forecasts = point_forecasts
-    bout.factors = factors
-
-    return bout
-end function
-
-
 function void get_point_low_up_bound_arrays (bundle *bout, bundle *self)
 /* Generate for each model based on respective point forecasts and
     estimated standard derrors, arrays holding the interval forecasts. */
@@ -294,16 +271,17 @@ end function
 
 
 function matrix set_xlist_and_forecast (bundle *self, const string estimator)
-    /* Compute point forecast and forecast standard errors. */
+    /* Set list of regressors, estimate model and compute
+    point forecast and forecast standard errors. */
 
     bundle model_settings = dict_models()["@estimator"]
     string fcast_arg = model_settings.forecast_arg
     string command = model_settings.command
     # TODO: consider 3 verbose levels: silent, normal, detailed
-    if self.verbose < 1 #2
+    if self.verbose < 2
         command += " --quiet"	# estimation details only for detailed verbosity level
+        fcast_arg += " --quiet"
     endif
-
     matrix forecast_results = zeros(self.horizon, 2) * NA
     series y = self.y					# length: window_length + horizon
 
@@ -639,11 +617,14 @@ function void get_moving_window_forecasts (bundle *self)
     # Loop over training sets, run estimation and retrieve interval forecasts.
     # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.
     matrices fc_and_sd_from_all_cv = run_movwin_forecasts(&cv, &self)
-    bundle bout = point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)	# stuff stored in an array in bout
+    
+    bundle forecasts_and_factors = \
+      point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)
 
     # Retrieve moving-window point_forecasts from array,
-    # and compute and get associated intervals.
-    matrices pt_lb_up = ret_movwin_point_lb_up_matrices(&bout, &self)
+    # compute forecast intervals and put stuff to bundle
+    bundle interval_forecasts = \
+      put_intval_fc_to_bundle(forecasts_and_factors, self)
 
     # --> For the 'static' case, point, lower and upper bound results
     # are stored in separate matrix arrays, as multiple models can be
@@ -656,13 +637,14 @@ function void get_moving_window_forecasts (bundle *self)
 end function
 
 
-function matrices ret_movwin_point_lb_up_matrices (bundle *bout,
-                                                   bundle *self)
+function bundle put_intval_fc_to_bundle (const bundle forecasts_and_factors,
+                                                 const bundle self)
     /* Retrieve miving-window point_forecasts from array,
       and compute and get associated intervals. */
-    matrices out = array(3)
-
-    out[1] = flatten(bout.point_forecasts)		# rows: horizon, cols: sample period
+    bundle interval_forecasts
+    out = flatten(bout.point_forecasts)		# rows: horizon, cols: sample period
+    out
+    stop 
     matrices get_movwin_low_up_matrices = get_movwin_low_up_matrices(out[1], \
       flatten(bout.factors))
     out[2] = get_movwin_low_up_matrices[1]
@@ -692,7 +674,7 @@ function matrices run_movwin_forecasts (bundle *cv, bundle *self)
 
         fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
     endloop
-
+    
     return fc_and_sd_from_all_cv
 end function
 
