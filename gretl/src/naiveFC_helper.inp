@@ -171,21 +171,6 @@ function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
 end function
 
 
-function scalar is_dynamic_model (const string method)
-    /* Flag dynamic models -- needed for 'fcast' command. */
-    # TODO: untested
-
-    if method == "snaivefc" || method == "snaivedriftfc" || \
-          method == "rwfc" || method == "rwdriftfc" || \
-          method == "ar1fc" || method == "ar1trendfc"
-
-        return 1
-    else
-        return 0
-    endif
-end function
-
-
 function strings gen_column_names (bundle *self)
     /* Construct column names */
 
@@ -248,10 +233,10 @@ function series get_highest_period_series (void)
 end function
 
 
-function list add_intercept_to_list (const string method,
-                                     list xlist)
+function list add_intercept_to_list (const string method)
     /* Add intercept to list. */
 
+    list xlist = null
     if method != "rwFC" || method != "rwdriftfc"
         list xlist += const
     endif

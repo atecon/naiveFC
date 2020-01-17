@@ -174,24 +174,68 @@ function matrices call_method (bundle *self)
 end function
 
 
-function matrix set_xlist_and_forecast (bundle *self, const string method)
+function bundle dict_models (void)
+    /* Dictionary including stuff for calling estimation
+    command and fcast command. */
+    
+    bundle dict_models
+    
+    dict_models.meanfc = defbundle( \
+        "forecast_arg", "--static", \
+        "command", "ols y xlist" \
+    )
+    dict_models.medianfc = defbundle( \
+        "forecast_arg", "--static", \
+        "command", "quantreg 0.5 y xlist" \
+    )
+
+    dict_models.smeanfc = defbundle( \
+        "forecast_arg", "--static", \
+        "command", "ols y xlist" \
+    )
+    dict_models.smedianfc = defbundle( \
+        "forecast_arg", "--static", \
+        "command", "quantreg 0.5 y xlist" \
+    )
+    dict_models.snaivefc = defbundle( \
+        "forecast_arg", "--dynamic", \
+        "command", "arima 0 0 0 ; 0 1 0 ; y xlist --nc" \
+    )
+    dict_models.snaivedriftfc = defbundle( \
+        "forecast_arg", "--dynamic", \
+        "command", "arima 0 0 0 ; 0 1 0 ; y xlist" \
+    )
+    dict_models.ar1fc = defbundle( \
+        "forecast_arg", "--dynamic", \
+        "command", "ols y xlist" \
+    )
+    dict_models.ar1trendfc = defbundle( \
+        "forecast_arg", "--dynamic", \
+        "command", "ols y xlist" \
+    )
+
+    return dict_models
+end function
+
+
+
+
+function matrix set_xlist_and_forecast (bundle *self, const string estimator)
     /* Compute point forecast and forecast standard errors. */
 
-    scalar dynamic_fc =
-    if is_dynamic_model(method)
-        string fcast_arg = "--dynamic"
-    else
-        string fcast_arg = "--static"
-    endif
+    bundle model_settings = dict_models()["@estimator"]
+    string fcast_arg = model_settings.forecast_arg
+    string command = model_settings.command
+    
     matrix forecast_results = zeros(self.horizon, 2) * NA
     list xlist = null
     series y = self.y					# length: window_length + horizon
 
-    xlist += add_ohe_periods_to_list(method, xlist)
-    xlist += add_linear_trend_to_list(&self, method, xlist)
-    xlist += add_intercept_to_list(method, xlist)
+    xlist += add_ohe_periods_to_list(estimator, xlist)
+    xlist += add_linear_trend_to_list(&self, estimator, xlist)
+    xlist += add_intercept_to_list(estimator, xlist)
     xlist += self.xlist
-    if method == "ar1fc" || method == "ar1trendfc"
+    if estimator == "ar1fc" || estimator == "ar1trendfc"
         xlist += y(-1)
     endif
 
@@ -216,27 +260,27 @@ function matrix set_xlist_and_forecast (bundle *self, const string method)
 
 
     # Estimation
-    if method == "meanfc"
+    if estimator == "meanfc"
         catch ols y xlist --quiet
 
-    elif method == "medianfc"
+    elif estimator == "medianfc"
         catch quantreg 0.5 y xlist --quiet
 
-    elif method == "smeanfc"
+    elif estimator == "smeanfc"
         catch ols y xlist --quiet
 
-    elif method == "smedianfc"
+    elif estimator == "smedianfc"
         catch quantreg 0.5 y xlist --quiet
 
-    elif method == "snaivefc" || method == "snaivedriftfc"
-        string arima_opt = (method == "snaive") ? "--nc" : ""
+    elif estimator == "snaivefc" || estimator == "snaivedriftfc"
+        string arima_opt = (estimator == "snaive") ? "--nc" : ""
         catch arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet
 
-    elif method == "rwfc" || method == "rwdriftfc"
-        string arima_opt = (method == "rwfc") ? "--nc" : ""
+    elif estimator == "rwfc" || estimator == "rwdriftfc"
+        string arima_opt = (estimator == "rwfc") ? "--nc" : ""
         catch arima 0 1 0 ; y xlist @arima_opt --quiet
 
-    elif method == "ar1fc" || method == "ar1trendfc"
+    elif estimator == "ar1fc" || estimator == "ar1trendfc"
         catch ols y xlist --quiet
     endif
 

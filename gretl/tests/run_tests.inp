@@ -285,9 +285,10 @@ function void test_add_intercept_to_list (void)
     print "Start with add_intercept_to_list()"
 
     list L = null
-    L = add_intercept_to_list("rwfc", L)
+    L += add_intercept_to_list("rwfc")
     assert_equal_num(nelem(L), 1)
-
+    L
+    stop
     list L = null
     L = add_intercept_to_list("rwdriftfc", L)
     assert_equal_num(nelem(L), 1)
