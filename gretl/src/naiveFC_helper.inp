@@ -245,10 +245,10 @@ function list add_intercept_to_list (const string method)
 end function
 
 
-function list add_ohe_periods_to_list (const string method,
-                                       list xlist)
+function list add_ohe_periods_to_list (const string method)
     /* Add list of dummyfied frequency components to list. */
 
+    list xlist = null
     if method == "smeanfc" || method == "smedianfc"
         series period = get_highest_period_series()
         xlist += dummify(period)
@@ -259,14 +259,14 @@ end function
 
 
 function list add_linear_trend_to_list (bundle *self,
-                                        const string method,
-                                        list xlist)
+                                        const string method)
     /* Add 'time' to list. */
 
+    list xlist = null
     if method == "ar1trendfc" && inbundle(self, "with_linear_trend")
         if self.with_linear_trend			# TODO: Is this necessary
             genr time
-            xlist += time
+            list xlist += time
         endif
     endif
 

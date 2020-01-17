@@ -253,31 +253,36 @@ function void test_add_ohe_periods_to_list (void)
     print "Start with add_ohe_periods_to_list()"
 
     list L = null
-    list Lout = add_ohe_periods_to_list("smeanfc", L)
-    assert_equal_num(nelem(Lout), 30)
-    list Lout = add_ohe_periods_to_list("smedianfc", L)
-    assert_equal_num(nelem(Lout), 30)
-    list Lout = add_ohe_periods_to_list("foo", L)
-    assert_false(nelem(Lout))
+    list L += add_ohe_periods_to_list("smeanfc")
+    assert_equal_num(nelem(L), 30)
+    
+    list L = null
+    list L += add_ohe_periods_to_list("smedianfc")
+    assert_equal_num(nelem(L), 30)
+    
+    list L = null
+    list L += add_ohe_periods_to_list("foo")
+    assert_false(nelem(L))
 end function
+
 
 function void test_add_linear_trend_to_list (void)
     print "Start with add_linear_trend_to_list()"
 
-    list Lout = null
+    list L = null
     bundle B = defbundle("with_trend", 1)
-    list Lout = add_linear_trend_to_list(&B, "ar1trendfc", Lout)
-    assert_false(nelem(Lout))
+    list L += add_linear_trend_to_list(&B, "ar1trendfc")
+    assert_false(nelem(L))
 
-    list Lout = null
+    list L = null
     bundle B = defbundle("with_linear_trend", 1)
-    list Lout = add_linear_trend_to_list(&B, "ar1trendfc", Lout)
-    assert_equal_num(nelem(Lout), 1)
+    list L += add_linear_trend_to_list(&B, "ar1trendfc")
+    assert_equal_num(nelem(L), 1)
 
-    list Lout = null
+    list L = null
     bundle B = defbundle("with_linear_trend", 1)
-    Lout = add_linear_trend_to_list(&B, "foo", Lout)
-    assert_false(nelem(Lout))
+    L += add_linear_trend_to_list(&B, "foo")
+    assert_false(nelem(L))
 end function
 
 
@@ -287,14 +292,13 @@ function void test_add_intercept_to_list (void)
     list L = null
     L += add_intercept_to_list("rwfc")
     assert_equal_num(nelem(L), 1)
-    L
-    stop
+    
     list L = null
-    L = add_intercept_to_list("rwdriftfc", L)
+    L += add_intercept_to_list("rwdriftfc")
     assert_equal_num(nelem(L), 1)
 
     list L = null
-    L = add_intercept_to_list("foo", L)
+    L += add_intercept_to_list("foo")
     assert_equal_num(nelem(L), 1)
 end function
 
