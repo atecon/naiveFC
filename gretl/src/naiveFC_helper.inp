@@ -233,38 +233,30 @@ function series get_highest_period_series (void)
 end function
 
 
-function list add_intercept_to_list (const string method)
+function list add_intercept_to_list (void)
     /* Add intercept to list. */
 
-    list xlist = null
-    if method != "rwFC" || method != "rwdriftfc"
-        list xlist += const
-    endif
-
+    list xlist = const
+    
     return xlist
 end function
 
 
-function list add_ohe_periods_to_list (const string method)
+function list add_ohe_periods_to_list (void)
     /* Add list of dummyfied frequency components to list. */
 
-    list xlist = null
-    if method == "smeanfc" || method == "smedianfc"
-        series period = get_highest_period_series()
-        xlist += dummify(period)
-    endif
-
+    series period = get_highest_period_series()
+    list xlist = dummify(period)
+    
     return xlist
 end function
 
 
-function list add_linear_trend_to_list (bundle *self,
-                                        const string method)
-    /* Add 'time' to list. */
+function list add_linear_trend_to_list (void)
+    /* Add linear trend to list. */
 
-    list xlist = null
     genr time
-    list xlist += time
+    list xlist = time
 
     return xlist
 end function

@@ -18,7 +18,7 @@ function void test_prepare_forecast_bundles (void)
     prepare_forecast_bundles(&b)
     bundle fc = b.forecast_results
     bundle fc1 = fc.snaivefc
-    
+
     assert_true(inbundle(fc,   snaivefc))
     assert_equal_num(nelem(fc), 10)
     assert_equal_num(nelem(fc1), 3)
@@ -252,53 +252,23 @@ setobs 7 2000-01-01 --time-series
 function void test_add_ohe_periods_to_list (void)
     print "Start with add_ohe_periods_to_list()"
 
-    list L = null
-    list L += add_ohe_periods_to_list("smeanfc")
+    list L = add_ohe_periods_to_list()
     assert_equal_num(nelem(L), 30)
-    
-    list L = null
-    list L += add_ohe_periods_to_list("smedianfc")
-    assert_equal_num(nelem(L), 30)
-    
-    list L = null
-    list L += add_ohe_periods_to_list("foo")
-    assert_false(nelem(L))
 end function
 
 
 function void test_add_linear_trend_to_list (void)
     print "Start with add_linear_trend_to_list()"
 
-    list L = null
-    bundle B = defbundle("with_trend", 1)
-    list L += add_linear_trend_to_list(&B, "ar1trendfc")
-    assert_false(nelem(L))
-
-    list L = null
-    bundle B = defbundle("with_linear_trend", 1)
-    list L += add_linear_trend_to_list(&B, "ar1trendfc")
+    list L = add_linear_trend_to_list()
     assert_equal_num(nelem(L), 1)
-
-    list L = null
-    bundle B = defbundle("with_linear_trend", 1)
-    L += add_linear_trend_to_list(&B, "foo")
-    assert_false(nelem(L))
 end function
 
 
 function void test_add_intercept_to_list (void)
     print "Start with add_intercept_to_list()"
 
-    list L = null
-    L += add_intercept_to_list("rwfc")
-    assert_equal_num(nelem(L), 1)
-    
-    list L = null
-    L += add_intercept_to_list("rwdriftfc")
-    assert_equal_num(nelem(L), 1)
-
-    list L = null
-    L += add_intercept_to_list("foo")
+    L = add_intercept_to_list()
     assert_equal_num(nelem(L), 1)
 end function
 

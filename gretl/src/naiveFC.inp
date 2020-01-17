@@ -183,50 +183,82 @@ function bundle dict_models (void)
     dict_models.meanfc = defbundle( \
       "forecast_arg", "--static", \
       "command", "ols y xlist", \
-      "includes_linear_trend", 0, \
-      "add_first_lag", 0 \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
       )
     dict_models.medianfc = defbundle( \
       "forecast_arg", "--static", \
       "command", "quantreg 0.5 y xlist", \
-      "includes_linear_trend", 0, \
-      "add_first_lag", 0 \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
       )
     dict_models.smeanfc = defbundle( \
       "forecast_arg", "--static", \
       "command", "ols y xlist", \
-      "includes_linear_trend", 0, \
-      "add_first_lag", 0 \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 1 \
       )
     dict_models.smedianfc = defbundle( \
       "forecast_arg", "--static", \
       "command", "quantreg 0.5 y xlist", \
-      "includes_linear_trend", 0, \
-      "add_first_lag", 0 \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 1 \
       )
     dict_models.snaivefc = defbundle( \
       "forecast_arg", "--dynamic", \
       "command", "arima 0 0 0 ; 0 1 0 ; y xlist --nc", \
-      "includes_linear_trend", 0, \
-      "add_first_lag", 0 \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
       )
     dict_models.snaivedriftfc = defbundle( \
       "forecast_arg", "--dynamic", \
       "command", "arima 0 0 0 ; 0 1 0 ; y xlist", \
-      "includes_linear_trend", 0, \
-      "add_first_lag", 0 \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
+      )
+    dict_models.rwfc = defbundle( \
+      "forecast_arg", "--dynamic", \
+      "command", "arima 0 1 0 ; y xlist --nc", \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 0, \
+      "add_ohe_periods", 0 \
+      )
+    dict_models.rwdriftfc = defbundle( \
+      "forecast_arg", "--dynamic", \
+      "command", "arima 0 1 0 ; y xlist", \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 0, \
+      "add_ohe_periods", 0 \
       )
     dict_models.ar1fc = defbundle( \
       "forecast_arg", "--dynamic", \
       "command", "ols y xlist", \
-      "includes_linear_trend", 0, \
-      "add_first_lag", 1 \
+      "add_linear_trend", 0, \
+      "add_first_lag", 1, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
       )
     dict_models.ar1trendfc = defbundle( \
       "forecast_arg", "--dynamic", \
       "command", "ols y xlist", \
-      "includes_linear_trend", 1, \
-      "add_first_lag", 1 \
+      "add_linear_trend", 1, \
+      "add_first_lag", 1, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
       )
 
     return dict_models
@@ -238,18 +270,25 @@ function list prepare_xlist (const string estimator,
                              const bundle model_settings,
                              const bundle self)
     /* Prepare list of additional regressors. */
-         
+
     list xlist = null
-    
-    xlist += add_ohe_periods_to_list(estimator)
-    xlist += add_intercept_to_list(estimator)
-    if model_settings.includes_linear_trend == 1
+
+    if model_settings.add_ohe_periods
+        xlist += add_ohe_periods_to_list(estimator)
+    endif
+    if model_settings.intercept
+        xlist += add_intercept_to_list(estimator)
+    endif
+    if model_settings.add_linear_trend
         xlist += add_linear_trend_to_list(estimator)
     endif
+
     if inbundle(self, "xlist")
         xlist += self.xlist
     endif
-        
+    
+    # TODO: check for duplicates in xlist
+
     return xlist
 end function
 
