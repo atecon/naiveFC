@@ -1,3 +1,17 @@
+function bundle prep_cv_bundle (bundle *self)
+    /* Prepare bundle for CvDataSplitter(). */
+
+    series y = self.y			# y includes the additional n=horizon newly added observations for the very last cv-dataset
+    bundle cv					# Tried to put this into a bundle, but git issues with index series
+    
+    list cv.X = 	y					# CvDataSplitter() expects a list
+    string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
+    scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
+
+    return cv
+end function
+
+
 # TODO: untested
 function scalar samples_for_y_and_xlist_match (const series y, const list xlist, bundle *self)
     /* Returns zero if samples of y and xlist are ok. */

@@ -525,10 +525,14 @@ function void get_moving_window_forecasts (bundle *self)
 
     series y = self.y			# y includes the additional n=horizon newly added observations for the very last cv-dataset
 
+    
+    bundle cv = prep_cv_bundle(&self)
+    cv
     bundle cv = null					# Tried to put this into a bundle, but git issues with index series
     list cv.X = 	y					# CvDataSplitter() expects a list
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
+    */
     CvDataSplitter(&cv)
 
     # As CvDataSplitter() doesn't consider the very last obs in
