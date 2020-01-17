@@ -317,11 +317,6 @@ function bundle naiveFC (const series y,
         return self
     endif
 
-    catch include CvDataSplitter.gfn
-    if !$error
-        printInfo("Necessary package 'CvDataSplitter' succesfully loaded.")
-    endif
-
     # Drop missings + determine number of valid observations
     valid_sample_and_obs_details(y, &self)
     if self.error
@@ -337,6 +332,7 @@ function bundle naiveFC (const series y,
           self.obs_added))
     endif
     
+    ** HIER WEITERMACHEN **
     do_naive_forecasting(&self)
 
     if self.verbose
@@ -539,8 +535,7 @@ function void get_moving_window_forecasts (bundle *self)
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
     CvDataSplitter(&cv)
-    cv
-    stop
+
     # As CvDataSplitter() doesn't consider the very last obs in
     # the final training set for 'rolwin' and 'recwin', this must be added.
     cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})

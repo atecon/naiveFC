@@ -1,7 +1,7 @@
 author = Artur Tarassow
 email = atecon@posteo.de
-version = 0.8
-date = 2019-10-23
+version = 0.9
+date = 2020-01-20
 description = Simple forecasting methods
 tags = C53
 min-version = 2019b
@@ -13,4 +13,4 @@ public = naiveFC naivePlot GUI_naiveFC getNaiveForecastsList
 menu-only = GUI_naiveFC
 help = naiveFC.pdf
 sample-script = naiveFC_sample.inp
-depends = CvDataSplitter
+depends = CvDataSplitter string_utils
