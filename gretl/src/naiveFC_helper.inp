@@ -1,3 +1,31 @@
+function strings array_of_horizon_labels (const int horizon[1::])
+    /* Construct string array for indicating the forecast horizons. */
+
+    strings r = array(horizon)
+    loop i=1..horizon -q
+        r[i] = sprintf(" h=%d", i)
+    endloop
+
+    return r
+end function
+
+
+function strings get_dates_forecasted (const string date_of_information_str "Obs. before 1st h=1 forecast",
+                                       const int max_horizon[1::])
+    /* Construct date strings refering to the date for which a the
+    h-step ahead forecast was made for.*/
+
+    strings dates_forecasted = array(max_horizon)
+    scalar date_of_information_num = obsnum(date_of_information_str)
+
+    loop i=1..max_horizon -q
+        dates_forecasted[i] = date_plus_x_as_obslabel(date_of_information_num, $i)
+    endloop
+
+    return dates_forecasted
+end function
+
+
 # TODO: untested
 function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
                                                bundle *self)
@@ -204,18 +232,6 @@ function strings gen_column_names (bundle *self)
     endif
 
     return s
-end function
-
-
-function strings array_of_horizon_labels (const int horizon[1::])
-    /* Construct string array for indicating the forecast horizons. */
-
-    strings r = array(horizon)
-    loop i=1..horizon -q
-        r[i] = sprintf(" h=%d", i)
-    endloop
-
-    return r
 end function
 
 
