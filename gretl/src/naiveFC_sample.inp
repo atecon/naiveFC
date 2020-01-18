@@ -18,7 +18,7 @@ include "./src/naiveFC_helper.inp" --force
 
 # Select an example
 #==================
-scalar runEX = 2
+scalar runEX = 1
 
 # Load data
 if runEX==1
@@ -144,11 +144,11 @@ opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of movi
 #opts.verbose = 0					# Don't print details (optional)
 
 # Select method
-string method = "ar1FC"#  "medianFC", "rwFC", "rwdriftFC", "smeanFC", "smedianFC", "snaiveFC", \
-#  "snaivedriftFC", "ar1FC", "ar1trendFC")
+strings methods = defarray("ar1FC", "medianFC", "rwFC", "rwdriftFC", \
+  "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC")
 
 bundle b = null
-bundle b = naiveFC(y, method, opts)
+bundle b = naiveFC(y, methods[3], opts)
 b
 stop
 eval b.forecasts_point[1]

@@ -1,4 +1,20 @@
 # TODO: untested
+function void attach_column_labels (bundle *interval_forecasts,
+                                    bundle self)
+/* Add date strings as column labels for indicating the date on
+    which the estimates are conditioned on. */
+
+    string date_first_train_end = date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -1)    
+    strings date_strings = future_date_strings(date_first_train_end, self.n_folds)
+
+    strings keys = getkeys(interval_forecasts)
+    loop i=1..nelem(keys) -q
+        cnameset(interval_forecasts[keys[i]], date_strings)
+    endloop
+end function
+
+
+# TODO: untested
 function void attach_row_labels (bundle *interval_forecasts,
                                  bundle self)
 /* Add date strings as row labels for 'static' forecasts,

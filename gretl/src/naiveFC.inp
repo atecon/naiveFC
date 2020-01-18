@@ -1,64 +1,3 @@
-function bundle default_values (const series y)
-    /* Set default values */
-
-    bundle self = null
-    scalar self.error = 0
-    list self.xlist = null
-    scalar self.horizon = 10				# maximum forecast horizon
-    scalar self.level = 0.9					# probability level for forecast interval
-    scalar self.fan = 0						# plot fan chart  (not supported yet)
-    scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
-    scalar self.blength = 4					# Block length bootstrap  (not supported yet)
-    scalar self.is_seas = data_has_seasonality()
-    strings self.estimator_names = get_estimator_names(self.is_seas)
-    scalar self.verbose = 1
-
-    genr index
-    series self.index = index
-
-    string self.type_moving_window = "static" 			# "static", "rolling" or "recursive"
-    scalar self.window_length = ceil(0.25 * nobs(y))		# default window length
-
-    # For naivePlot()
-    string self.title = ""
-    string self.ylab = ""
-    string self.xlab = ""
-    string self.filename = "display"
-    scalar self.pre_fc_periods_to_plot = int(0.25 * nobs(y))
-
-    return self
-end function
-
-
-
-function void get_static_forecasts (bundle *self)
-/* Estimate model 'static' and compute interval h-multistep forecast,
-      store results. */
-
-    matrices fc_and_sd = call_method(&self)
-    if !self.error
-        bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &self)
-        get_point_low_up_bound_arrays(&bout, &self)
-    endif
-end function
-
-
-function matrices call_method (bundle *self)
-/* Wrapper for calling method. Returns p-dimension array where
-   each matrix is of size h by 2 holding point forecasts and forecast
-    standard errors. */
-
-    # Returned array includes m matrices. Each matrix is of dimension h by 2 (point~sderr)
-    if self.which != "avgfc"	# m=1
-        matrices fc_and_sd = defarray(set_xlist_and_forecast(&self, self.which))	# 1-dim array incl. single h by 2 matrix
-    else								# currently m=10 incl. avg. forecast
-        matrices fc_and_sd = avg_set_xlist_and_forecast(&self)	# function already transforms into array
-    endif
-
-    return fc_and_sd
-end function
-
-
 function bundle dict_models (void)
 /* Dictionary including stuff for calling estimation
     command and fcast command. */
@@ -150,6 +89,67 @@ function bundle dict_models (void)
 end function
 
 
+function bundle default_values (const series y)
+    /* Set default values */
+
+    bundle self = null
+    scalar self.error = 0
+    list self.xlist = null
+    scalar self.horizon = 10				# maximum forecast horizon
+    scalar self.level = 0.9					# probability level for forecast interval
+    scalar self.fan = 0						# plot fan chart  (not supported yet)
+    scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
+    scalar self.blength = 4					# Block length bootstrap  (not supported yet)
+    scalar self.is_seas = data_has_seasonality()
+    strings self.estimator_names = get_estimator_names(self.is_seas)
+    scalar self.verbose = 1
+
+    genr index
+    series self.index = index
+
+    string self.type_moving_window = "static" 			# "static", "rolling" or "recursive"
+    scalar self.window_length = ceil(0.25 * nobs(y))		# default window length
+
+    # For naivePlot()
+    string self.title = ""
+    string self.ylab = ""
+    string self.xlab = ""
+    string self.filename = "display"
+    scalar self.pre_fc_periods_to_plot = int(0.25 * nobs(y))
+
+    return self
+end function
+
+
+function void get_static_forecasts (bundle *self)
+/* Estimate model 'static' and compute interval h-multistep forecast,
+      store results. */
+
+    matrices fc_and_sd = call_method(&self)
+    if !self.error
+        bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &self)
+        get_point_low_up_bound_arrays(&bout, &self)
+    endif
+end function
+
+
+function matrices call_method (bundle *self)
+/* Wrapper for calling method. Returns p-dimension array where
+   each matrix is of size h by 2 holding point forecasts and forecast
+    standard errors. */
+
+    # Returned array includes m matrices. Each matrix is of dimension h by 2 (point~sderr)
+    if self.which != "avgfc"	# m=1
+        matrices fc_and_sd = defarray(set_xlist_and_forecast(&self, self.which))	# 1-dim array incl. single h by 2 matrix
+    else								# currently m=10 incl. avg. forecast
+        matrices fc_and_sd = avg_set_xlist_and_forecast(&self)	# function already transforms into array
+    endif
+
+    return fc_and_sd
+end function
+
+
+
 # TODO: untested
 function list prepare_xlist (const string estimator,
                              const bundle model_settings,
@@ -178,6 +178,7 @@ function list prepare_xlist (const string estimator,
 end function
 
 
+# TODO: untested
 function matrix set_xlist_and_forecast (bundle *self, const string estimator)
 /* Set list of regressors, estimate model and compute
     point forecast and forecast standard errors. */
@@ -228,7 +229,7 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
 
         return forecast_results
     else
-        fcast ($t2+1) ($t2+self.horizon) @fcast_arg #--quiet
+        fcast ($t2+1) ($t2+self.horizon) @fcast_arg
     endif
 
     if self.type_moving_window == "static"
@@ -320,21 +321,22 @@ function bundle naiveFC (const series y,
     endif
 
     do_naive_forecasting(&self)
-    if self.verbose
-        summarize_naive_fc_results(&self)
-    endif
+    summarize_naive_fc_results(&self)
+    cleanup_bundle(&self)
 
-stop
+    return self
+end function
 
-    # Drop some elements from self
+
+function void cleanup_bundle (bundle *self)
+    /* Delete some elements before returning to user. */
+
     delete self.fan
     delete self.blength
     delete self.nboot
     if inbundle(self,"obs_season")
         delete self.obs_season
     endif
-
-    return self
 end function
 
 
@@ -372,51 +374,39 @@ function void do_naive_forecasting (bundle *self)
 
     attach_row_labels(&interval_forecasts, self)
     attach_column_labels(&interval_forecasts, self)
+
+    self.interval_forecasts = interval_forecasts
 end function
 
-
-function void attach_column_labels (bundle *interval_forecasts,
-                                    bundle self)
-/* Add date strings as column labels for indicating the date on
-    which the estimates are conditioned on. */
-
-    string date_first_train_end = date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -1)    
-    strings date_strings = future_date_strings(date_first_train_end, self.n_folds)
-
-    strings keys = getkeys(interval_forecasts)
-    loop i=1..nelem(keys) -q
-        cnameset(interval_forecasts[keys[i]], date_strings)
-    endloop
-end function
 
 
 function void summarize_naive_fc_results (bundle *self)
     /* Print summarising information */
 
-    printf "****************************************************\n"
-    printf "\t\tNaive Forecasting Method\n"
-    printf "\nEndogenous: \t\t\t\t%s\n", self.name_endo
-    printf "Number of additional exogenous: \t%d\n", nelem(self.xlist)
-    printf "Forecasting method: \t\t\t%s\n", self.which
-    printf "Start valid data set: \t\t\t%s\n", self.t1_label
-    printf "End valid data set: \t\t\t%s\n", self.t2_label
-    printf "Number of observations: \t\t%d\n", obsnum(self.t2_label) - obsnum(self.t1_label)
-    printf "Forecast horizon: \t\t\t%d\n", self.horizon
-    printf "First observation forecasted (h=1): \t%s\n", self.t1_forecast_date
-    printf "Last observation forecasted (h=%d): \t%s\n", self.horizon, self.t2_forecast_date
-    if self.type_moving_window == "static"
-#        if self.which != "avgFC"
+    if self.verbose
+        printf "****************************************************\n"
+        printf "\t\tNaive Forecasting Method\n"
+        printf "\nEndogenous: \t\t\t\t%s\n", self.name_endo
+        printf "Number of additional exogenous: \t%d\n", nelem(self.xlist)
+        printf "Forecasting method: \t\t\t%s\n", self.which
+        printf "Start valid data set: \t\t\t%s\n", self.t1_label
+        printf "End valid data set: \t\t\t%s\n", self.t2_label
+        printf "Number of observations: \t\t%d\n", obsnum(self.t2_label) - obsnum(self.t1_label)
+        printf "Forecast horizon: \t\t\t%d\n", self.horizon
+        printf "First observation forecasted (h=1): \t%s\n", self.t1_forecast_date
+        printf "Last observation forecasted (h=%d): \t%s\n", self.horizon, self.t2_forecast_date
+        if self.type_moving_window == "static"
+            #        if self.which != "avgFC"
             printf "Width forecast interval: \t\t%d pct.\n", self.level * 100
-#        endif
-    else
-        printf "Moving window length: \t\t\t%d\n", self.window_length
-        printf "Number of %s forecasts: \t\t%d\n", self.type_moving_window, self.n_folds
+            #        endif
+        else
+            printf "Moving window length: \t\t\t%d\n", self.window_length
+            printf "Number of %s forecasts: \t\t%d\n", self.type_moving_window, self.n_folds
+        endif
+        printf "****************************************************\n"
+        printf "\n"
     endif
-    printf "****************************************************\n"
-    printf "\n"
 end function
-
-
 
 
 # TODO: untested
@@ -572,6 +562,7 @@ function matrices run_movwin_forecasts (bundle *cv, bundle *self)
 end function
 
 
+# TODO: untested
 function list getNaiveForecastsList (bundle *self,
                                      const matrix horizons[null] "Select only specific horizons",
                                      const string suffix[null] "Suffix for series' names")
