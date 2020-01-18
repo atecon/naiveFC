@@ -86,19 +86,48 @@ function bundle point_fc_and_factor_as_arrays (const matrices collected_point_fc
 end function
 
 
+# TODO: untested
+function scalar cv_window_length (const bundle self)
+    /* Compute window_length for calling CvDataSplitter(). */
+    
+    if self.type_moving_window == "static"
+        scalar win_size = self.window_length	# X_test already includes period to be forecasted
+    else
+		# The last self.horizon rows are reserved for the OoS evaluation 
+        scalar win_size = self.window_length + self.horizon
+    endif
+    
+    return win_size
+end function
+
+
+function void x_train_test_mats_static_case (bundle *cv, const bundle self)
+    /* For the static case we only need the first fold returned by
+    CvDataSplitter(). */
+
+    if self.type_moving_window == "static"
+        matrices cv.X_train = defarray(cv.X_train[1])
+        matrices cv.X_test = defarray(cv.X_test[1])
+        cv.n_folds = nelem(cv.X_test)
+    endif
+end function
+
+
 # TODO: untested -- however, rather CvDataSplitter() should be tested!
 function bundle prep_and_get_cv_folds (bundle *self)
     /* Prepare bundle for CvDataSplitter() and compute folds. */
 
     bundle cv					# Tried to put this into a bundle, but git issues with index series
+    
     series y = self.y		# This assignment is needed!
     list X = y				# y includes the additional n=horizon newly added observations for the very last cv-dataset   
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
-    scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
+    scalar cv.win_size = cv_window_length(self)
     list cv.X = X
-
+    
     CvDataSplitter(&cv)
-    add_last_xtrain_fold(y, &cv)
+    x_train_test_mats_static_case(&cv, self)
+    add_last_xtrain_fold(y, &cv, self)
 
     return cv
 end function
@@ -229,7 +258,11 @@ function bundle set_bundle (const series y,
         strings self.models = defarray(self.which)
     else
         strings self.models = self.supported_estimators
-    endif    
+    endif
+    if self.type_moving_window == "static"
+        scalar self.window_length = $tmax	# make sure cv gets only a single fold
+    endif
+
     self.forecast_results = prepare_forecast_bundles(&self)
     self.type_moving_window = tolower(self.type_moving_window)
     self.name_endo = argname(y)

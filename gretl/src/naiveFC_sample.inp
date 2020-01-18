@@ -137,7 +137,7 @@ endif
 scalar horizon = 10
 bundle opts = null					# setup additional options
 opts.horizon = horizon
-opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+#opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
 #opts.window_length = xmax($pd, 90) 			# moving window length (optional)
 # opts.window_length = $tmax
 #catch list opts.xlist = D743 FDD			# optional additional regressors
@@ -148,7 +148,7 @@ strings methods = defarray("ar1FC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
-bundle b = naiveFC(y, methods[11], opts)
+bundle b = naiveFC(y, methods[1], opts)
 b
 stop
 eval b.forecasts_point[1]

@@ -14,16 +14,15 @@ function void test_prepare_forecast_bundles (void)
     print "Start with prepare_forecast_bundles()"
 
     scalar is_seas = 1
-    bundle b = defbundle("estimators", get_estimator_names(is_seas))
+    bundle b = defbundle("models", get_estimator_names(is_seas))
     b = prepare_forecast_bundles(&b)
     bundle fc = b.snaivefc
-    
+
     assert_equal_num(nelem(b), 10)
     assert_true(inbundle(b, snaivefc))
     assert_equal_num(nelem(fc), 0)
 end function
-test_prepare_forecast_bundles()
-stop
+
 
 function void test_fc_interval_width (void)
     print "Start with fc_interval_width()"
@@ -167,17 +166,6 @@ function void test_get_estimator_names (void)
     assert_equal_num(nelem(S), 10)
 end function
 
-
-function void test_prepare_forecast_bundles (void)
-    print "Start with prepare_forecast_bundles()"
-
-    bundle B = defbundle("is_seas", 0, \
-      "estimator_names", get_supported_nonseas_methods())
-    bundle Bout = prepare_forecast_bundles(&B)
-
-    assert_equal_num(nelem(Bout), 7)
-    assert_equal_num(nelem(Bout.rwfc), 3)
-end function
 
 
 # As 'nulldata' command is applied below, we call some tests already here

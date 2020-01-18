@@ -108,7 +108,7 @@ function bundle default_values (const series y)
     series self.index = index
 
     string self.type_moving_window = "static" 			# "static", "rolling" or "recursive"
-    scalar self.window_length = ceil(0.25 * nobs(y))		# default window length
+    scalar self.window_length = ceil(0.25 * nobs(y))	# default window length for moving-windows
 
     # For naivePlot()
     string self.title = ""
@@ -328,6 +328,12 @@ function bundle naiveFC (const series y,
     endif
 
     do_naive_forecasting(&self)
+
+    # TODO
+    if self.which == "avgfc"
+        compute_avgerage_forecast()
+    endif
+
     summarize_naive_fc_results(&self)
     cleanup_bundle(&self)
 
@@ -375,7 +381,9 @@ function void do_naive_forecasting (bundle *self)
         self.active_model = models[i]
 
         if self.type_moving_window == "static"
-            get_static_forecasts(&self)
+            bundle interval_forecasts = get_moving_window_forecasts(&self)
+            interval_forecasts
+            #get_static_forecasts(&self)
         else
             bundle interval_forecasts = get_moving_window_forecasts(&self)
             attach_row_labels(&interval_forecasts, self)
@@ -495,12 +503,16 @@ end function
 
 
 # TODO: untested
-function void add_last_xtrain_fold (const series y, 	bundle *cv)
+function void add_last_xtrain_fold (const series y,
+                                    bundle *cv,
+                                    const bundle self)
 /* As CvDataSplitter() doesn't consider the very last obs in
     the final training set for 'rolwin' and 'recwin', this must be added. */
 
-    cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
-    cv.n_folds++
+    if self.type_moving_window != "static"
+        cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
+        cv.n_folds++
+    endif
 end function
 
 
