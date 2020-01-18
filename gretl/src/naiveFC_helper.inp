@@ -396,15 +396,3 @@ function scalar nobs_to_add_to_dataset (const list y,
     return add_n_new_obs
 end function
 
-
-function matrices get_movwin_low_up_matrices (const matrix point_forecasts,
-                                              const matrix factors)
-    /* Compute for all horizons and moving windows the intervals
-    for the forecast. */
-
-    matrices lower_and_upper = array(2)
-    matrix lower_and_upper[1] = point_forecasts .- factors
-    matrix lower_and_upper[2] = point_forecasts .+ factors
-
-    return lower_and_upper
-end function

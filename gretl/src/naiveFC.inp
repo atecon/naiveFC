@@ -411,24 +411,6 @@ function void valid_sample_and_obs_details (const series y, bundle *self)
 end function
 
 
-# FIXME: Unfinished function and not used, yet!
-function bundle get_mean_fc_and_mean_sd (const matrices fc_and_sd)
-    /* */
-
-    scalar n = nelem(fc_and_sd)
-    scalar h = rows(fc_and_sd[1])
-    matrix point_fc_avg = NA * zeros(h, n)	# avg. point forecast across all models
-    matrix sd_fc_avg = NA * zeros(h, n)		# avg. std. error of forecasts across all models
-
-    loop i=1..n -q			# TODO: Future drill() may replace this
-        point_fc_avg[,i] = fc_and_sd[i][,1]
-        sd_fc_avg[,i] = fc_and_sd[i][,2]
-    endloop
-
-    return defbundle("fc_point_avg", meanr(point_fc_avg), "fc_sd_avg", meanr(sd_fc_avg))
-end function
-
-
 # TODO: untested
 function void add_last_xtrain_fold (const series y,
                                     bundle *cv,
@@ -441,7 +423,6 @@ function void add_last_xtrain_fold (const series y,
         cv.n_folds++
     endif
 end function
-
 
 
 function bundle get_moving_window_forecasts (bundle *self)
@@ -510,6 +491,7 @@ function matrices run_movwin_forecasts (bundle *cv, bundle *self)
 
     return collected_point_fc_and_sderr
 end function
+
 
 
 # TODO: untested
