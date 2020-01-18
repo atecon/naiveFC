@@ -20,10 +20,7 @@ function void test_prepare_forecast_bundles (void)
     
     assert_equal_num(nelem(b), 10)
     assert_true(inbundle(b, snaivefc))
-    assert_equal_num(nelem(fc), 3)
-    assert_true(inbundle(fc, point_fc))
-    assert_true(inbundle(fc, lower_fc))
-    assert_true(inbundle(fc, upper_fc))
+    assert_equal_num(nelem(fc), 0)
 end function
 test_prepare_forecast_bundles()
 stop

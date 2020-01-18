@@ -139,20 +139,25 @@ function matrices call_method (bundle *self)
     standard errors. */
 
     # Returned array includes m matrices. Each matrix is of dimension h by 2 (point~sderr)
+    matrices fc_and_sd = defarray(set_xlist_and_forecast(&self))	# 1-dim array incl. single h by 2 matrix
+
+    /*
     if self.which != "avgfc"	# m=1
         matrices fc_and_sd = defarray(set_xlist_and_forecast(&self, self.which))	# 1-dim array incl. single h by 2 matrix
+        fc_and_sd
+        stop
     else								# currently m=10 incl. avg. forecast
         matrices fc_and_sd = avg_set_xlist_and_forecast(&self)	# function already transforms into array
     endif
-
+    */
+    
     return fc_and_sd
 end function
 
 
 
 # TODO: untested
-function list prepare_xlist (const string estimator,
-                             const bundle model_settings,
+function list prepare_xlist (const bundle model_settings,
                              const bundle self)
     /* Prepare list of additional regressors. */
 
@@ -179,11 +184,11 @@ end function
 
 
 # TODO: untested
-function matrix set_xlist_and_forecast (bundle *self, const string estimator)
+function matrix set_xlist_and_forecast (bundle *self)
 /* Set list of regressors, estimate model and compute
     point forecast and forecast standard errors. */
 
-    bundle model_settings = dict_models()["@estimator"]
+    bundle model_settings = dict_models()[self.active_model]
     string fcast_arg = model_settings.forecast_arg
     string command = model_settings.command
     # TODO: consider 3 verbose levels: silent, normal, detailed
@@ -194,7 +199,7 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
     matrix forecast_results = zeros(self.horizon, 2) * NA
     series y = self.y					# length: window_length + horizon
 
-    list xlist = prepare_xlist(estimator, model_settings, self)
+    list xlist = prepare_xlist(model_settings, self)
     if model_settings.add_first_lag
         xlist += y(-1)
     endif
@@ -211,7 +216,7 @@ function matrix set_xlist_and_forecast (bundle *self, const string estimator)
         return forecast_results
     endif
 
-    # TODO: Can this happen, and if yes, why?
+    # TODO: Can this happen, and if so why?
     if self.type_moving_window != "static" && ($nobs > self.window_length)
         printError(sprintf("You training sample (T=%d) is longer than the\n\
           specified window length (T=%d).", $nobs, self.window_length))
@@ -282,6 +287,7 @@ function void do_initial_checks (bundle *self)
         self.error = 1
     endif
 
+    /*
     if (self.type_moving_window == "rolling" || self.type_moving_window=="recursive") \
           && self.which == "avgfc"
 
@@ -290,6 +296,7 @@ function void do_initial_checks (bundle *self)
           Re-specify")
         self.error = 1
     endif
+    */
 end function
 
 
@@ -337,6 +344,9 @@ function void cleanup_bundle (bundle *self)
     if inbundle(self,"obs_season")
         delete self.obs_season
     endif
+    delete self.supported_estimators
+    delete self.index
+    delete self.active_model
 end function
 
 
@@ -344,41 +354,38 @@ function bundle prepare_forecast_bundles (bundle *self)
 /* Prepare for each estimator a dictionary for point
     interval forecast results to be stored in matrices. */
 
-    bundle forecast_results = null
-
-    loop i=1..nelem(self.estimators) -q
-        bundle forecast_results[self.estimators[i]] \
-          = defbundle("point_fc", {}, "lower_fc", {}, "upper_fc", {})
+    bundle forecast_results
+    
+    loop i=1..nelem(self.models) -q
+        string model = self.models[i]
+        bundle forecast_results["@model"] = null
     endloop
 
     return forecast_results
 end function
 
 
-# TODO: This function looks to me as the ideal one
-# where to call various model via a loop!
 function void do_naive_forecasting (bundle *self)
 /* Wrapper function actually calling static or
     moving-window procedures. */
 
-    self.forecast_results = prepare_forecast_bundles(&self)
-    eval self.forecast_results
-    stop
+    strings models = getkeys(self.forecast_results)
 
+    loop i=1..nelem(self.forecast_results) -q	# loop over models
+        self.active_model = models[i]
 
-    if self.type_moving_window == "static"
-        get_static_forecasts(&self)
-    else
-        # TODO: later 'interval_forecasts' is a container
-        # holding a bundle with interval_forecasts for each
-        # model
-        bundle interval_forecasts = get_moving_window_forecasts(&self)
-    endif
-
-    attach_row_labels(&interval_forecasts, self)
-    attach_column_labels(&interval_forecasts, self)
-
-    self.interval_forecasts = interval_forecasts
+        if self.type_moving_window == "static"
+            get_static_forecasts(&self)
+        else
+            bundle interval_forecasts = get_moving_window_forecasts(&self)
+            attach_row_labels(&interval_forecasts, self)
+            attach_column_labels(&interval_forecasts, self)
+            
+            self.forecast_results[self.active_model] = interval_forecasts
+#            eval self.forecast_results[self.active_model]
+#            eval self.forecast_results[self.active_model]["forecasts_point"]	# TODO: drop later
+        endif
+    endloop
 end function
 
 
@@ -497,6 +504,7 @@ function void add_last_xtrain_fold (const series y, 	bundle *cv)
 end function
 
 
+
 function bundle get_moving_window_forecasts (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores sequences of interval forecasts. */
@@ -506,19 +514,20 @@ function bundle get_moving_window_forecasts (bundle *self)
 
     # Loop over training sets, run estimation and retrieve interval forecasts.
     # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.
-    matrices fc_and_sd_from_all_cv = run_movwin_forecasts(&cv, &self)
+    matrices collected_point_fc_and_sderr = run_movwin_forecasts(&cv, &self)
 
     bundle forecasts_and_factors = \
-      point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &self)
+      point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &self)
 
     # Retrieve moving-window point_forecasts from array,
     # compute forecast intervals and put stuff to bundle
-    return comp_intval_fc_and_to_bundle(forecasts_and_factors)
+
+    return compute_intval_forecasts(forecasts_and_factors)
 end function
 
 
 # TODO: untested
-function bundle comp_intval_fc_and_to_bundle (const bundle forecasts_and_factors)
+function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
 /* Generate for each model based on respective point forecasts and
     estimated standard derrors, arrays holding interval forecasts. */
 
@@ -545,7 +554,7 @@ function matrices run_movwin_forecasts (bundle *cv, bundle *self)
 /* Loop over training sets, run estimation and retrieve
     interval forecasts. */
 
-    matrices fc_and_sd_from_all_cv = array(cv.n_folds)
+    matrices collected_point_fc_and_sderr = array(cv.n_folds)
 
     loop lwin=1..cv.n_folds -q
         matrix date_idx = cv.X_train[lwin]
@@ -558,10 +567,10 @@ function matrices run_movwin_forecasts (bundle *cv, bundle *self)
             self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_label), self.horizon)	# Date of last h-step ahead forecast
         endif
 
-        fc_and_sd_from_all_cv[lwin] = call_method(&self)[1]
+        collected_point_fc_and_sderr[lwin] = call_method(&self)[1]
     endloop
 
-    return fc_and_sd_from_all_cv
+    return collected_point_fc_and_sderr
 end function
 
 

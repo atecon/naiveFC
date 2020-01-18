@@ -63,20 +63,20 @@ end function
 
 
 # TODO: untested
-function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
+function bundle point_fc_and_factor_as_arrays (const matrices collected_point_fc_and_sderr,
                                                bundle *self)
     /* Using each model's point forecast and standard error, compute
     the forecast interval assuming standard normal. */
 
     bundle bout
 
-    scalar m = nelem(fc_and_sd)
+    scalar m = nelem(collected_point_fc_and_sderr)
     matrices point_forecasts = array(m)
     matrices factors = array(m)
 
     loop i=1..m -q
-        point_forecasts[i] = fc_and_sd[i][,1]
-        factors[i] = fc_interval_width(fc_and_sd[i][,1], self.level)
+        point_forecasts[i] = collected_point_fc_and_sderr[i][,1]
+        factors[i] = fc_interval_width(collected_point_fc_and_sderr[i][,1], self.level)
     endloop
 
     bout.point_forecasts = point_forecasts
@@ -226,10 +226,11 @@ function bundle set_bundle (const series y,
     self = opts + self			# override defaults
     self.which = tolower(which)
     if self.which != "avgfc"
-        strings self.estimators = defarray(self.which)
+        strings self.models = defarray(self.which)
     else
-        strings self.estimators = self.supported_estimators
+        strings self.models = self.supported_estimators
     endif    
+    self.forecast_results = prepare_forecast_bundles(&self)
     self.type_moving_window = tolower(self.type_moving_window)
     self.name_endo = argname(y)
 
