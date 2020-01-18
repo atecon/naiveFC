@@ -121,40 +121,6 @@ function bundle default_values (const series y)
 end function
 
 
-function void get_static_forecasts (bundle *self)
-/* Estimate model 'static' and compute interval h-multistep forecast,
-      store results. */
-
-    matrices fc_and_sd = call_method(&self)
-    if !self.error
-        bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &self)
-        get_point_low_up_bound_arrays(&bout, &self)
-    endif
-end function
-
-
-function matrices call_method (bundle *self)
-/* Wrapper for calling method. Returns p-dimension array where
-   each matrix is of size h by 2 holding point forecasts and forecast
-    standard errors. */
-
-    # Returned array includes m matrices. Each matrix is of dimension h by 2 (point~sderr)
-    matrices fc_and_sd = defarray(set_xlist_and_forecast(&self))	# 1-dim array incl. single h by 2 matrix
-
-    /*
-    if self.which != "avgfc"	# m=1
-        matrices fc_and_sd = defarray(set_xlist_and_forecast(&self, self.which))	# 1-dim array incl. single h by 2 matrix
-        fc_and_sd
-        stop
-    else								# currently m=10 incl. avg. forecast
-        matrices fc_and_sd = avg_set_xlist_and_forecast(&self)	# function already transforms into array
-    endif
-    */
-    
-    return fc_and_sd
-end function
-
-
 
 # TODO: untested
 function list prepare_xlist (const bundle model_settings,
@@ -288,14 +254,14 @@ function void do_initial_checks (bundle *self)
     endif
 
     /*
-    if (self.type_moving_window == "rolling" || self.type_moving_window=="recursive") \
-          && self.which == "avgfc"
+       if (self.type_moving_window == "rolling" || self.type_moving_window=="recursive") \
+       && self.which == "avgfc"
 
-        printError("Automatic forecast averaging ('avgfc') is\n\
-          currently not compatible with moving forecasts.\n\
-          Re-specify")
-        self.error = 1
-    endif
+       printError("Automatic forecast averaging ('avgfc') is\n\
+       currently not compatible with moving forecasts.\n\
+       Re-specify")
+       self.error = 1
+       endif
     */
 end function
 
@@ -361,7 +327,7 @@ function bundle prepare_forecast_bundles (bundle *self)
     interval forecast results to be stored in matrices. */
 
     bundle forecast_results
-    
+
     loop i=1..nelem(self.models) -q
         string model = self.models[i]
         bundle forecast_results["@model"] = null
@@ -380,19 +346,14 @@ function void do_naive_forecasting (bundle *self)
     loop i=1..nelem(self.forecast_results) -q	# loop over models
         self.active_model = models[i]
 
-        if self.type_moving_window == "static"
-            bundle interval_forecasts = get_moving_window_forecasts(&self)
-            interval_forecasts
-            #get_static_forecasts(&self)
-        else
-            bundle interval_forecasts = get_moving_window_forecasts(&self)
-            attach_row_labels(&interval_forecasts, self)
-            attach_column_labels(&interval_forecasts, self)
-            
-            self.forecast_results[self.active_model] = interval_forecasts
-#            eval self.forecast_results[self.active_model]
-#            eval self.forecast_results[self.active_model]["forecasts_point"]	# TODO: drop later
-        endif
+        bundle interval_forecasts = get_moving_window_forecasts(&self)
+        attach_row_labels(&interval_forecasts, self)
+        attach_column_labels(&interval_forecasts, self)
+
+        self.forecast_results[self.active_model] = interval_forecasts
+        eval self.forecast_results[self.active_model]
+        eval self.forecast_results[self.active_model]["forecasts_point"]	# TODO: drop later
+        eval self.forecast_results[self.active_model]["forecasts_lower_bound"]	# TODO: drop later
     endloop
 end function
 
@@ -506,7 +467,7 @@ end function
 function void add_last_xtrain_fold (const series y,
                                     bundle *cv,
                                     const bundle self)
-/* As CvDataSplitter() doesn't consider the very last obs in
+    /* As CvDataSplitter() doesn't consider the very last obs in
     the final training set for 'rolwin' and 'recwin', this must be added. */
 
     if self.type_moving_window != "static"
@@ -533,7 +494,6 @@ function bundle get_moving_window_forecasts (bundle *self)
 
     # Retrieve moving-window point_forecasts from array,
     # compute forecast intervals and put stuff to bundle
-
     return compute_intval_forecasts(forecasts_and_factors)
 end function
 
@@ -579,7 +539,7 @@ function matrices run_movwin_forecasts (bundle *cv, bundle *self)
             self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_label), self.horizon)	# Date of last h-step ahead forecast
         endif
 
-        collected_point_fc_and_sderr[lwin] = call_method(&self)[1]
+        collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)	# h by 2 matrix (point_fc ~ sderr)
     endloop
 
     return collected_point_fc_and_sderr

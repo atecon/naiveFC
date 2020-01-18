@@ -100,7 +100,7 @@ function scalar cv_window_length (const bundle self)
     return win_size
 end function
 
-
+# TODO: untested
 function void x_train_test_mats_static_case (bundle *cv, const bundle self)
     /* For the static case we only need the first fold returned by
     CvDataSplitter(). */
@@ -131,6 +131,7 @@ function bundle prep_and_get_cv_folds (bundle *self)
 
     return cv
 end function
+
 
 # TODO: untested
 function scalar samples_for_y_and_xlist_match (const series y, const list xlist, bundle *self)
