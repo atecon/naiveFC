@@ -101,7 +101,7 @@ function bundle default_values (const series y)
     scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
     scalar self.blength = 4					# Block length bootstrap  (not supported yet)
     scalar self.is_seas = data_has_seasonality()
-    strings self.estimator_names = get_estimator_names(self.is_seas)
+    strings self.supported_estimators = get_estimator_names(self.is_seas)
     scalar self.verbose = 1
 
     genr index
@@ -346,8 +346,8 @@ function bundle prepare_forecast_bundles (bundle *self)
 
     bundle forecast_results = null
 
-    loop i=1..nelem(self.estimator_names) -q
-        bundle forecast_results[self.estimator_names[i]] \
+    loop i=1..nelem(self.estimators) -q
+        bundle forecast_results[self.estimators[i]] \
           = defbundle("point_fc", {}, "lower_fc", {}, "upper_fc", {})
     endloop
 
@@ -362,6 +362,9 @@ function void do_naive_forecasting (bundle *self)
     moving-window procedures. */
 
     self.forecast_results = prepare_forecast_bundles(&self)
+    eval self.forecast_results
+    stop
+
 
     if self.type_moving_window == "static"
         get_static_forecasts(&self)
@@ -447,11 +450,11 @@ function matrices do_avgfcs_and_get_fc_sd_array (bundle *self)
 /* Compute forecasts for each method. For each mezthod we obtain a matrix
     of size h by 2 holding point forecasts and associated standard errors. */
 
-    scalar m = nelem(self.estimator_names)
+    scalar m = nelem(self.supported_estimators)
     matrices fc_and_sd = array(m)
 
     loop i=1..m -q
-        fc_and_sd[i] = set_xlist_and_forecast(&self, self.estimator_names[i])
+        fc_and_sd[i] = set_xlist_and_forecast(&self, self.supported_estimators[i])
     endloop
 
     return fc_and_sd
@@ -574,9 +577,9 @@ function list getNaiveForecastsList (bundle *self,
     hor = (exists(horizons)) ? horizons : hor
     hor = vec(hor)
 
-    # FIXME: 'methods_used' still needed? All names stored in self.estimator_names
+    # FIXME: 'methods_used' still needed? All names stored in self.supported_estimators
     #    strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
-    #    strings methods_used = (inbundle(self, "methods_used")) ? self.estimator_names : methods_used
+    #    strings methods_used = (inbundle(self, "methods_used")) ? self.supported_estimators : methods_used
 
     if !exists(suffix)
         string suffix = ""

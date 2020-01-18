@@ -13,17 +13,20 @@ include assertion.gfn
 function void test_prepare_forecast_bundles (void)
     print "Start with prepare_forecast_bundles()"
 
-    scalar is_seas = 1    
-    bundle b = defbundle("estimator_names", get_estimator_names(is_seas))
-    prepare_forecast_bundles(&b)
-    bundle fc = b.forecast_results
-    bundle fc1 = fc.snaivefc
-
-    assert_true(inbundle(fc,   snaivefc))
-    assert_equal_num(nelem(fc), 10)
-    assert_equal_num(nelem(fc1), 3)
+    scalar is_seas = 1
+    bundle b = defbundle("estimators", get_estimator_names(is_seas))
+    b = prepare_forecast_bundles(&b)
+    bundle fc = b.snaivefc
+    
+    assert_equal_num(nelem(b), 10)
+    assert_true(inbundle(b, snaivefc))
+    assert_equal_num(nelem(fc), 3)
+    assert_true(inbundle(fc, point_fc))
+    assert_true(inbundle(fc, lower_fc))
+    assert_true(inbundle(fc, upper_fc))
 end function
-
+test_prepare_forecast_bundles()
+stop
 
 function void test_fc_interval_width (void)
     print "Start with fc_interval_width()"
@@ -118,7 +121,7 @@ function void test_set_bundle (const series djclose)
     assert_equal_num(Bret.level, 0.05)
     assert_equal_str(Bret.type_moving_window, "rolling")
     assert_equal_str(Bret.name_endo, "djclose")
-    
+
 
     bundle Bret = set_bundle(djclose, "avg")
     assert_equal_num(Bret.horizon, 10)
@@ -336,7 +339,7 @@ nulldata 7 -p
 setobs 7 2000-01-01 --time-series
 function void test_nobs_to_add_to_dataset (void)
     print "Start with nobs_to_add_to_dataset()"
-    
+
     series s1 = normal()
     series s2 = s1
     series s3 = s1
@@ -346,13 +349,13 @@ function void test_nobs_to_add_to_dataset (void)
     s4[1] = NA
     s4[7] = NA
     bundle B = defbundle("horizon", 2)
-    
+
     list L = s1
     assert_equal_num(nobs_to_add_to_dataset(L, B.horizon), 2)
-    
+
     list L = s2
     assert_equal_num(nobs_to_add_to_dataset(L, B.horizon), 2)
-    
+
     list L = s3
     assert_equal_num(nobs_to_add_to_dataset(L, B.horizon), 1)
 
@@ -368,7 +371,7 @@ setobs 7 2000-01-01 --time-series
 function void test_diff_t2_of_y_and_x (void)
     print "Start with diff_nobs_of_y_and_x()"
 
-    series s1 = normal()    
+    series s1 = normal()
     series s2 = s1
     series s3 = s1
     series s4 = s1
@@ -376,11 +379,11 @@ function void test_diff_t2_of_y_and_x (void)
     s3[7] = NA
     s4[1] = NA
     s4[7] = NA
-    
+
     list L = s1
     scalar s = diff_t2_of_y_and_x(s1, L)
     assert_equal_num(s, 0)
-    
+
     list L = s2
     scalar s = diff_t2_of_y_and_x(s1, L)
     assert_equal_num(s, 0)
@@ -388,7 +391,7 @@ function void test_diff_t2_of_y_and_x (void)
     list L = s3
     scalar s = diff_t2_of_y_and_x(s1, L)
     assert_equal_num(s, -1)
-    
+
     list L = s4
     scalar s = diff_t2_of_y_and_x(s1, L)
     assert_equal_num(s, -1)

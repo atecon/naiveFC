@@ -225,6 +225,11 @@ function bundle set_bundle (const series y,
     bundle self = default_values(y)
     self = opts + self			# override defaults
     self.which = tolower(which)
+    if self.which != "avgfc"
+        strings self.estimators = defarray(self.which)
+    else
+        strings self.estimators = self.supported_estimators
+    endif    
     self.type_moving_window = tolower(self.type_moving_window)
     self.name_endo = argname(y)
 
