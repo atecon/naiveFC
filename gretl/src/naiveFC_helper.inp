@@ -1,4 +1,52 @@
 # TODO: untested
+function void attach_row_labels (bundle *interval_forecasts,
+                                 bundle self)
+/* Add date strings as row labels for 'static' forecasts,
+   or indicate the forecast horizon for moving-window
+    forecasts. */
+   
+    if self.type_moving_window == "static"
+        strings row_labels = future_date_strings(self.t2_label, self.horizon)
+    else
+        strings row_labels = array_of_horizon_labels(self.horizon)
+    endif
+
+    strings keys = getkeys(interval_forecasts)
+    loop i=1..nelem(keys) -q
+        rnameset(interval_forecasts[keys[i]], row_labels)
+    endloop
+end function
+
+
+function strings array_of_horizon_labels (const int horizon[1::])
+    /* Construct string array for indicating the forecast horizons. */
+
+    strings r = array(horizon)
+    loop i=1..horizon -q
+        r[i] = sprintf(" h=%d", i)
+    endloop
+
+    return r
+end function
+
+
+function strings future_date_strings (const string date_of_information_str "Obs. before 1st h=1 forecast",
+                                      const int n_future_periods[1::])
+    /* Construct date strings refering to the date for which a the
+    h-step ahead forecast was made for.*/
+
+    strings future_dates = array(n_future_periods)
+    scalar date_of_information_num = obsnum(date_of_information_str)
+
+    loop i=1..n_future_periods -q
+        future_dates[i] = date_plus_x_as_obslabel(date_of_information_num, $i)
+    endloop
+
+    return future_dates
+end function
+
+
+# TODO: untested
 function bundle point_fc_and_factor_as_arrays (const matrices fc_and_sd,
                                                bundle *self)
     /* Using each model's point forecast and standard error, compute
@@ -104,7 +152,6 @@ function strings get_estimator_names (const bool is_seas "0=data has no seasonal
 end function
 
 
-
 function void obslabels_and_nobs_to_bundle (const list y,
                                             bundle *self)
     smpl y --contiguous
@@ -205,18 +252,6 @@ function strings gen_column_names (bundle *self)
     endif
 
     return s
-end function
-
-
-function strings array_of_horizon_labels (const int horizon[1::])
-    /* Construct string array for indicating the forecast horizons. */
-
-    strings r = array(horizon)
-    loop i=1..horizon -q
-        r[i] = sprintf(" h=%d", i)
-    endloop
-
-    return r
 end function
 
 
