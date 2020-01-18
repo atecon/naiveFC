@@ -252,17 +252,6 @@ function void do_initial_checks (bundle *self)
         print_no_bootstrap_support()
         self.error = 1
     endif
-
-    /*
-       if (self.type_moving_window == "rolling" || self.type_moving_window=="recursive") \
-       && self.which == "avgfc"
-
-       printError("Automatic forecast averaging ('avgfc') is\n\
-       currently not compatible with moving forecasts.\n\
-       Re-specify")
-       self.error = 1
-       endif
-    */
 end function
 
 
@@ -419,29 +408,6 @@ function void valid_sample_and_obs_details (const series y, bundle *self)
     endif
 
     self.error = valid_window_length(&self)
-end function
-
-
-function matrices do_avgfcs_and_get_fc_sd_array (bundle *self)
-/* Compute forecasts for each method. For each mezthod we obtain a matrix
-    of size h by 2 holding point forecasts and associated standard errors. */
-
-    scalar m = nelem(self.supported_estimators)
-    matrices fc_and_sd = array(m)
-
-    loop i=1..m -q
-        fc_and_sd[i] = set_xlist_and_forecast(&self, self.supported_estimators[i])
-    endloop
-
-    return fc_and_sd
-end function
-
-
-function matrices avg_set_xlist_and_forecast (bundle *self)
-/* Compute forecasts using different methods supported, and return array of point
-    forecasts and associated standard errors. */
-
-    return do_avgfcs_and_get_fc_sd_array(&self)
 end function
 
 
