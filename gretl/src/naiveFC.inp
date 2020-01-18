@@ -327,22 +327,18 @@ end function
 
 
 function void do_naive_forecasting (bundle *self)
-/* Wrapper function actually calling static or
-    moving-window procedures. */
+/* Wrapper function actually calling procedures. */
 
     strings models = getkeys(self.forecast_results)
 
     loop i=1..nelem(self.forecast_results) -q	# loop over models
         self.active_model = models[i]
 
-        bundle interval_forecasts = get_moving_window_forecasts(&self)
+        bundle interval_forecasts = execute_forecasting(&self)
         attach_row_labels(&interval_forecasts, self)
         attach_column_labels(&interval_forecasts, self)
 
         self.forecast_results[self.active_model] = interval_forecasts
-        eval self.forecast_results[self.active_model]
-        eval self.forecast_results[self.active_model]["forecasts_point"]	# TODO: drop later
-        eval self.forecast_results[self.active_model]["forecasts_lower_bound"]	# TODO: drop later
     endloop
 end function
 
@@ -411,21 +407,8 @@ function void valid_sample_and_obs_details (const series y, bundle *self)
 end function
 
 
-# TODO: untested
-function void add_last_xtrain_fold (const series y,
-                                    bundle *cv,
-                                    const bundle self)
-    /* As CvDataSplitter() doesn't consider the very last obs in
-    the final training set for 'rolwin' and 'recwin', this must be added. */
 
-    if self.type_moving_window != "static"
-        cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
-        cv.n_folds++
-    endif
-end function
-
-
-function bundle get_moving_window_forecasts (bundle *self)
+function bundle execute_forecasting (bundle *self)
 /* This function estimates the point forecasts either in (i) a rolling or
     (ii) a recursive manner and stores sequences of interval forecasts. */
 
@@ -434,7 +417,7 @@ function bundle get_moving_window_forecasts (bundle *self)
 
     # Loop over training sets, run estimation and retrieve interval forecasts.
     # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.
-    matrices collected_point_fc_and_sderr = run_movwin_forecasts(&cv, &self)
+    matrices collected_point_fc_and_sderr = set_model_estimate_and_forecast(&cv, &self)
 
     bundle forecasts_and_factors = \
       point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &self)
@@ -469,7 +452,7 @@ end function
 
 
 # TODO: untested
-function matrices run_movwin_forecasts (bundle *cv, bundle *self)
+function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
 /* Loop over training sets, run estimation and retrieve
     interval forecasts. */
 

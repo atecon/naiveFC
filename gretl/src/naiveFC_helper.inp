@@ -1,4 +1,18 @@
 # TODO: untested
+function void add_last_xtrain_fold (const series y,
+                                    bundle *cv,
+                                    const bundle self)
+    /* As CvDataSplitter() doesn't consider the very last obs in
+    the final training set for 'rolwin' and 'recwin', this must be added. */
+
+    if self.type_moving_window != "static"
+        cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
+        cv.n_folds++
+    endif
+end function
+
+
+# TODO: untested
 function void attach_column_labels (bundle *interval_forecasts,
                                     bundle self)
 /* Add date strings as column labels for indicating the date on
