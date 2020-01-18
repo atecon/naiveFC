@@ -433,6 +433,7 @@ function void do_naive_forecasting (bundle *self)
         bundle interval_forecasts = get_moving_window_forecasts(&self)
     endif
 
+    ** HIER WEITER
     attach_column_labels(&self)
     attach_row_labels(&self)
 end function
