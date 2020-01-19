@@ -12,8 +12,7 @@ function void add_last_xtrain_fold (const series y,
 end function
 
 function scalar periods_back_for_future_dates (const string type_moving_window)
-    /* Helper neede for getting correct conditioning date for
-    attach_column_labels(). */
+    /* Helper for getting correct conditioning date for attach_column_labels(). */
     
     if type_moving_window == "static"
         return 2
@@ -23,6 +22,7 @@ function scalar periods_back_for_future_dates (const string type_moving_window)
         funcerr "Unknown value  for variable 'type_moving_window' passed."
     endif
 end function
+
 
 # TODO: untested
 function void attach_column_labels (bundle *interval_forecasts,

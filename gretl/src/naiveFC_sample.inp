@@ -141,14 +141,14 @@ opts.horizon = horizon
 #opts.window_length = xmax($pd, 90) 			# moving window length (optional)
 # opts.window_length = $tmax
 #catch list opts.xlist = D743 FDD			# optional additional regressors
-#opts.verbose = 0					# Don't print details (optional)
+opts.verbose = 1					# Don't print details (optional)
 
 # Select method - dim = 11
 strings methods = defarray("ar1FC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
-bundle b = naiveFC(y, methods[1], opts)
+bundle b = naiveFC(y, methods[5], opts)
 b
 forecast_results = b.forecast_results
 eval forecast_results.ar1fc

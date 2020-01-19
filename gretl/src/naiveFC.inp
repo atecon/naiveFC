@@ -192,6 +192,8 @@ function matrix set_xlist_and_forecast (bundle *self)
     endif
 
     # Estimation
+    ols y xlist
+    stop
     catch @command
     model_error = $error
     if model_error
