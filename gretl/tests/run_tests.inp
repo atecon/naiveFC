@@ -6,6 +6,7 @@ clear
 include "./src/naiveFC.inp" --force
 include "./src/naiveFC_helper.inp" --force
 
+include CvDataSplitter.gfn
 include string_utils.gfn
 include assertion.gfn
 
@@ -387,6 +388,60 @@ function void test_diff_t2_of_y_and_x (void)
 end function
 test_diff_t2_of_y_and_x()
 
+
+
+# Run a proper sample
+open AWM.gdt -q			# quarterly
+series y = YGA
+smpl y --no-missing --permanent
+function void test_naiveFC_awm (series y)
+    print "Start test_naiveFC() with AWM_data"
+
+    scalar horizon = 10
+    bundle opts = null					# setup additional options
+    opts.horizon = horizon
+
+    bundle b = null
+    bundle b = naiveFC(y, "ar1fc", opts)
+    bundle forecast_results = b.forecast_results
+       
+    assert_equal_str(b.t1_label, "1971:4")
+    assert_equal_str(b.t2_label, "1998:2")
+    assert_equal_str(b.t1_forecast_date, "1998:3")
+    assert_equal_str(b.t2_forecast_date, "2000:4")
+    
+    assert_equal_num(b.T, 107)
+    assert_equal_num(b.window_length, 107)
+    assert_equal_num(b.horizon, 10)
+    assert_equal_num(nobs(b.y), 117)
+
+    assert_equal_num(nelem(forecast_results), 1)
+    assert_equal_num(nelem(forecast_results.ar1fc), 3)
+
+
+    eval forecast_results.ar1fc
+    strings col_labels_point = cnameget(forecast_results.ar1fc.forecasts_point)
+    strings col_labels_lower = cnameget(forecast_results.ar1fc.forecasts_lower_bound)
+    strings col_labels_upper = cnameget(forecast_results.ar1fc.forecasts_upper_bound)
+    strings row_labels_point = rnameget(forecast_results.ar1fc.forecasts_point)
+    strings row_labels_lower = rnameget(forecast_results.ar1fc.forecasts_lower_bound)
+    strings row_labels_upper = rnameget(forecast_results.ar1fc.forecasts_upper_bound)
+
+    assert_equal_str(col_labels_point[1], "1998:2")
+    assert_equal_str(row_labels_point[1], "1998:3")
+    assert_equal_str(col_labels_lower[1], "1998:2")
+    assert_equal_str(row_labels_lower[1], "1998:3")
+    assert_equal_str(col_labels_upper[1], "1998:2")
+    assert_equal_str(row_labels_upper[1], "1998:3")
+    
+
+    stop
+    
+    
+end function
+test_naiveFC_awm(y)
+
+print YGA -o
 
 printf "\nInfo: All tests passed.\n"
 

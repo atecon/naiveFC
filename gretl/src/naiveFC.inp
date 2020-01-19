@@ -276,13 +276,20 @@ function bundle naiveFC (const series y,
         return self
     endif
 
-    self.add_n_new_obs = nobs_to_add_to_dataset(y, self.horizon)
+    self.add_n_new_obs = nobs_to_add_to_dataset(y, self.horizon)	# TODO: return directly to self
     if self.add_n_new_obs > 0
         dataset addobs self.add_n_new_obs
         series self.y = misszero(y)		# new obs are set as NA
     endif
 
     do_naive_forecasting(&self)
+    /*
+    print self
+    eval self.forecast_results
+    eval self.forecast_results["ar1fc"]
+    eval self.forecast_results["ar1fc"].forecasts_point
+    #   stop
+    */
 
     # TODO
     if self.which == "avgfc"
@@ -291,6 +298,8 @@ function bundle naiveFC (const series y,
 
     summarize_naive_fc_results(&self)
     cleanup_bundle(&self)
+
+    #eval self.forecast_results["ar1fc"].forecasts_point
 
     return self
 end function
