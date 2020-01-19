@@ -144,22 +144,16 @@ opts.horizon = horizon
 opts.verbose = 1					# Don't print details (optional)
 
 # Select method - dim = 11
-strings methods = defarray("ar1FC", "medianFC", "rwFC", "rwdriftFC", \
+strings methods = defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
 bundle b = naiveFC(y, methods[5], opts)
 b
 forecast_results = b.forecast_results
-eval forecast_results.ar1fc
-eval forecast_results.ar1fc.forecasts_point
+eval forecast_results.meanfc
+eval forecast_results.meanfc.forecasts_point
 stop
- = b.forecast_results
-print forecast_results
-print forecast_results.ar1fc
-eval forecast_results.ar1fc.forecasts_point
-
-eval b.forecasts_point[1]
 
 # Get interval forecasts as series
 dataset addobs opts.horizon			# forecast may exceed current sample length

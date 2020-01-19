@@ -165,15 +165,21 @@ function matrix set_xlist_and_forecast (bundle *self)
     matrix forecast_results = zeros(self.horizon, 2) * NA
     series y = self.y					# length: window_length + horizon
 
+    # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
+    # is not the effective sample length
+    # but (window_length-max(lags))
+    bundle train_obsnums = get_train_start_end_obsnums(&self)
+    scalar t1_test_obsnum = 1 + train_obsnums.t2_obsnum
+    scalar t2_test_obsnum = t1_test_obsnum + self.horizon
+
+    smpl full
+    #catch smpl train_obsnums.t1_obsnum t2_test_obsnum	# TODO: Why not use full sample        
     list xlist = prepare_xlist(model_settings, self)
     if model_settings.add_first_lag
         xlist += y(-1)
     endif
 
-    bundle train_obsnums = get_train_start_end_obsnums(&self)
-    # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
-    # is not the effective sample length
-    # but (window_length-max(lags))
+    # restrict to training sample
     catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 
     if $error
@@ -192,8 +198,6 @@ function matrix set_xlist_and_forecast (bundle *self)
     endif
 
     # Estimation
-    ols y xlist
-    stop
     catch @command
     model_error = $error
     if model_error
@@ -236,12 +240,6 @@ function void do_initial_checks (bundle *self)
         self.error = 1
     endif
 
-    if $nobs < self.window_length
-        printError(sprintf("Select window size (wsize=%d) exceeds the\n\
-          number of valid observations (T=%d).", self.window_length, $nobs))
-        self.error = 1
-    endif
-
     if self.window_length < $pd
         printError("Periodicity cannot be negative.")
         printError(sprintf("Window size = %d", self.window_length))
@@ -254,6 +252,57 @@ function void do_initial_checks (bundle *self)
         print_no_bootstrap_support()
         self.error = 1
     endif
+end function
+
+# TODO: untested
+function bundle t1_and_t2_of_y_and_xlist (const series y,
+                                          const list xlist)
+    /* Check valid start and end dates of y and xlist. */
+
+    bundle dates
+    scalar t1_curr = $t1
+    scalar t2_curr = $tmax    
+    bundle obsdetails_y
+    bundle obsdetails_x
+    
+    obslabels_and_nobs_to_bundle(y, &obsdetails_y)
+    string dates.t1_label_y = obsdetails_y.t1_label
+    string dates.t2_label_y = obsdetails_y.t2_label
+    scalar dates.t1_obsnum_y = obsnum(obsdetails_y.t1_label)
+    scalar dates.t2_obsnum_y = obsnum(obsdetails_y.t2_label)
+    
+    scalar t1_diff_y = dates.t1_obsnum_y - t1_curr
+    scalar t2_diff_y = t2_curr - dates.t2_obsnum_y
+    
+    if t1_diff_y
+        printWarning(sprintf("Found %d missing initial observations for %s.", \
+          t1_diff_y, argname(y)))
+    endif
+    if t2_diff_y
+        printWarning(sprintf("Found %d missing observations at sample end for %s.", \
+          t2_diff_y, argname(y)))
+    endif
+    
+    if nelem(xlist) > 0
+        obslabels_and_nobs_to_bundle(xlist, &obsdetails_y)
+        scalar dates.t1_obsnum_xlist = obsnum(obsdetails_x.t1_label)
+        scalar dates.t2_obsnum_xlist = obsnum(obsdetails_x.t2_label)
+        string dates.t1_label_xlist = obsdetails_x.t1_label
+        string dates.t2_label_xlist = obsdetails_x.t2_label
+        scalar t1_diff_x = t1_obsnum_x - t1_curr
+        scalar t2_diff_x = t2_curr - dates.t2_obsnum_x
+        
+        if t1_diff_x
+            printWarning(sprintf("Found %d missing initial observations for exogenous.", \
+              t1_diff_x))
+        endif
+        if t2_diff_y
+            printWarning(sprintf("Found %d missing observations at sample end for exogenous.", \
+              t2_diff_x))
+        endif
+    endif
+    
+    return dates
 end function
 
 
@@ -272,26 +321,62 @@ function bundle naiveFC (const series y,
         return self
     endif
 
+    # FIXME: Need to refactored given that we don't want addobs anymore!
     # Drop missings + determine number of valid observations
-    valid_sample_and_obs_details(y, &self)
+    #valid_sample_and_obs_details(y, &self)
     if self.error
         return self
     endif
 
+    # FIXME: drop this, as we do not want to add obs. internally any more!
+    /*
     self.add_n_new_obs = nobs_to_add_to_dataset(y, self.horizon)	# TODO: return directly to self
     if self.add_n_new_obs > 0
         dataset addobs self.add_n_new_obs
         series self.y = misszero(y)		# new obs are set as NA
     endif
+    */
+
+    # TODO: TESTEN "t1_and_t2_of_y_and_xlist()"
+    bundle dates = t1_and_t2_of_y_and_xlist(y, self.xlist)
+    
+    if nelem(self.xlist)	# TODO: put to addiotional function
+        if dates.t2_obsnum_y >= dates.t2_obsnum_xlist
+            printError(sprintf("Exogenous regressors end earlier than endogenous '%s'.\n\
+              Forecasting not possible.", self.name_endo))
+            self.error = 1
+            return self
+        endif
+    endif
+
+    # Sample covering sample of valid observations in both y and xlist
+    # TODO: If the user has called 'dataset addobs' before, and y
+    # has NAs that these are not considered.
+    # USER should replace missings for the out-of-sample period by some
+    # arbitrary value before.
+    list yxlist = y self.xlist
+    bundle obsdetails_yxlist
+    obslabels_and_nobs_to_bundle(yxlist, &obsdetails_yxlist)
+
+    self.t1_label = obsdetails_yxlist.t1_label
+    self.t2_label = obsdetails_yxlist.t2_label
+    
+    smpl obsnum(obsdetails_yxlist.t1_label) obsnum(obsdetails_yxlist.t2_label)
+    series self.y = y
 
     do_naive_forecasting(&self)
-    /*
+    
+#    /*
     print self
     eval self.forecast_results
-    eval self.forecast_results["ar1fc"]
-    eval self.forecast_results["ar1fc"].forecasts_point
-    #   stop
-    */
+    eval self.forecast_results["smeanfc"]
+    eval self.forecast_results["smeanfc"].forecasts_point
+    stop
+    #    */
+    
+    ** HIER WEITERMACHEN **
+    - Scheint zu laufen fr static case
+    - testen für dynamischen fall!
 
     # TODO
     if self.which == "avgfc"
@@ -346,6 +431,7 @@ function void do_naive_forecasting (bundle *self)
         self.active_model = models[i]
 
         bundle interval_forecasts = execute_forecasting(&self)
+        
         attach_row_labels(&interval_forecasts, self)
         attach_column_labels(&interval_forecasts, self)
 
@@ -389,12 +475,6 @@ function void valid_sample_and_obs_details (const series y, bundle *self)
     /* Drop missing values + construct a contiguous data set. */
 
     self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
-
-    if inbundle(self, "xlist")
-        list xlist = self.xlist
-    else
-        list xlist = null
-    endif
 
     self.error = samples_for_y_and_xlist_match(y, xlist, &self)
 
@@ -471,15 +551,17 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
 
     loop lwin=1..cv.n_folds -q
         matrix date_idx = cv.X_train[lwin]
-        smpl minc(date_idx[,1]) (maxc(date_idx[,1]))		# time index of the training set: T=self.window_length + self-horizon
+
+        # time index of the training set: T=self.window_length + self-horizon
+        smpl minc(date_idx[,1]) (maxc(date_idx[,1]) + self.horizon)
 
         if lwin == 1
             # CV series holds "window_length+horizon" observations: subtract "horizon"
+            self.t2_train_date = date_plus_x_as_obslabel(($t2 - self.horizon), 0)
             self.t1_forecast_date = date_plus_x_as_obslabel(($t2 - self.horizon), 1)	# Date of 1st h=1 ahead forecast
         elif lwin == cv.n_folds
             self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_label), self.horizon)	# Date of last h-step ahead forecast
         endif
-
         collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)	# h by 2 matrix (point_fc ~ sderr)
     endloop
 
@@ -724,4 +806,5 @@ function matrix GUI_naiveFC (const series y "Dependent variable",
 
     return self.fc
 end function
+
 

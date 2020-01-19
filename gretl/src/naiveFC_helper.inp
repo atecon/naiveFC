@@ -51,7 +51,7 @@ function void attach_row_labels (bundle *interval_forecasts,
     forecasts. */
    
     if self.type_moving_window == "static"
-        strings row_labels = future_date_strings(self.t2_label, self.horizon)
+        strings row_labels = future_date_strings(self.t2_train_date, self.horizon)
     else
         strings row_labels = array_of_horizon_labels(self.horizon)
     endif
@@ -120,7 +120,7 @@ function scalar cv_window_length (const bundle self)
     /* Compute window_length for calling CvDataSplitter(). */
     
     if self.type_moving_window == "static"
-        scalar win_size = self.window_length	# X_test already includes period to be forecasted
+        scalar win_size = self.window_length 	# X_test already includes period to be forecasted
     else
 		# The last self.horizon rows are reserved for the OoS evaluation 
         scalar win_size = self.window_length + self.horizon
@@ -173,7 +173,7 @@ function scalar samples_for_y_and_xlist_match (const series y, const list xlist,
     bundle obsdetails_x
 
     obslabels_and_nobs_to_bundle(y, &obsdetails_y)	# no. of valid obs before adding obs. for forecasting purpose
-    obslabels_and_nobs_to_bundle(x, &obsdetails_x)	# no. of valid obs before adding obs. for forecasting purpose
+    obslabels_and_nobs_to_bundle(x, &obsdetails_x)	# no. of valid obs before adding obs. for forecasting purpose    
     scalar tdiff = diff_t2_of_y_and_x(y, xlist)
 
     if tdiff > && (tdiff < self.horizon)
@@ -290,7 +290,8 @@ function bundle set_bundle (const series y,
         strings self.models = self.supported_estimators
     endif
     if self.type_moving_window == "static"
-        scalar self.window_length = $tmax	# make sure cv gets only a single fold
+    	# make sure cv gets only a single fold
+        scalar self.window_length = $tmax - self.horizon
     endif
 
     self.forecast_results = prepare_forecast_bundles(&self)
@@ -352,7 +353,7 @@ function bundle get_train_start_end_obsnums (bundle *self)
     bundle ret = null
     if self.type_moving_window == "static"
         ret.t1_obsnum = obsnum(self.t1_label)
-        ret.t2_obsnum = obsnum(self.t2_label)
+        ret.t2_obsnum = obsnum(self.t2_label) - self.horizon
     else
         scalar ret.t2_obsnum = $t2 - self.horizon
         scalar ret.t1_obsnum = 1 + ret.t2_obsnum - self.window_length
