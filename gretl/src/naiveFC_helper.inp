@@ -11,6 +11,18 @@ function void add_last_xtrain_fold (const series y,
     endif
 end function
 
+function scalar periods_back_for_future_dates (const string type_moving_window)
+    /* Helper neede for getting correct conditioning date for
+    attach_column_labels(). */
+    
+    if type_moving_window == "static"
+        return 2
+    else
+        return 1
+    else
+        funcerr "Unknown value  for variable 'type_moving_window' passed."
+    endif
+end function
 
 # TODO: untested
 function void attach_column_labels (bundle *interval_forecasts,
@@ -18,13 +30,12 @@ function void attach_column_labels (bundle *interval_forecasts,
 /* Add date strings as column labels for indicating the date on
     which the estimates are conditioned on. */
 
-    eval self.t1_forecast_date
-    string date_first_train_end = date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -1)
-    eval date_first_train_end
-    strings date_strings = future_date_strings(date_first_train_end, self.n_folds)
-    eval date_strings    
-    stop
+    scalar periods_back = periods_back_for_future_dates(self.type_moving_window)
 
+    string date_first_trainset_end = \
+      date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -periods_back)
+    strings date_strings = future_date_strings(date_first_trainset_end, self.n_folds)
+    
     strings keys = getkeys(interval_forecasts)
     loop i=1..nelem(keys) -q
         cnameset(interval_forecasts[keys[i]], date_strings)

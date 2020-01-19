@@ -428,20 +428,20 @@ function void test_naiveFC_awm (series y)
     strings row_labels_upper = rnameget(forecast_results.ar1fc.forecasts_upper_bound)
 
     assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(row_labels_point[1], "1998:3")
     assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(row_labels_lower[1], "1998:3")
     assert_equal_str(col_labels_upper[1], "1998:2")
+    
+    assert_equal_str(row_labels_point[1], "1998:3")
+    assert_equal_str(row_labels_lower[1], "1998:3")
     assert_equal_str(row_labels_upper[1], "1998:3")
-    
 
-    stop
-    
+    assert_equal_str(row_labels_point[10], "2000:4")
+    assert_equal_str(row_labels_lower[10], "2000:4")
+    assert_equal_str(row_labels_upper[10], "2000:4")
+
     
 end function
 test_naiveFC_awm(y)
-
-print YGA -o
 
 printf "\nInfo: All tests passed.\n"
 
