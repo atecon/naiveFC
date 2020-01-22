@@ -283,13 +283,13 @@ function void test_get_train_start_end_obs_d (void)
     assert_true(inbundle(Bret, "t1_obsnum"))
     assert_true(inbundle(Bret, "t2_obsnum"))
     assert_equal_num(Bret.t1_obsnum, 1)
-    assert_equal_num(Bret.t2_obsnum, 31)
+    assert_equal_num(Bret.t2_obsnum, 29)
 
     string B.t1_label = "2000-01-02"
     string B.t2_label = "2000-02-03"
     bundle Bret = get_train_start_end_obsnums(&B)
     assert_equal_num(Bret.t1_obsnum, 2)
-    assert_equal_num(Bret.t2_obsnum, 34)
+    assert_equal_num(Bret.t2_obsnum, 32)
 end function
 test_get_train_start_end_obs_d()
 
@@ -303,9 +303,8 @@ function void test_get_train_start_end_obs_dd (void)
     scalar B.horizon = 2
     string B.type_moving_window = "rolling"
     scalar B.window_length = 5
-
+    
     bundle Bret = get_train_start_end_obsnums(&B)
-
     assert_equal_num(nelem(Bret), 2)
     assert_true(inbundle(Bret, "t1_obsnum"))
     assert_true(inbundle(Bret, "t2_obsnum"))

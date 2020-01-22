@@ -374,9 +374,9 @@ function bundle naiveFC (const series y,
     stop
     #    */
     
-    ** HIER WEITERMACHEN **
-    - Scheint zu laufen fr static case
-    - testen für dynamischen fall!
+#    ** HIER WEITERMACHEN **
+#	- Scheint zu laufen fr static case
+#   - testen für dynamischen fall!
 
     # TODO
     if self.which == "avgfc"
