@@ -328,19 +328,10 @@ function bundle naiveFC (const series y,
         return self
     endif
 
-    # FIXME: drop this, as we do not want to add obs. internally any more!
-    /*
-    self.add_n_new_obs = nobs_to_add_to_dataset(y, self.horizon)	# TODO: return directly to self
-    if self.add_n_new_obs > 0
-        dataset addobs self.add_n_new_obs
-        series self.y = misszero(y)		# new obs are set as NA
-    endif
-    */
-
     # TODO: TESTEN "t1_and_t2_of_y_and_xlist()"
     bundle dates = t1_and_t2_of_y_and_xlist(y, self.xlist)
     
-    if nelem(self.xlist)	# TODO: put to addiotional function
+    if nelem(self.xlist)	# TODO: put to additional function
         if dates.t2_obsnum_y >= dates.t2_obsnum_xlist
             printError(sprintf("Exogenous regressors end earlier than endogenous '%s'.\n\
               Forecasting not possible.", self.name_endo))
