@@ -1,3 +1,103 @@
+function bundle compute_avgerage_forecast (bundle *self)
+    /* Compute avgerage forecast combination across all models
+    estimated. This is done foreach horizon and each moving
+    window, respectively. We also compute averages of forecast
+    intervals. */
+
+    bundle avgfc = null
+
+    if !inbundle(self, "forecast_results")
+        printError("Bundle 'forecast_results' does not exist.")
+        scalar self.error = 1
+    endif
+    if nelem(self.forecast_results) < 2
+        printError("Average forecast combination requires at least two forecasting models.")
+        scalar self.error = 1
+    endif
+
+    strings keys = get_name_of_intval_matrices(self)
+
+    if !self.error
+        bundle avgfc = initialize_avgfc_bundle(self)
+
+        # Compute for lower ~ point ~ upper separate matrices
+        # holding respective values across models
+        loop i=1..nelem(keys) -q
+            string key_name = keys[i]		# lower ~ point ~ upper
+            # return array of n matrices holding interval_part for n models
+            matrices @key_name = get_interval_forecast_matrices(keys[i], self)
+        endloop
+
+        loop i=1..nelem(keys) -q
+            string key_name = keys[i]		# lower ~ point ~ upper
+            avgfc[keys[i]] = avg_across_matrices(@key_name)
+        endloop
+
+    endif
+
+    return avgfc
+end function
+
+
+# implicitly tested via compute_avgerage_forecast()
+function matrix avg_across_matrices (const matrices mats)
+    /* */
+
+    scalar n_rows = rows(mats[1])	# equivalent to self.horizon
+    scalar n_cols = cols(mats[1])	# equivalent to self.n_folds
+    matrix averages = NA * zeros(n_rows, n_cols)
+
+    loop i=1..n_rows -q
+        matrix drilled = drill(mats, i)		# rows=models; cols=moving_window
+        averages[i,] = meanc(drilled)		# avg. for horizon 'h' across all moving_windows
+    endloop
+
+    return averages
+end function
+
+
+# implicitly tested via compute_avgerage_forecast()
+function matrices get_interval_forecast_matrices (const string interval_part,
+                                                  const bundle self)
+    /* Retrieve from forecast_results for all models estimated
+       one of the matrices holding the interval forecast results: either
+    lower bound, point fc, or upper bound. */
+
+    matrices ret = array(nelem(self.models))
+
+    loop i=1..nelem(self.models) -q
+        ret[i] = self.forecast_results[self.models[i]]["@interval_part"]
+    endloop
+
+    return ret
+end function
+
+
+# implicitly tested via compute_avgerage_forecast()
+function strings get_name_of_intval_matrices (const bundle self)
+    /* Name of matrices holding interval forecasts. */
+
+    return getkeys(self.forecast_results[self.models[1]])
+end function
+
+
+# implicitly tested via compute_avgerage_forecast()
+function bundle initialize_avgfc_bundle (const bundle self)
+    /* */
+
+    strings keys = get_name_of_intval_matrices(self)
+    bundle avgfc = null
+
+    loop i=1..nelem(keys) -q
+        string key_name = keys[i]		# lower ~ point ~ upper
+        matrix avgfc[keys[i]] = NA * ones(self.horizon, self.n_folds)
+    endloop
+
+    return avgfc
+end function
+
+
+
 # TODO: untested
 function void add_last_xtrain_fold (const series y,
                                     bundle *cv,
@@ -13,7 +113,7 @@ end function
 
 function scalar periods_back_for_future_dates (const string type_moving_window)
     /* Helper for getting correct conditioning date for attach_column_labels(). */
-    
+
     if type_moving_window == "static"
         return 2
     else
@@ -27,7 +127,7 @@ end function
 # TODO: untested
 function void attach_column_labels (bundle *interval_forecasts,
                                     bundle self)
-/* Add date strings as column labels for indicating the date on
+    /* Add date strings as column labels for indicating the date on
     which the estimates are conditioned on. */
 
     scalar periods_back = periods_back_for_future_dates(self.type_moving_window)
@@ -35,7 +135,7 @@ function void attach_column_labels (bundle *interval_forecasts,
     string date_first_trainset_end = \
       date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -periods_back)
     strings date_strings = future_date_strings(date_first_trainset_end, self.n_folds)
-    
+
     strings keys = getkeys(interval_forecasts)
     loop i=1..nelem(keys) -q
         cnameset(interval_forecasts[keys[i]], date_strings)
@@ -46,10 +146,10 @@ end function
 # TODO: untested
 function void attach_row_labels (bundle *interval_forecasts,
                                  bundle self)
-/* Add date strings as row labels for 'static' forecasts,
-   or indicate the forecast horizon for moving-window
+    /* Add date strings as row labels for 'static' forecasts,
+       or indicate the forecast horizon for moving-window
     forecasts. */
-   
+
     if self.type_moving_window == "static"
         strings row_labels = future_date_strings(self.t2_train_date, self.horizon)
     else
@@ -118,20 +218,20 @@ end function
 # TODO: untested
 function scalar cv_window_length (const bundle self)
     /* Compute window_length for calling CvDataSplitter(). */
-    
+
     if self.type_moving_window == "static"
         scalar win_size = self.window_length 	# X_test already includes period to be forecasted
     else
-		# The last self.horizon rows are reserved for the OoS evaluation 
+        # The last self.horizon rows are reserved for the OoS evaluation
         scalar win_size = self.window_length + self.horizon
     endif
-    
+
     return win_size
 end function
 
 # TODO: untested
 function void x_train_test_mats_static_case (bundle *cv, const bundle self)
-    /* For the static case we only need the first fold returned by
+/* For the static case we only need the first fold returned by
     CvDataSplitter(). */
 
     if self.type_moving_window == "static"
@@ -147,13 +247,13 @@ function bundle prep_and_get_cv_folds (bundle *self)
     /* Prepare bundle for CvDataSplitter() and compute folds. */
 
     bundle cv					# Tried to put this into a bundle, but git issues with index series
-    
+
     series y = self.y		# This assignment is needed!
-    list X = y				# y includes the additional n=horizon newly added observations for the very last cv-dataset   
+    list X = y				# y includes the additional n=horizon newly added observations for the very last cv-dataset
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = cv_window_length(self)
     list cv.X = X
-    
+
     CvDataSplitter(&cv)
     x_train_test_mats_static_case(&cv, self)
     add_last_xtrain_fold(y, &cv, self)
@@ -173,7 +273,7 @@ function scalar samples_for_y_and_xlist_match (const series y, const list xlist,
     bundle obsdetails_x
 
     obslabels_and_nobs_to_bundle(y, &obsdetails_y)	# no. of valid obs before adding obs. for forecasting purpose
-    obslabels_and_nobs_to_bundle(x, &obsdetails_x)	# no. of valid obs before adding obs. for forecasting purpose    
+    obslabels_and_nobs_to_bundle(x, &obsdetails_x)	# no. of valid obs before adding obs. for forecasting purpose
     scalar tdiff = diff_t2_of_y_and_x(y, xlist)
 
     if tdiff > && (tdiff < self.horizon)
@@ -246,7 +346,7 @@ function scalar diff_t2_of_y_and_x (const series y, const list xlist)
         list L = y
         obslabels_and_nobs_to_bundle(L, &b)
         scalar t2_y = obsnum(b.t2_date)
-        
+
         bundle b = null
         obslabels_and_nobs_to_bundle(xlist, &b)
         scalar t2_x = obsnum(b.t2_date)
@@ -290,7 +390,7 @@ function bundle set_bundle (const series y,
         strings self.models = self.supported_estimators
     endif
     if self.type_moving_window == "static"
-    	# make sure cv gets only a single fold
+        # make sure cv gets only a single fold
         scalar self.window_length = $tmax - self.horizon
     endif
 
@@ -382,7 +482,7 @@ function list add_intercept_to_list (void)
     /* Add intercept to list. */
 
     list xlist = const
-    
+
     return xlist
 end function
 
@@ -392,7 +492,7 @@ function list add_ohe_periods_to_list (void)
 
     series period = get_highest_period_series()
     list xlist = dummify(period)
-    
+
     return xlist
 end function
 

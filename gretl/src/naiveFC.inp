@@ -369,9 +369,8 @@ function bundle naiveFC (const series y,
 #	- Scheint zu laufen fr static case
 #   - testen für dynamischen fall!
 
-    # TODO
     if self.which == "avgfc"
-        compute_avgerage_forecast()
+        self.forecast_results.avgfc = compute_avgerage_forecast(&self)
     endif
 
     summarize_naive_fc_results(&self)
@@ -432,6 +431,7 @@ end function
 
 
 
+# TODO: untested
 function void summarize_naive_fc_results (bundle *self)
     /* Print summarising information */
 
@@ -443,7 +443,7 @@ function void summarize_naive_fc_results (bundle *self)
         printf "Forecasting method: \t\t\t%s\n", self.which
         printf "Start valid data set: \t\t\t%s\n", self.t1_date
         printf "End valid data set: \t\t\t%s\n", self.t2_date
-        printf "Number of observations: \t\t%d\n", obsnum(self.t2_date) - obsnum(self.t1_date)
+        printf "Number of observations: \t\t%d\n", 1 + obsnum(self.t2_date) - obsnum(self.t1_date)
         printf "Forecast horizon: \t\t\t%d\n", self.horizon
         printf "First observation forecasted (h=1): \t%s\n", self.t1_forecast_date
         printf "Last observation forecasted (h=%d): \t%s\n", self.horizon, self.t2_forecast_date
