@@ -272,8 +272,8 @@ function void test_get_train_start_end_obs_d (void)
     print "Start with get_train_start_end_obsnums() daily"
 
     bundle B = null
-    string B.t1_label = "2000-01-01"
-    string B.t2_label = "2000-01-31"
+    string B.t1_date = "2000-01-01"
+    string B.t2_date = "2000-01-31"
     scalar B.horizon = 2
     string B.type_moving_window = "static"
 
@@ -285,8 +285,8 @@ function void test_get_train_start_end_obs_d (void)
     assert_equal_num(Bret.t1_obsnum, 1)
     assert_equal_num(Bret.t2_obsnum, 29)
 
-    string B.t1_label = "2000-01-02"
-    string B.t2_label = "2000-02-03"
+    string B.t1_date = "2000-01-02"
+    string B.t2_date = "2000-02-03"
     bundle Bret = get_train_start_end_obsnums(&B)
     assert_equal_num(Bret.t1_obsnum, 2)
     assert_equal_num(Bret.t2_obsnum, 32)
@@ -354,7 +354,7 @@ test_nobs_to_add_to_dataset()
 nulldata 7 -p
 setobs 7 2000-01-01 --time-series
 function void test_diff_t2_of_y_and_x (void)
-    print "Start with diff_nobs_of_y_and_x()"
+    print "Start with diff_t2_of_y_and_x()"
 
     series s1 = normal()
     series s2 = s1
@@ -417,11 +417,14 @@ function void test_naiveFC_meanfc_awn (series y)
 
     b
     forecast_results
-    print "huhu"
+    
+    assert_equal_str(b.t1_date, "1971:4")
+    assert_equal_str(b.t2_date, "1998:2")
+    
+    assert_equal_str(b.t1_train_date, "1971:4")
+    assert_equal_str(b.t2_train_date, "1995:4")
     stop
     
-    assert_equal_str(b.t1_label, "1971:4")
-    assert_equal_str(b.t2_label, "1998:2")
     assert_equal_str(b.t1_forecast_date, "1998:3")
     assert_equal_str(b.t2_forecast_date, "2000:4")
     

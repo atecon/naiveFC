@@ -205,7 +205,7 @@ end function
 function scalar valid_window_length (bundle *self)
     /* Returns zero of window_length is valid. */
 
-    if smplspan(self.t1_label, self.t2_label, $pd) < self.window_length
+    if smplspan(self.t1_date, self.t2_date, $pd) < self.window_length
         printError(sprintf("The window size you selected (wsize=%d) exceeds the\n\
           number of valid observations in '%s'.", self.window_length, self.name_endo))
 
@@ -230,8 +230,8 @@ end function
 function void obslabels_and_nobs_to_bundle (const list y,
                                             bundle *self)
     smpl y --contiguous
-    string self.t1_label = obslabel($t1)
-    string self.t2_label = obslabel($t2)
+    string self.t1_date = obslabel($t1)
+    string self.t2_date = obslabel($t2)
     scalar self.T = $nobs
 end function
 
@@ -245,11 +245,11 @@ function scalar diff_t2_of_y_and_x (const series y, const list xlist)
         bundle b = null
         list L = y
         obslabels_and_nobs_to_bundle(L, &b)
-        scalar t2_y = obsnum(b.t2_label)
+        scalar t2_y = obsnum(b.t2_date)
         
         bundle b = null
         obslabels_and_nobs_to_bundle(xlist, &b)
-        scalar t2_x = obsnum(b.t2_label)
+        scalar t2_x = obsnum(b.t2_date)
 
         scalar tdiff = t2_x - t2_y
     endif
@@ -352,8 +352,8 @@ function bundle get_train_start_end_obsnums (bundle *self)
 
     bundle ret = null
     if self.type_moving_window == "static"
-        ret.t1_obsnum = obsnum(self.t1_label)
-        ret.t2_obsnum = obsnum(self.t2_label) - self.horizon
+        ret.t1_obsnum = obsnum(self.t1_date)
+        ret.t2_obsnum = obsnum(self.t2_date) - self.horizon
     else
         scalar ret.t2_obsnum = $t2 - self.horizon
         scalar ret.t1_obsnum = 1 + ret.t2_obsnum - self.window_length

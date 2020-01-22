@@ -266,10 +266,10 @@ function bundle t1_and_t2_of_y_and_xlist (const series y,
     bundle obsdetails_x
     
     obslabels_and_nobs_to_bundle(y, &obsdetails_y)
-    string dates.t1_label_y = obsdetails_y.t1_label
-    string dates.t2_label_y = obsdetails_y.t2_label
-    scalar dates.t1_obsnum_y = obsnum(obsdetails_y.t1_label)
-    scalar dates.t2_obsnum_y = obsnum(obsdetails_y.t2_label)
+    string dates.t1_date_y = obsdetails_y.t1_date
+    string dates.t2_date_y = obsdetails_y.t2_date
+    scalar dates.t1_obsnum_y = obsnum(obsdetails_y.t1_date)
+    scalar dates.t2_obsnum_y = obsnum(obsdetails_y.t2_date)
     
     scalar t1_diff_y = dates.t1_obsnum_y - t1_curr
     scalar t2_diff_y = t2_curr - dates.t2_obsnum_y
@@ -349,21 +349,21 @@ function bundle naiveFC (const series y,
     bundle obsdetails_yxlist
     obslabels_and_nobs_to_bundle(yxlist, &obsdetails_yxlist)
 
-    self.t1_label = obsdetails_yxlist.t1_label
-    self.t2_label = obsdetails_yxlist.t2_label
+    self.t1_date = obsdetails_yxlist.t1_date
+    self.t2_date = obsdetails_yxlist.t2_date
     
-    smpl obsnum(obsdetails_yxlist.t1_label) obsnum(obsdetails_yxlist.t2_label)
+    smpl obsnum(obsdetails_yxlist.t1_date) obsnum(obsdetails_yxlist.t2_date)
     series self.y = y
 
     do_naive_forecasting(&self)
     
-#    /*
+    /*
     print self
     eval self.forecast_results
     eval self.forecast_results["smeanfc"]
     eval self.forecast_results["smeanfc"].forecasts_point
     stop
-    #    */
+    */
     
 #    ** HIER WEITERMACHEN **
 #	- Scheint zu laufen fr static case
@@ -441,9 +441,9 @@ function void summarize_naive_fc_results (bundle *self)
         printf "\nEndogenous: \t\t\t\t%s\n", self.name_endo
         printf "Number of additional exogenous: \t%d\n", nelem(self.xlist)
         printf "Forecasting method: \t\t\t%s\n", self.which
-        printf "Start valid data set: \t\t\t%s\n", self.t1_label
-        printf "End valid data set: \t\t\t%s\n", self.t2_label
-        printf "Number of observations: \t\t%d\n", obsnum(self.t2_label) - obsnum(self.t1_label)
+        printf "Start valid data set: \t\t\t%s\n", self.t1_date
+        printf "End valid data set: \t\t\t%s\n", self.t2_date
+        printf "Number of observations: \t\t%d\n", obsnum(self.t2_date) - obsnum(self.t1_date)
         printf "Forecast horizon: \t\t\t%d\n", self.horizon
         printf "First observation forecasted (h=1): \t%s\n", self.t1_forecast_date
         printf "Last observation forecasted (h=%d): \t%s\n", self.horizon, self.t2_forecast_date
@@ -481,7 +481,7 @@ function void valid_sample_and_obs_details (const series y, bundle *self)
             printWarning(sprintf("Information on the new contiguous \n\
               set for series '%s':\n\
               Start date: %s\n\
-              End date: %s", self.name_endo, self.t1_label, self.t2_label))
+              End date: %s", self.name_endo, self.t1_date, self.t2_date))
         endif
     endif
 
@@ -548,10 +548,11 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
 
         if lwin == 1
             # CV series holds "window_length+horizon" observations: subtract "horizon"
+            self.t1_train_date = date_plus_x_as_obslabel($t1, 0)
             self.t2_train_date = date_plus_x_as_obslabel(($t2 - self.horizon), 0)
             self.t1_forecast_date = date_plus_x_as_obslabel(($t2 - self.horizon), 1)	# Date of 1st h=1 ahead forecast
         elif lwin == cv.n_folds
-            self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_label), self.horizon)	# Date of last h-step ahead forecast
+            self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_date), self.horizon)	# Date of last h-step ahead forecast
         endif
         collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)	# h by 2 matrix (point_fc ~ sderr)
     endloop
@@ -597,7 +598,7 @@ function list getNaiveForecastsList (bundle *self,
 
     series y = self.y
     if self.add_n_new_obs > 0				# The last h observations were added and set to zero
-        smpl (obsnum(self.t2_label)+1) $tmax
+        smpl (obsnum(self.t2_date)+1) $tmax
         series y = NA
         smpl full
     endif
@@ -640,7 +641,7 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()",
     setinfo y --graph-name="Actuals"
     if self.add_n_new_obs > 0				# The last h observations were added and set to zero
         # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
-        smpl (obsnum(self.t2_label)+1) $tmax
+        smpl (obsnum(self.t2_date)+1) $tmax
         series y = NA
         smpl full
     endif
