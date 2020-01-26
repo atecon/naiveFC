@@ -168,20 +168,17 @@ function matrix set_xlist_and_forecast (bundle *self)
     series y = self.y					# length: window_length + horizon
 
     # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
-    # is not the effective sample length
-    # but (window_length-max(lags))
-    bundle train_obsnums = get_train_start_end_obsnums(&self)
-        
+    # is not the effective sample length but (window_length-max(lags))
+    bundle train_obsnums = get_train_start_end_obsnums(self)       
     bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
     
-#    smpl full											# TODO drop?
-    #catch smpl train_obsnums.t1_obsnum t2_test_obsnum	# TODO: Why not use full sample        
+#   smpl full											# TODO drop?
+#	catch smpl train_obsnums.t1_obsnum t2_test_obsnum	# TODO: Why not use full sample        
     list xlist = prepare_xlist(model_settings, self)
     if model_settings.add_first_lag
         xlist += y(-1)
     endif
 
-    # restrict to training sample
     catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 
     if $error
@@ -190,7 +187,7 @@ function matrix set_xlist_and_forecast (bundle *self)
         return forecast_results
     endif
 
-    # TODO: Can this happen, and if so why?
+    # TODO: Can this happen, and if so why -- otherwise drop
     if self.type_moving_window != "static" && ($nobs > self.window_length)
         printError(sprintf("You training sample (T=%d) is longer than the\n\
           specified window length (T=%d).", $nobs, self.window_length))
@@ -199,29 +196,17 @@ function matrix set_xlist_and_forecast (bundle *self)
         return forecast_results
     endif
 
-    # Estimation
-    catch @command
-    model_error = $error
-    if model_error
-        printError("Error: Model estimation failed.\n\
-          Forecast values are set to NA for the current sample.")
-
-        return forecast_results
-    else
-        #fcast ($t2+1) ($t2+self.horizon) @fcast_arg		# TODO: drop
-        fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_arg
-    endif
+    self.error = estimate_model_and_forecast(command, fcast_arg, y, \
+      xlist, train_obsnums, test_obsnums)
 
     if self.type_moving_window == "static"
-        self.t1_forecast_date = date_plus_x_as_obslabel($t2, 1)
-        self.t2_forecast_date = date_plus_x_as_obslabel($t2, self.horizon)
+        self.t1_forecast_date = obslabel(test_obsnums.t1_test_obsnum)
+        self.t2_forecast_date = obslabel(test_obsnums.t2_test_obsnum)
     endif
 
-    if !model_error
-        forecast_results = $fcast ~ $fcse
-    endif
-
+    forecast_results[1:self.horizon_current,] = $fcast ~ $fcse
     return forecast_results
+
 end function
 
 
@@ -422,6 +407,8 @@ function void do_naive_forecasting (bundle *self)
         self.active_model = models[i]
 
         bundle interval_forecasts = execute_forecasting(&self)
+        interval_forecasts
+        *** HIER WEITERMACHEN*** Scheint soweit zu laufen!
         
         attach_row_labels(&interval_forecasts, self)
         attach_column_labels(&interval_forecasts, self)
@@ -506,7 +493,7 @@ function bundle execute_forecasting (bundle *self)
       point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &self)
 
     # Retrieve moving-window point_forecasts from array,
-    # compute forecast intervals and put stuff to bundle
+      # compute forecast intervals and put stuff to bundle
     return compute_intval_forecasts(forecasts_and_factors)
 end function
 
@@ -545,15 +532,36 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
         matrix date_idx = cv.X_train[lwin]
         
         # time index of the training set = self.window_length + self-horizon
-        smpl minc(date_idx[,1]) (maxc(date_idx[,1]) + self.horizon)
+        # As the last rolling samples may inlude only a sample set less than self.horizon
+        # observations, we still can compute forecasts for $Ttest < self.horizon$
+        scalar obs_left = $tmax - maxc(date_idx[,1])
+        scalar self.horizon_current = xmin(self.horizon, obs_left)
+        
+        if self.horizon_current == 0		# FIXME: Why is n_folds=81 but only n_folds=80 would work!
+            break
+        endif
+
+        smpl minc(date_idx[,1]) (maxc(date_idx[,1]) + self.horizon_current)
 
         if lwin == 1
             # CV series holds "window_length+horizon" observations: subtract "horizon"
             self.t1_train_date = date_plus_x_as_obslabel($t1, 0)
-            self.t2_train_date = date_plus_x_as_obslabel(($t2 - self.horizon), 0)
-            self.t1_forecast_date = date_plus_x_as_obslabel(($t2 - self.horizon), 1)	# Date of 1st h=1 ahead forecast
-        elif lwin == cv.n_folds
-            self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_date), self.horizon)	# Date of last h-step ahead forecast
+            self.t2_train_date = date_plus_x_as_obslabel(($t2 - self.horizon_current), 0)
+            self.t1_forecast_date = date_plus_x_as_obslabel(($t2 - self.horizon_current), 1)	# Date of 1st h=1 ahead forecast
+        elif lwin == (cv.n_folds - 1) && self.type_moving_window != "static"
+            # FIXME: drop
+            /* 		
+            eval $lwin
+            eval cv.n_folds
+            eval $t1
+            eval $t2
+            eval $nobs
+            eval self.horizon_current
+            eval self.t2_date
+            */
+            self.t2_forecast_date = self.t2_date		# Date of last h-step ahead forecast
+        elif lwin == cv.n_folds && self.type_moving_window == "static"
+            self.t2_forecast_date = date_plus_x_as_obslabel(obsnum(self.t2_date), self.horizon_current)	# Date of last h-step ahead forecast
         endif
         collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)	# h by 2 matrix (point_fc ~ sderr)
     endloop

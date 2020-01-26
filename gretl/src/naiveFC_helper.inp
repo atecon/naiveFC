@@ -1,3 +1,30 @@
+function scalar estimate_model_and_forecast (const string est_command,
+                                             const string fcast_command,
+                                             const series y,
+                                             const list xlist,
+                                             const bundle train_obsnums,
+                                             const bundle test_obsnums)
+    /* Estimate model and return oos-forecast. */
+
+    smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+    catch @est_command
+    if $error
+        printError("Model estimation failed.\n\
+          Forecast values are set to NA for the current sample.")
+        return 1
+    endif
+
+    catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
+    if $error
+        printError("Failed executing forecast command.")
+        return 1
+    endif
+
+    return 0
+end function
+
+
+
 function bundle compute_avgerage_forecast (bundle *self)
 /* Compute avgerage forecast combination across all models
    estimated. This is done foreach horizon and each moving
@@ -98,18 +125,22 @@ end function
 
 
 
-# TODO: untested
+
+# TODO: seems deprecated
+/*
 function void add_last_xtrain_fold (const series y,
                                     bundle *cv,
                                     const bundle self)
-    /* As CvDataSplitter() doesn't consider the very last obs in
-    the final training set for 'rolwin' and 'recwin', this must be added. */
+    # As CvDataSplitter() doesn't consider the very last obs in
+    # the final training set for 'rolwin' and 'recwin', this must be added.
 
     if self.type_moving_window != "static"
         cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
         cv.n_folds++
     endif
 end function
+*/
+
 
 function scalar periods_back_for_future_dates (const string type_moving_window)
     /* Helper for getting correct conditioning date for attach_column_labels(). */
@@ -256,7 +287,7 @@ function bundle prep_and_get_cv_folds (const bundle self)
 
     CvDataSplitter(&cv)
     x_train_test_mats_static_case(&cv, self)
-    add_last_xtrain_fold(y, &cv, self)
+#    add_last_xtrain_fold(y, &cv, self)			# TODO: seems deprecated
 
     return cv
 end function
@@ -449,26 +480,26 @@ end function
 
 # TODO: untested
 function bundle get_test_start_end_obsnums (const bundle train_obsnums,
-                                           const bundle self)
+                                            const bundle self)
     /* Compute start and end date of test sample based. */
 
     bundle ret = null
     scalar ret.t1_test_obsnum = 1 + train_obsnums.t2_obsnum
-    scalar ret.t2_test_obsnum = t1_test_obsnum + self.horizon
+    scalar ret.t2_test_obsnum = ret.t1_test_obsnum + self.horizon_current - 1
 
     return ret
 end function
 
 
-function bundle get_train_start_end_obsnums (bundle *self)
+function bundle get_train_start_end_obsnums (const bundle self)
     /* Return obs. numbers for trainings set. */
 
     bundle ret = null
     if self.type_moving_window == "static"
         ret.t1_obsnum = obsnum(self.t1_date)
-        ret.t2_obsnum = obsnum(self.t2_date) - self.horizon
+        ret.t2_obsnum = obsnum(self.t2_date) - self.horizon_current
     else
-        scalar ret.t2_obsnum = $t2 - self.horizon
+        scalar ret.t2_obsnum = $t2 - self.horizon_current
         scalar ret.t1_obsnum = 1 + ret.t2_obsnum - self.window_length
     endif
 
