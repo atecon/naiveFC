@@ -215,7 +215,7 @@ function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     pkg query extra --quiet
-    if $result["version"] < 0.6
+    if atof($result["version"]) < 0.6
         printError("You need at least version 0.6 of the 'extra' package.")
         printError("Update by executing 'pkg install extra'")
     endif
@@ -348,24 +348,15 @@ function bundle naiveFC (const series y,
     series self.y = y
 
     do_naive_forecasting(&self)
-    
-    /*
-    print self
-    eval self.forecast_results
-    eval self.forecast_results["smeanfc"]
-    eval self.forecast_results["smeanfc"].forecasts_point
-    stop
-    */
-    
-#    ** HIER WEITERMACHEN **
-#	- Scheint zu laufen fr static case
-#   - testen für dynamischen fall!
 
     if self.which == "avgfc"
         self.forecast_results.avgfc = compute_avgerage_forecast(&self)
+        eval self.forecast_results.avgfc
+        stop
     endif
 
-    summarize_naive_fc_results(&self)
+    #    summarize_naive_fc_results(&self)
+    self
     cleanup_bundle(&self)
 
     #eval self.forecast_results["ar1fc"].forecasts_point
@@ -386,6 +377,10 @@ function void cleanup_bundle (bundle *self)
     delete self.supported_estimators
     delete self.index
     delete self.active_model
+    delete self.horizon_current
+    delete self.t1_date
+    delete self.t2_date
+    delete self.xlist
 end function
 
 
@@ -413,9 +408,7 @@ function void do_naive_forecasting (bundle *self)
         self.active_model = models[i]
 
         bundle interval_forecasts = execute_forecasting(&self)
-        interval_forecasts
-        *** HIER WEITERMACHEN*** Scheint soweit zu laufen!
-        
+
         attach_row_labels(&interval_forecasts, self)
         attach_column_labels(&interval_forecasts, self)
 

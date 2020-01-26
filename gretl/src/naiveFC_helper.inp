@@ -142,31 +142,16 @@ end function
 */
 
 
-function scalar periods_back_for_future_dates (const string type_moving_window)
-    /* Helper for getting correct conditioning date for attach_column_labels(). */
-
-    if type_moving_window == "static"
-        return 2
-    else
-        return 1
-    else
-        funcerr "Unknown value  for variable 'type_moving_window' passed."
-    endif
-end function
-
-
-# TODO: untested
 function void attach_column_labels (bundle *interval_forecasts,
                                     bundle self)
     /* Add date strings as column labels for indicating the date on
     which the estimates are conditioned on. */
 
-    scalar periods_back = periods_back_for_future_dates(self.type_moving_window)
-
     string date_first_trainset_end = \
-      date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -periods_back)
+      date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -2)
+    
     strings date_strings = future_date_strings(date_first_trainset_end, self.n_folds)
-
+    
     strings keys = getkeys(interval_forecasts)
     loop i=1..nelem(keys) -q
         cnameset(interval_forecasts[keys[i]], date_strings)
@@ -174,7 +159,7 @@ function void attach_column_labels (bundle *interval_forecasts,
 end function
 
 
-# TODO: untested
+# TODO: partly untested
 function void attach_row_labels (bundle *interval_forecasts,
                                  bundle self)
     /* Add date strings as row labels for 'static' forecasts,
@@ -199,7 +184,7 @@ function strings array_of_horizon_labels (const int horizon[1::])
 
     strings r = array(horizon)
     loop i=1..horizon -q
-        r[i] = sprintf(" h=%d", i)
+        r[i] = sprintf("h=%d", i)
     endloop
 
     return r
