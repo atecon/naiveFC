@@ -125,23 +125,6 @@ end function
 
 
 
-
-# TODO: seems deprecated
-/*
-function void add_last_xtrain_fold (const series y,
-                                    bundle *cv,
-                                    const bundle self)
-    # As CvDataSplitter() doesn't consider the very last obs in
-    # the final training set for 'rolwin' and 'recwin', this must be added.
-
-    if self.type_moving_window != "static"
-        cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
-        cv.n_folds++
-    endif
-end function
-*/
-
-
 function void attach_column_labels (bundle *interval_forecasts,
                                     bundle self)
     /* Add date strings as column labels for indicating the date on
@@ -244,6 +227,7 @@ function scalar cv_window_length (const bundle self)
     return win_size
 end function
 
+
 # TODO: untested
 function void x_train_test_mats_static_case (bundle *cv, const bundle self)
 /* For the static case we only need the first fold returned by
@@ -272,7 +256,6 @@ function bundle prep_and_get_cv_folds (const bundle self)
 
     CvDataSplitter(&cv)
     x_train_test_mats_static_case(&cv, self)
-#    add_last_xtrain_fold(y, &cv, self)			# TODO: seems deprecated
 
     return cv
 end function

@@ -868,7 +868,6 @@ function void test_naiveFC_smeanfc_awm_stat_r (series y)
     strings row_labels_lower = rnameget(forecast_results.smeanfc.forecasts_lower_bound)
     strings row_labels_upper = rnameget(forecast_results.smeanfc.forecasts_upper_bound)
 
-
     matrix point = forecast_results.smeanfc.forecasts_point
     matrix lower_bound = forecast_results.smeanfc.forecasts_lower_bound
     matrix upper_bound = forecast_results.smeanfc.forecasts_upper_bound
