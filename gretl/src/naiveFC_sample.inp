@@ -137,10 +137,10 @@ endif
 scalar horizon = 10
 bundle opts = null					# setup additional options
 opts.horizon = horizon
-#opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
-#opts.window_length = xmax($pd, 90) 			# moving window length (optional)
+opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+# opts.window_length = xmax($pd, 90) 			# moving window length (optional)
 # opts.window_length = $tmax
-#catch list opts.xlist = D743 FDD			# optional additional regressors
+# catch list opts.xlist = D743 FDD			# optional additional regressors
 opts.verbose = 1					# Don't print details (optional)
 
 # Select method - dim = 11
@@ -151,8 +151,8 @@ bundle b = null
 bundle b = naiveFC(y, methods[5], opts)
 b
 forecast_results = b.forecast_results
-eval forecast_results.meanfc
-eval forecast_results.meanfc.forecasts_point
+eval forecast_results.smeanfc
+eval forecast_results.smeanfc.forecasts_point
 stop
 
 # Get interval forecasts as series

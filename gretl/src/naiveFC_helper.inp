@@ -1,7 +1,7 @@
 function bundle compute_avgerage_forecast (bundle *self)
-    /* Compute avgerage forecast combination across all models
-    estimated. This is done foreach horizon and each moving
-    window, respectively. We also compute averages of forecast
+/* Compute avgerage forecast combination across all models
+   estimated. This is done foreach horizon and each moving
+   window, respectively. We also compute averages of forecast
     intervals. */
 
     bundle avgfc = null
@@ -215,7 +215,6 @@ function bundle point_fc_and_factor_as_arrays (const matrices collected_point_fc
 end function
 
 
-# TODO: untested
 function scalar cv_window_length (const bundle self)
     /* Compute window_length for calling CvDataSplitter(). */
 
@@ -243,7 +242,7 @@ end function
 
 
 # TODO: untested -- however, rather CvDataSplitter() should be tested!
-function bundle prep_and_get_cv_folds (bundle *self)
+function bundle prep_and_get_cv_folds (const bundle self)
     /* Prepare bundle for CvDataSplitter() and compute folds. */
 
     bundle cv					# Tried to put this into a bundle, but git issues with index series
@@ -251,7 +250,8 @@ function bundle prep_and_get_cv_folds (bundle *self)
     series y = self.y		# This assignment is needed!
     list X = y				# y includes the additional n=horizon newly added observations for the very last cv-dataset
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
-    scalar cv.win_size = cv_window_length(self)
+    #    scalar cv.win_size = cv_window_length(self)	# FIXME: If I am right: deprecated!
+    scalar cv.win_size = self.window_length
     list cv.X = X
 
     CvDataSplitter(&cv)
@@ -444,6 +444,19 @@ end function
 # TODO: Drop funcerr, instead return error but don't stop
 function void print_no_bootstrap_support (void)
     printError("Bootstrap confidence intervals are not supported, yet")
+end function
+
+
+# TODO: untested
+function bundle get_test_start_end_obsnums (const bundle train_obsnums,
+                                           const bundle self)
+    /* Compute start and end date of test sample based. */
+
+    bundle ret = null
+    scalar ret.t1_test_obsnum = 1 + train_obsnums.t2_obsnum
+    scalar ret.t2_test_obsnum = t1_test_obsnum + self.horizon
+
+    return ret
 end function
 
 
