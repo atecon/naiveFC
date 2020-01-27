@@ -169,11 +169,9 @@ function matrix set_xlist_and_forecast (bundle *self)
 
     # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
     # is not the effective sample length but (window_length-max(lags))
-    bundle train_obsnums = get_train_start_end_obsnums(self)       
+    bundle train_obsnums = get_train_start_end_obsnums(self)
     bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
-    
-#   smpl full											# TODO drop?
-#	catch smpl train_obsnums.t1_obsnum t2_test_obsnum	# TODO: Why not use full sample        
+
     list xlist = prepare_xlist(model_settings, self)
     if model_settings.add_first_lag
         xlist += y(-1)
@@ -255,19 +253,19 @@ function bundle t1_and_t2_of_y_and_xlist (const series y,
 
     bundle dates
     scalar t1_curr = $t1
-    scalar t2_curr = $tmax    
+    scalar t2_curr = $tmax
     bundle obsdetails_y
     bundle obsdetails_x
-    
+
     obslabels_and_nobs_to_bundle(y, &obsdetails_y)
     string dates.t1_date_y = obsdetails_y.t1_date
     string dates.t2_date_y = obsdetails_y.t2_date
     scalar dates.t1_obsnum_y = obsnum(obsdetails_y.t1_date)
     scalar dates.t2_obsnum_y = obsnum(obsdetails_y.t2_date)
-    
+
     scalar t1_diff_y = dates.t1_obsnum_y - t1_curr
     scalar t2_diff_y = t2_curr - dates.t2_obsnum_y
-    
+
     if t1_diff_y != 0
         printWarning(sprintf("Found %d missing initial observations for %s.", \
           t1_diff_y, argname(y)))
@@ -278,11 +276,11 @@ function bundle t1_and_t2_of_y_and_xlist (const series y,
     endif
 
     if nelem(xlist) > 0
-        obslabels_and_nobs_to_bundle(xlist, &obsdetails_y)
-        scalar dates.t1_obsnum_xlist = obsnum(obsdetails_x.t1_label)
-        scalar dates.t2_obsnum_xlist = obsnum(obsdetails_x.t2_label)
-        string dates.t1_label_xlist = obsdetails_x.t1_label
-        string dates.t2_label_xlist = obsdetails_x.t2_label
+        obslabels_and_nobs_to_bundle(xlist, &obsdetails_x)
+        scalar dates.t1_obsnum_xlist = obsnum(obsdetails_x.t1_date)
+        scalar dates.t2_obsnum_xlist = obsnum(obsdetails_x.t2_date)
+        string dates.t1_label_xlist = obsdetails_x.t1_date
+        string dates.t2_label_xlist = obsdetails_x.t2_date
         scalar t1_diff_x = dates.t1_obsnum_xlist - t1_curr
         scalar t2_diff_x = t2_curr - dates.t2_obsnum_xlist
 
@@ -343,23 +341,19 @@ function bundle naiveFC (const series y,
     obslabels_and_nobs_to_bundle(yxlist, &obsdetails_yxlist)
     self.t1_date = obsdetails_yxlist.t1_date
     self.t2_date = obsdetails_yxlist.t2_date
-    
+
     smpl obsnum(obsdetails_yxlist.t1_date) obsnum(obsdetails_yxlist.t2_date)
     series self.y = y
 
     do_naive_forecasting(&self)
 
+    # TODO: Make this a separate public function!
     if self.which == "avgfc"
         self.forecast_results.avgfc = compute_avgerage_forecast(&self)
-        eval self.forecast_results.avgfc
-        stop
     endif
 
-    #    summarize_naive_fc_results(&self)
-    self
+    summarize_naive_fc_results(&self)
     cleanup_bundle(&self)
-
-    #eval self.forecast_results["ar1fc"].forecasts_point
 
     return self
 end function
@@ -400,7 +394,7 @@ end function
 
 
 function void do_naive_forecasting (bundle *self)
-/* Wrapper function actually calling procedures. */
+    /* Wrapper function actually calling procedures. */
 
     strings models = getkeys(self.forecast_results)
 
@@ -417,33 +411,37 @@ function void do_naive_forecasting (bundle *self)
 end function
 
 
-
-# TODO: untested
 function void summarize_naive_fc_results (bundle *self)
     /* Print summarising information */
 
     if self.verbose
-        printf "****************************************************\n"
-        printf "\t\tNaive Forecasting Method\n"
-        printf "\nEndogenous: \t\t\t\t%s\n", self.name_endo
-        printf "Number of additional exogenous: \t%d\n", nelem(self.xlist)
-        printf "Forecasting method: \t\t\t%s\n", self.which
-        printf "Start valid data set: \t\t\t%s\n", self.t1_date
-        printf "End valid data set: \t\t\t%s\n", self.t2_date
-        printf "Number of observations: \t\t%d\n", 1 + obsnum(self.t2_date) - obsnum(self.t1_date)
-        printf "Forecast horizon: \t\t\t%d\n", self.horizon
-        printf "First observation forecasted (h=1): \t%s\n", self.t1_forecast_date
-        printf "Last observation forecasted (h=%d): \t%s\n", self.horizon, self.t2_forecast_date
+        printf "-------------------------------------------------------------------\n"
+        printf "\t\tSummary of naive forecasting\n"
+        printf "\nForecasting method: \t\t\t%s\n", self.which
+        printf "Endogenous: \t\t\t\t%s\n", self.name_endo
+        printf "Number of additional regressors: \t%d\n", nelem(self.xlist)
+        printf "Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date, self.t2_date, \
+          nobs(self.y)
+        printf "Max. forecast horizon: \t\t\t%d\n", self.horizon
         if self.type_moving_window == "static"
-            #        if self.which != "avgFC"
-            printf "Width forecast interval: \t\t%d pct.\n", self.level * 100
-            #        endif
-        else
+            printf "Last in-sample observation: \t\t%s\n", self.t2_train_date
+        elif self.type_moving_window == "rolling"
             printf "Moving window length: \t\t\t%d\n", self.window_length
-            printf "Number of %s forecasts: \t\t%d\n", self.type_moving_window, self.n_folds
+        else
+            printf "Initial window length: \t\t\t%d\n", self.window_length
         endif
-        printf "****************************************************\n"
-        printf "\n"
+        if self.type_moving_window != "static"
+            printf "Number of %s multi-step forecasts: %d\n", self.type_moving_window, \
+              self.n_folds
+        endif
+        printf "First observation forecasted (h=1): \t%s\n", self.t1_forecast_date
+        printf "Last observation forecasted (h=%d): \t%s\n", self.horizon, \
+          self.t2_forecast_date
+        if self.type_moving_window == "static"
+            printf "Width forecast interval: \t\t%d pct.\n", self.level * 100
+        else
+        endif
+        printf "-------------------------------------------------------------------\n\n"
     endif
 end function
 
@@ -492,7 +490,7 @@ function bundle execute_forecasting (bundle *self)
       point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &self)
 
     # Retrieve moving-window point_forecasts from array,
-      # compute forecast intervals and put stuff to bundle
+    # compute forecast intervals and put stuff to bundle
     return compute_intval_forecasts(forecasts_and_factors)
 end function
 
@@ -529,13 +527,13 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
 
     loop lwin=1..cv.n_folds -q
         matrix date_idx = cv.X_train[lwin]
-        
+
         # time index of the training set = self.window_length + self-horizon
         # As the last rolling samples may inlude only a sample set less than self.horizon
         # observations, we still can compute forecasts for $Ttest < self.horizon$
         scalar obs_left = $tmax - maxc(date_idx[,1])
         scalar self.horizon_current = xmin(self.horizon, obs_left)
-        
+
         if self.horizon_current == 0		# FIXME: Why is n_folds=81 but only n_folds=80 would work!
             break
         endif
@@ -549,14 +547,14 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
             self.t1_forecast_date = date_plus_x_as_obslabel(($t2 - self.horizon_current), 1)	# Date of 1st h=1 ahead forecast
         elif lwin == (cv.n_folds - 1) && self.type_moving_window != "static"
             # FIXME: drop
-            /* 		
-            eval $lwin
-            eval cv.n_folds
-            eval $t1
-            eval $t2
-            eval $nobs
-            eval self.horizon_current
-            eval self.t2_date
+            /*
+               eval $lwin
+               eval cv.n_folds
+               eval $t1
+               eval $t2
+               eval $nobs
+               eval self.horizon_current
+               eval self.t2_date
             */
             self.t2_forecast_date = self.t2_date		# Date of last h-step ahead forecast
         elif lwin == cv.n_folds && self.type_moving_window == "static"
@@ -569,65 +567,118 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
 end function
 
 
+# TODO: untested
+function scalar horizons_isok (const bundle self,
+                               const matrix horizons)
+    /* Check that vector horizons is ok. Relevant for 
+    get_naive_forecasts(). */
+
+    if self.type_moving_window == "static" && self.verbose
+        printInfo("You cannot select specific horizons for 'static' forecasts.")
+        printInfo("Instead multi-step forecast values will be returned.")
+    endif
+
+    if self.type_moving_window != "static" && (maxc(horizons) > self.horizon)
+        printError(sprintf("The maximum forecast horizon you \n\
+          selected (%d) does exceed the horizon set before.", maxc(horizons)))
+        return 1
+    endif
+    if minc(horizons) <= 0
+        printError("You cannot select a negative forecast horizon.")
+        return 1
+    endif
+    
+    return 0
+end function
+
 
 # TODO: untested
-function list getNaiveForecastsList (bundle *self,
-                                     const matrix horizons[null] "Select only specific horizons",
-                                     const string suffix[null] "Suffix for series' names")
+function list get_naive_forecasts (const bundle self,
+                                   matrix horizons[null] "Select only specific horizons",
+                                   const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
-    # Initial settings
     list R = null
-    matrix hor = seq(1, self.horizon)'
-    hor = (exists(horizons)) ? horizons : hor
-    hor = vec(hor)
-
-    # FIXME: 'methods_used' still needed? All names stored in self.supported_estimators
-    #    strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
-    #    strings methods_used = (inbundle(self, "methods_used")) ? self.supported_estimators : methods_used
+    series y = self.y
+    strings models = getkeys(self.forecast_results)
 
     if !exists(suffix)
         string suffix = ""
     endif
-
-    if maxc(hor) > self.horizon
-        printf "\nError: The maximum forecast horizon you selected (%d) does not exist.\n\
-          Empty list returned.", maxc(hor)
-        return R
-    elif minc(hor) <= 0
-        printf "\nError: The minimum forecast horizon you selected (%d) does not exist.\n\
-          Empty list returned.", minc(hor)
+    if exists(horizons)
+        matrix horizons = vec(horizons)
+    else
+        matrix horizons = seq(1, self.horizon)'
+    endif
+    if horizons_isok(self, horizons)
         return R
     endif
+        
+    smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
 
-    if self.add_n_new_obs > 0
-        dataset addobs self.add_n_new_obs
-    endif
+    loop i=1..nelem(models) -q
+        if self.type_moving_window == "static"
+            list R += get_static_forecast_list(self, models[i], suffix)
+        else
+            list R += get_movwindow_forecast_list(horizons, self, models[i], suffix)
+        endif
+    endloop
+    
+    return R
+end function
 
-    series y = self.y
-    if self.add_n_new_obs > 0				# The last h observations were added and set to zero
-        smpl (obsnum(self.t2_date)+1) $tmax
-        series y = NA
-        smpl full
-    endif
 
-    loop j=1..nelem(methods_used) -q
-        loop i=1..rows(hor) -q
-            scalar start = obsnum(self.t1_forecast_date) + hor[i] - 1
-            scalar ende = start + self.n_folds - 1
-            smpl start ende
+function list get_movwindow_forecast_list (const matrix horizons,
+                                           const bundle self,
+                                           const string model,
+                                           const string suffix)
+    /* Return sascade of h-step forecast_results. For 'rolling'
+    and 'recursive' cases. */
 
-            R += genseries(sprintf("fc_pt_h_%d_%s%s", hor[i], methods_used[j], suffix), \
-              self.forecasts_point[j][i,]')
-            R += genseries(sprintf("fc_lo_h_%d_%s%s", hor[i], methods_used[j], suffix), \
-              self.forecasts_lower_bound[j][i,]')
-            R += genseries(sprintf("fc_up_h_%d_%s%s", hor[i], methods_used[j], suffix), \
-              self.forecasts_upper_bound[j][i,]')
-        endloop
+    list R = null
+
+    loop i=1..rows(horizons) -q
+
+        R += genseries(sprintf("low_h%d_%s%s", horizons[i], \
+          model, suffix), \
+          self.forecast_results[model].forecasts_lower_bound[i,]')
+
+        R += genseries(sprintf("point_h%d_%s%s", horizons[i], \
+          model, suffix), \
+          self.forecast_results[model].forecasts_point[i,]')
+
+        R += genseries(sprintf("up_h%d_%s%s", horizons[i], \
+          model, suffix), \
+          self.forecast_results[model].forecasts_upper_bound[i,]')
     endloop
 
     return R
 end function
+
+
+function list get_static_forecast_list (const bundle self,
+                                        const string model,
+                                        const string suffix)
+    /* Return single multi-step forecast_results. For 'static'
+    case. */
+
+    list R = null
+
+    R += genseries(sprintf("low_h1to%d_%s%s", self.horizon, \
+      model, suffix), \
+      self.forecast_results[model].forecasts_lower_bound)
+
+    R += genseries(sprintf("point_h1to%d_%s%s", self.horizon, \
+      model, suffix), \
+      self.forecast_results[model].forecasts_point)
+
+    R += genseries(sprintf("up_h1to%d_%s%s", self.horizon, \
+      model, suffix), \
+      self.forecast_results[model].forecasts_upper_bound)
+
+    return R
+end function
+
 
 
 

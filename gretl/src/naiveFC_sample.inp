@@ -9,6 +9,7 @@ set workdir @WD
 # TODO: can be dropped once gfn compiled
 include string_utils.gfn			# already added to spec
 include CvDataSplitter.gfn			# already added to spec
+include extra.gfn			# already added to spec
 
 
 include "./src/naiveFC.inp" --force
@@ -18,7 +19,7 @@ include "./src/naiveFC_helper.inp" --force
 
 # Select an example
 #==================
-scalar runEX = 2
+scalar runEX = 5
 
 # Load data
 if runEX==1
@@ -39,6 +40,9 @@ elif runEX == 5
     string FILENAME = "opaf_daily.csv"
     open "./tests/opaf_daily.gdt" -p -q
     series y = ANSPRACHE_BEREINIGT
+    setobs 7 2018-01-01
+    delete CALENDAR_DATE
+    smpl y --contiguous
 endif
 
 #=======================
@@ -138,9 +142,9 @@ scalar horizon = 10
 bundle opts = null					# setup additional options
 opts.horizon = horizon
 opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
-# opts.window_length = xmax($pd, 90) 			# moving window length (optional)
+opts.window_length = 400 #xmax($pd, 90) 			# moving window length (optional)
 # opts.window_length = $tmax
-# catch list opts.xlist = D743 FDD			# optional additional regressors
+#catch list opts.xlist = BUDGET_PLANNED			# optional additional regressors
 opts.verbose = 1					# Don't print details (optional)
 
 # Select method - dim = 11
@@ -148,11 +152,15 @@ strings methods = defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
-bundle b = naiveFC(y, methods[5], opts)
-b
-forecast_results = b.forecast_results
-eval forecast_results.smeanfc
-eval forecast_results.smeanfc.forecasts_point
+bundle b = naiveFC(y, methods[11], opts)
+
+bundle forecast_results = b.forecast_results
+#eval forecast_results.rwfc
+#eval forecast_results.rwfc.forecasts_point
+
+list FC = get_naive_forecasts(b, {1,10})
+smpl FC --no-missing
+print FC -o
 stop
 
 # Get interval forecasts as series

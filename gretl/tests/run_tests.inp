@@ -946,6 +946,7 @@ test_naiveFC_smeanfc_awm_stat_r(y)
 
 *** TODO
 - naiveFC() für daily data
+- mit exogenen Variablen!
 - teste weitere schätzverfahren
 - teste recursive window
 - füge STSM_fcast() aus Structism Paket hinzu
