@@ -1,5 +1,6 @@
 clear
 set verbose off
+set debug 0
 
 #include naiveFC.gfn --force				# TODO:
 
@@ -42,7 +43,6 @@ elif runEX == 5
     series y = ANSPRACHE_BEREINIGT
     setobs 7 2018-01-01
     delete CALENDAR_DATE
-    smpl y --contiguous
 endif
 
 #=======================
@@ -144,7 +144,7 @@ opts.horizon = horizon
 opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
 opts.window_length = 400 #xmax($pd, 90) 			# moving window length (optional)
 # opts.window_length = $tmax
-#catch list opts.xlist = BUDGET_PLANNED			# optional additional regressors
+catch list opts.xlist = BUDGET_PLANNED			# optional additional regressors
 opts.verbose = 1					# Don't print details (optional)
 
 # Select method - dim = 11

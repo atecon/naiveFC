@@ -266,11 +266,11 @@ function bundle t1_and_t2_of_y_and_xlist (const series y,
     scalar t1_diff_y = dates.t1_obsnum_y - t1_curr
     scalar t2_diff_y = t2_curr - dates.t2_obsnum_y
 
-    if t1_diff_y != 0
+    if t1_diff_y > 0
         printWarning(sprintf("Found %d missing initial observations for %s.", \
           t1_diff_y, argname(y)))
     endif
-    if t2_diff_y != 0
+    if t2_diff_y > 0
         printWarning(sprintf("Found %d missing observations at sample end for %s.", \
           t2_diff_y, argname(y)))
     endif
@@ -279,22 +279,70 @@ function bundle t1_and_t2_of_y_and_xlist (const series y,
         obslabels_and_nobs_to_bundle(xlist, &obsdetails_x)
         scalar dates.t1_obsnum_xlist = obsnum(obsdetails_x.t1_date)
         scalar dates.t2_obsnum_xlist = obsnum(obsdetails_x.t2_date)
-        string dates.t1_label_xlist = obsdetails_x.t1_date
-        string dates.t2_label_xlist = obsdetails_x.t2_date
+        string dates.t1_date_xlist = obsdetails_x.t1_date
+        string dates.t2_date_xlist = obsdetails_x.t2_date
         scalar t1_diff_x = dates.t1_obsnum_xlist - t1_curr
         scalar t2_diff_x = t2_curr - dates.t2_obsnum_xlist
 
-        if t1_diff_x
-            printWarning(sprintf("Found %d missing initial observations for exogenous.", \
+        if t1_diff_x > 0
+            printWarning(sprintf("Found %d missing initial observations for exogenous.",\
               t1_diff_x))
         endif
-        if t2_diff_y
-            printWarning(sprintf("Found %d missing observations at sample end for exogenous.", \
+        if t2_diff_x > 0
+            printWarning(sprintf("Found %d missing observations at sample end for exogenous.",\
               t2_diff_x))
         endif
     endif
 
     return dates
+end function
+
+
+# TODO: untested
+function scalar valid_dates_of_y_and_xlist (const bundle dates,
+                                            bundle *self)
+    /* Check that sufficient future values of exogenous variables exist. */
+
+    if nelem(self.xlist) > 0
+        scalar tdiff_y_xlist = dates.t2_obsnum_y - dates.t2_obsnum_xlist
+
+        if tdiff_y_xlist >= 0
+            if tdiff_y_xlist > 0
+                printError(sprintf("Sample ends earlier for exogenous regressors (%s)\n\
+                  than for the endogenous %s (%s). List of exogenous has no valid\n\
+                  future values.", dates.t2_date_xlist, self.name_endo, dates.t2_date_y))
+            else
+                printError(sprintf("Sample ends for both the exogenous regressors\n\
+                  and for the endogenous %s at observation %s. List of exogenous has\n\
+                  no valid future values.", self.name_endo, dates.t2_date_y))
+            endif
+            
+            self.error = 1
+            return 1
+        endif
+        if tdiff_y_xlist < 0 && (tdiff_y_xlist <  self.horizon)
+            printError(sprintf("You set the maximum forecast horizon to %d periods but\n\
+              the sample of the exogenous regressors has only %d future values left after\n\
+              %s. Either restrict the maximum forecast horizon or add additional future\n\
+              values to the exogenous variables.", self.horizon, tdiff_y_xlist, \
+              dates.t2_date_xlist))
+              
+            self.error = 1
+            return 1
+        endif
+
+        if nelem(self.xlist)	# TODO: put to additional function
+            if dates.t2_obsnum_y >= dates.t2_obsnum_xlist
+                printError(sprintf("Exogenous regressors end earlier than endogenous '%s'.\n\
+                  Forecasting not possible.", self.name_endo))
+                  
+                self.error = 1
+                return 1
+            endif
+        endif
+    endif
+    
+    return 0
 end function
 
 
@@ -321,15 +369,10 @@ function bundle naiveFC (const series y,
     endif
 
     bundle dates = t1_and_t2_of_y_and_xlist(y, self.xlist)
-
-    if nelem(self.xlist)	# TODO: put to additional function
-        if dates.t2_obsnum_y >= dates.t2_obsnum_xlist
-            printError(sprintf("Exogenous regressors end earlier than endogenous '%s'.\n\
-              Forecasting not possible.", self.name_endo))
-            self.error = 1
-            return self
-        endif
+    if valid_dates_of_y_and_xlist(dates, &self)
+        return self
     endif
+
 
     # Sample covering sample of valid observations in both y and xlist
     # TODO: If the user has called 'dataset addobs' before, and y
@@ -570,7 +613,7 @@ end function
 # TODO: untested
 function scalar horizons_isok (const bundle self,
                                const matrix horizons)
-    /* Check that vector horizons is ok. Relevant for 
+    /* Check that vector horizons is ok. Relevant for
     get_naive_forecasts(). */
 
     if self.type_moving_window == "static" && self.verbose
@@ -587,7 +630,7 @@ function scalar horizons_isok (const bundle self,
         printError("You cannot select a negative forecast horizon.")
         return 1
     endif
-    
+
     return 0
 end function
 
@@ -613,7 +656,7 @@ function list get_naive_forecasts (const bundle self,
     if horizons_isok(self, horizons)
         return R
     endif
-        
+
     smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
 
     loop i=1..nelem(models) -q
@@ -623,7 +666,7 @@ function list get_naive_forecasts (const bundle self,
             list R += get_movwindow_forecast_list(horizons, self, models[i], suffix)
         endif
     endloop
-    
+
     return R
 end function
 
