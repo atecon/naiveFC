@@ -1,3 +1,43 @@
+function scalar valid_dates_of_y_and_xlist (const bundle dates,
+                                            bundle *self)
+    /* Check that sufficient future values of exogenous variables exist. */
+
+    if nelem(self.xlist) > 0
+        scalar tdiff_y_xlist = dates.t2_obsnum_y - dates.t2_obsnum_xlist
+
+        if tdiff_y_xlist >= 0
+            if tdiff_y_xlist > 0
+                printError(sprintf("Sample ends earlier for exogenous regressors ('%s')\n\
+                  than for the endogenous %s ('%s').\n\
+                  List of exogenous has insufficient future values.", \
+                  dates.t2_date_xlist, self.name_endo, dates.t2_date_y))
+            else
+                printError(sprintf("Sample ends for both the exogenous regressors\n\
+                  and for the endogenous %s at observation %s. List of exogenous has\n\
+                  no valid future values.", self.name_endo, dates.t2_date_y))
+            endif
+            
+            self.error = 1
+            return 1
+        endif
+        if tdiff_y_xlist < 0 && (abs(tdiff_y_xlist) <  self.horizon)            
+            printError(sprintf("You set the maximum forecast horizon to %d periods but\n\
+              the sample of the exogenous regressors has only %d future\n\
+              values left after period %s.\n\
+              Either restrict the maximum forecast horizon to 'horizon = %d'\n\
+              or add %d additional future values to the exogenous variables.", \
+              self.horizon, abs(tdiff_y_xlist), dates.t2_date_xlist, abs(tdiff_y_xlist), 
+              self.horizon-abs(tdiff_y_xlist)))
+              
+            self.error = 1
+            return 1
+        endif
+    endif
+    
+    return 0
+end function
+
+
 function scalar estimate_model_and_forecast (const string est_command,
                                              const string fcast_command,
                                              const series y,
@@ -247,13 +287,13 @@ function bundle prep_and_get_cv_folds (const bundle self)
 
     bundle cv					# Tried to put this into a bundle, but git issues with index series
 
-    series y = self.y		# This assignment is needed!
-    list X = y				# y includes the additional n=horizon newly added observations for the very last cv-dataset
+    # y includes the additional n=horizon newly added observations for
+    # the very last cv-dataset
+    series y = self.y
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
-    #    scalar cv.win_size = cv_window_length(self)	# FIXME: If I am right: deprecated!
     scalar cv.win_size = self.window_length
-    list cv.X = X
-
+    list cv.X = y self.xlist
+    
     CvDataSplitter(&cv)
     x_train_test_mats_static_case(&cv, self)
 

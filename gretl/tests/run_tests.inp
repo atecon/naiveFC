@@ -12,30 +12,53 @@ include assertion.gfn
 
 
 nulldata 10
+smpl 1 5
 series y = normal()
+smpl full
 series x = normal()
 list L = y x
 function void test_valid_dates_of_y_and_xlist (const list L )
     print "Start with valid_dates_of_y_and_xlist()"
     
     list xlist = null
-    bundle self = defbundle("horizon", 10, "xlist", xlist)
+    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y")
     bundle dates = defbundle("t2_obsnum_y", 5)
     assert_false(valid_dates_of_y_and_xlist(dates, &self))
-
-    *** HIER WEITERMACHEN     
+    
+    # Series y and xlist members have equal number of observations
     list xlist = x
-    bundle self = defbundle("horizon", 10, "xlist", xlist)
-    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 5)
-    eval valid_dates_of_y_and_xlist(dates, &self)
+    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y")
+    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 5, \
+      "t2_date_y", "5", "t2_date_xlist", "5")
+    assert_true(valid_dates_of_y_and_xlist(dates, &self))
 
+    # Series y has more observations than xlist members
+    list xlist = x
+    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y")
+    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 3, \
+      "t2_date_y", "5", "t2_date_xlist", "3")
+    assert_true(valid_dates_of_y_and_xlist(dates, &self))
+    
+    # xlist members have t more future obs than y, but
+    # requested horizon is bigger than 't'
+    list xlist = x
+    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y")
+    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 8, \
+      "t2_date_y", "5", "t2_date_xlist", "8")
+    assert_true(valid_dates_of_y_and_xlist(dates, &self))
     
 
-print "huhu"
+    # xlist members have t more future obs than y, and
+    # t > horizon
+    list xlist = x
+    bundle self = defbundle("horizon", 2, "xlist", xlist, "name_endo", "y")
+    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 8, \
+      "t2_date_y", "5", "t2_date_xlist", "8")
+    assert_false(valid_dates_of_y_and_xlist(dates, &self))
+
 end function
 test_valid_dates_of_y_and_xlist(L)
 
-stop
 
 function void test_compute_avgerage_forecast (void)
     print "Start with compute_avgerage_forecast()"
@@ -98,8 +121,6 @@ function void test_compute_avgerage_forecast (void)
     assert_equal_num(avgfc.forecasts_upper_bound[2,2], 5)
     assert_equal_num(avgfc.forecasts_upper_bound[3,2], 3.5)
     assert_equal_num(avgfc.forecasts_upper_bound[4,2], 2)
-
-
 
     bundle self = null
     scalar self.error = 0
