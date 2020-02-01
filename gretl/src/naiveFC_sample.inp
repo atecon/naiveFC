@@ -41,8 +41,7 @@ elif runEX == 5
     open "./tests/opaf_daily.gdt" -p -q
     series y = ANSPRACHE_BEREINIGT
     setobs 7 2018-01-01
-    delete CALENDAR_DATE
-#    smpl y --no-missing --permanent
+#    smpl ; 2019-12-20   		# the last 'h' period are taken for forecasting in 'static' case
 endif
 
 #=======================
@@ -141,10 +140,10 @@ endif
 scalar horizon = 10
 bundle opts = null					# setup additional options
 opts.horizon = horizon
-#opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
-#opts.window_length = 400 #xmax($pd, 90) 			# moving window length (optional)
+# opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+# opts.window_length = 400 #xmax($pd, 90) 			# moving window length (optional)
 # opts.window_length = $tmax
-catch list opts.xlist = BUDGET_PLANNED			# optional additional regressors
+# catch list opts.xlist = BUDGET_PLANNED			# optional additional regressors
 opts.verbose = 1					# Don't print details (optional)
 
 strings methods = defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", \

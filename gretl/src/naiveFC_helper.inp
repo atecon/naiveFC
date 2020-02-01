@@ -1,39 +1,86 @@
-function scalar valid_dates_of_y_and_xlist (const bundle dates,
-                                            bundle *self)
+function scalar sufficient_future_obs (bundle *self)
+    /* */
+
+    scalar tdiff = $tmax - self.t2_obsnum_y
+    if tdiff < self.horizon
+        printError(sprintf("Requested maximum forecast horizon exceeds\n\
+          the number of available future periods. Either add observations\n\
+          or decrease the maximum forecast horizon to %d",
+          self.horizon - (self.horizon - tdiff)))
+        self.error = 1
+        return 1
+    endif
+
+    return 0
+end function
+
+
+# TODO: untested
+function scalar get_sample_end (const bundle self)
+    /* */
+
+    scalar sample_end = obsnum(self.t2_date_y)
+    if self.type_moving_window == "static"
+        scalar sample_end += self.horizon
+    endif
+
+    return sample_end
+end function
+
+
+function series replace_future_missings (series y,
+                                         const bundle self)
+    /* User wants to forecast out-of-sample the last h period of y.
+       Naturally, one expects that the last h periods of y are NA values.
+    Hence, we need to replace NAs by -999 to get stuff work. */
+
+    if self.type_moving_window == "static"
+        smpl (1 + self.t2_obsnum_y) ;
+        series y = -999
+        smpl full
+    endif
+
+    return y
+end function
+
+
+function scalar valid_dates_of_y_and_xlist (bundle *self)
     /* Check that sufficient future values of exogenous variables exist. */
 
-    if nelem(self.xlist) > 0
-        scalar tdiff_y_xlist = dates.t2_obsnum_y - dates.t2_obsnum_xlist
-
-        if tdiff_y_xlist >= 0
-            if tdiff_y_xlist > 0
-                printError(sprintf("Sample ends earlier for exogenous regressors ('%s')\n\
-                  than for the endogenous %s ('%s').\n\
-                  List of exogenous has insufficient future values.", \
-                  dates.t2_date_xlist, self.name_endo, dates.t2_date_y))
-            else
-                printError(sprintf("Sample ends for both the exogenous regressors\n\
-                  and for the endogenous %s at observation %s. List of exogenous has\n\
-                  no valid future values.", self.name_endo, dates.t2_date_y))
-            endif
-            
-            self.error = 1
-            return 1
-        endif
-        if tdiff_y_xlist < 0 && (abs(tdiff_y_xlist) <  self.horizon)            
-            printError(sprintf("You set the maximum forecast horizon to %d periods but\n\
-              the sample of the exogenous regressors has only %d future\n\
-              values left after period %s.\n\
-              Either restrict the maximum forecast horizon to 'horizon = %d'\n\
-              or add %d additional future values to the exogenous variables.", \
-              self.horizon, abs(tdiff_y_xlist), dates.t2_date_xlist, abs(tdiff_y_xlist), 
-              self.horizon-abs(tdiff_y_xlist)))
-              
-            self.error = 1
-            return 1
-        endif
+    if !nelem(self.xlist)
+        return 0
     endif
-    
+
+    scalar tdiff_y_xlist = self.t2_obsnum_y - self.t2_obsnum_xlist
+
+    if tdiff_y_xlist >= 0
+        if tdiff_y_xlist > 0
+            printError(sprintf("Sample ends earlier for exogenous regressors ('%s')\n\
+              than for the endogenous %s ('%s').", self.t2_date_xlist,
+              self.name_endo, self.t2_date_y))
+        else
+            printError(sprintf("Sample ends for both the exogenous regressors\n\
+              and for the endogenous %s at observation '%s'.",
+              self.name_endo, self.t2_date_y))
+        endif
+        printError("List of exogenous has insufficient future values.")
+
+        self.error = 1
+        return 1
+    endif
+    if tdiff_y_xlist < 0 && (abs(tdiff_y_xlist) <  self.horizon)
+        printError(sprintf("You set the maximum forecast horizon to %d periods but\n\
+          the sample of the exogenous regressors has only %d future\n\
+          values left after period %s.\n\
+          Either restrict the maximum forecast horizon to 'horizon = %d'\n\
+          or add %d additional future values to the exogenous variables.", \
+          self.horizon, abs(tdiff_y_xlist), self.t2_date_xlist, abs(tdiff_y_xlist),
+          self.horizon-abs(tdiff_y_xlist)))
+
+        self.error = 1
+        return 1
+    endif
+
     return 0
 end function
 
@@ -170,11 +217,9 @@ function void attach_column_labels (bundle *interval_forecasts,
     /* Add date strings as column labels for indicating the date on
     which the estimates are conditioned on. */
 
-    string date_first_trainset_end = \
-      date_plus_x_as_obslabel(obsnum(self.t1_forecast_date), -2)
-    
+    string date_first_trainset_end = obslabel(obsnum(self.t1_forecast_date) - 2)
     strings date_strings = future_date_strings(date_first_trainset_end, self.n_folds)
-    
+
     strings keys = getkeys(interval_forecasts)
     loop i=1..nelem(keys) -q
         cnameset(interval_forecasts[keys[i]], date_strings)
@@ -223,7 +268,7 @@ function strings future_date_strings (const string date_of_information_str "Obs.
     scalar date_of_information_num = obsnum(date_of_information_str)
 
     loop i=1..n_future_periods -q
-        future_dates[i] = date_plus_x_as_obslabel(date_of_information_num, $i)
+        future_dates[i] = obslabel(date_of_information_num + $i)
     endloop
 
     return future_dates
@@ -290,10 +335,11 @@ function bundle prep_and_get_cv_folds (const bundle self)
     # y includes the additional n=horizon newly added observations for
     # the very last cv-dataset
     series y = self.y
+    list xlist = self.xlist
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
-    list cv.X = y self.xlist
-    
+    list cv.X = y xlist
+
     CvDataSplitter(&cv)
     x_train_test_mats_static_case(&cv, self)
 
@@ -301,50 +347,10 @@ function bundle prep_and_get_cv_folds (const bundle self)
 end function
 
 
-# TODO: untested
-function scalar samples_for_y_and_xlist_match (const series y, const list xlist, bundle *self)
-    /* Returns zero if samples of y and xlist are ok. */
-
-    if nelem(xlist) == 0
-        return 0
-    endif
-    bundle obsdetails_y
-    bundle obsdetails_x
-
-    obslabels_and_nobs_to_bundle(y, &obsdetails_y)	# no. of valid obs before adding obs. for forecasting purpose
-    obslabels_and_nobs_to_bundle(x, &obsdetails_x)	# no. of valid obs before adding obs. for forecasting purpose
-    scalar tdiff = diff_t2_of_y_and_x(y, xlist)
-
-    if tdiff > && (tdiff < self.horizon)
-        printError(sprintf("The last valid observation of series %s is %s.", \
-          self.name_endo, obsdetails_y.t2_label))
-        printError(sprintf("You requested a %d-step ahead sequence of forecasts.", \
-          self.horizon))
-        printError(sprintf"The last valid observation of the contiguous sample\n\
-          for the additional regressors is %s.", obsdetails_x.t2_label)
-        printError("It is not possible to compute the requested h-steap ahead\n\
-          sequence of forecasts.")
-        printError(sprintf("Either reduce the forecast horizon to h=%d\n\
-          or add future information for your 'xlist' variables.", tdiff))
-
-        return 1
-    elif tdiff <= 0
-        printError("The 'xlist' variables include no valid future observations\n\
-          but only missings.")
-        printError(sprintf("Last valid observation of additional exogenous\n\
-          regressors is %s", obsdetails_x.t2_label))
-
-        return 1
-    endif
-
-    return 0
-end function
-
-
 function scalar valid_window_length (bundle *self)
     /* Returns zero of window_length is valid. */
 
-    if smplspan(self.t1_date, self.t2_date, $pd) < self.window_length
+    if smplspan(self.t1_date_y, self.t2_date_y, $pd) < self.window_length
         printError(sprintf("The window size you selected (wsize=%d) exceeds the\n\
           number of valid observations in '%s'.", self.window_length, self.name_endo))
 
@@ -372,28 +378,6 @@ function void obslabels_and_nobs_to_bundle (const list y,
     string self.t1_date = obslabel($t1)
     string self.t2_date = obslabel($t2)
     scalar self.T = $nobs
-end function
-
-
-function scalar diff_t2_of_y_and_x (const series y, const list xlist)
-    /* Compute difference of valid obs in y and x. */
-
-    scalar tdiff = NA
-
-    if nelem(xlist)
-        bundle b = null
-        list L = y
-        obslabels_and_nobs_to_bundle(L, &b)
-        scalar t2_y = obsnum(b.t2_date)
-
-        bundle b = null
-        obslabels_and_nobs_to_bundle(xlist, &b)
-        scalar t2_x = obsnum(b.t2_date)
-
-        scalar tdiff = t2_x - t2_y
-    endif
-
-    return tdiff
 end function
 
 
@@ -427,10 +411,6 @@ function bundle set_bundle (const series y,
         strings self.models = defarray(self.which)
     else
         strings self.models = self.supported_estimators
-    endif
-    if self.type_moving_window == "static"
-        # make sure cv gets only a single fold
-        scalar self.window_length = $tmax - self.horizon
     endif
 
     self.forecast_results = prepare_forecast_bundles(&self)
@@ -504,8 +484,8 @@ function bundle get_train_start_end_obsnums (const bundle self)
 
     bundle ret = null
     if self.type_moving_window == "static"
-        ret.t1_obsnum = obsnum(self.t1_date)
-        ret.t2_obsnum = obsnum(self.t2_date) - self.horizon_current
+        ret.t1_obsnum = obsnum(self.t1_date_y)
+        ret.t2_obsnum = obsnum(self.t2_date_y) - self.horizon_current
     else
         scalar ret.t2_obsnum = $t2 - self.horizon_current
         scalar ret.t1_obsnum = 1 + ret.t2_obsnum - self.window_length
@@ -556,13 +536,6 @@ function list add_linear_trend_to_list (void)
     list xlist = time
 
     return xlist
-end function
-
-
-function string date_plus_x_as_obslabel (const int obs_num[1::] "Obs-number",
-                                         const int x "days to add")
-    /* Return the date for which the first 1-step ahead forecast is made for. */
-    return obslabel(obs_num + x)
 end function
 
 
