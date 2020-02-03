@@ -9,6 +9,7 @@ include "./src/naiveFC_helper.inp" --force
 include CvDataSplitter.gfn
 include string_utils.gfn
 include assertion.gfn
+include extra.gfn
 
 
 nulldata 10
@@ -21,40 +22,40 @@ function void test_valid_dates_of_y_and_xlist (const list L )
     print "Start with valid_dates_of_y_and_xlist()"
     
     list xlist = null
-    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y")
-    bundle dates = defbundle("t2_obsnum_y", 5)
-    assert_false(valid_dates_of_y_and_xlist(dates, &self))
+    bundle self = defbundle("horizon", 10, "xlist", \
+      xlist, "name_endo", "y", "t2_obsnum_y", 5)
+    assert_false(valid_dates_of_y_and_xlist(&self))
     
     # Series y and xlist members have equal number of observations
     list xlist = x
-    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y")
-    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 5, \
+    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y", \
+      "t2_obsnum_y", 5, "t2_obsnum_xlist", 5, \
       "t2_date_y", "5", "t2_date_xlist", "5")
-    assert_true(valid_dates_of_y_and_xlist(dates, &self))
+    assert_true(valid_dates_of_y_and_xlist(&self))
 
     # Series y has more observations than xlist members
     list xlist = x
-    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y")
-    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 3, \
+    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y", \
+      "t2_obsnum_y", 5, "t2_obsnum_xlist", 3, \
       "t2_date_y", "5", "t2_date_xlist", "3")
-    assert_true(valid_dates_of_y_and_xlist(dates, &self))
+    assert_true(valid_dates_of_y_and_xlist(&self))
     
     # xlist members have t more future obs than y, but
     # requested horizon is bigger than 't'
     list xlist = x
-    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y")
-    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 8, \
+    bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y", \
+      "t2_obsnum_y", 5, "t2_obsnum_xlist", 8, \
       "t2_date_y", "5", "t2_date_xlist", "8")
-    assert_true(valid_dates_of_y_and_xlist(dates, &self))
+    assert_true(valid_dates_of_y_and_xlist(&self))
     
 
     # xlist members have t more future obs than y, and
     # t > horizon
     list xlist = x
-    bundle self = defbundle("horizon", 2, "xlist", xlist, "name_endo", "y")
-    bundle dates = defbundle("t2_obsnum_y", 5, "t2_obsnum_xlist", 8, \
+    bundle self = defbundle("horizon", 2, "xlist", xlist, "name_endo", "y", \
+      "t2_obsnum_y", 5, "t2_obsnum_xlist", 8, \
       "t2_date_y", "5", "t2_date_xlist", "8")
-    assert_false(valid_dates_of_y_and_xlist(dates, &self))
+    assert_false(valid_dates_of_y_and_xlist(&self))
 
 end function
 test_valid_dates_of_y_and_xlist(L)
@@ -429,8 +430,8 @@ function void test_get_train_start_end_obs_d (void)
     print "Start with get_train_start_end_obsnums() daily"
 
     bundle B = null
-    string B.t1_date = "2000-01-01"
-    string B.t2_date = "2000-01-31"
+    string B.t1_date_y = "2000-01-01"
+    string B.t2_date_y = "2000-01-31"
     scalar B.horizon_current = 2
     string B.type_moving_window = "static"
 
@@ -442,8 +443,8 @@ function void test_get_train_start_end_obs_d (void)
     assert_equal_num(Bret.t1_obsnum, 1)
     assert_equal_num(Bret.t2_obsnum, 29)
 
-    string B.t1_date = "2000-01-02"
-    string B.t2_date = "2000-02-03"
+    string B.t1_date_y = "2000-01-02"
+    string B.t2_date_y = "2000-02-03"
     bundle Bret = get_train_start_end_obsnums(B)
     assert_equal_num(Bret.t1_obsnum, 2)
     assert_equal_num(Bret.t2_obsnum, 32)
@@ -508,50 +509,14 @@ test_nobs_to_add_to_dataset()
 
 
 
-nulldata 7 -p
-setobs 7 2000-01-01 --time-series
-function void test_diff_t2_of_y_and_x (void)
-    print "Start with diff_t2_of_y_and_x()"
-
-    series s1 = normal()
-    series s2 = s1
-    series s3 = s1
-    series s4 = s1
-    s2[1] = NA
-    s3[7] = NA
-    s4[1] = NA
-    s4[7] = NA
-
-    list L = s1
-    scalar s = diff_t2_of_y_and_x(s1, L)
-    assert_equal_num(s, 0)
-
-    list L = s2
-    scalar s = diff_t2_of_y_and_x(s1, L)
-    assert_equal_num(s, 0)
-
-    list L = s3
-    scalar s = diff_t2_of_y_and_x(s1, L)
-    assert_equal_num(s, -1)
-
-    list L = s4
-    scalar s = diff_t2_of_y_and_x(s1, L)
-    assert_equal_num(s, -1)
-
-    list L = s4
-    scalar s = diff_t2_of_y_and_x(s3, L)
-    assert_equal_num(s, 0)
-end function
-test_diff_t2_of_y_and_x()
-
-
 
 # Run complete examples
 open AWM.gdt -q			# quarterly
 series y = YGA
-smpl y --no-missing --permanent
+smpl y --no-missing --permanent		# no future data available --> error
 function void test_naiveFC_meanfc_awm_stat (series y)
-    print "Start test_naiveFC() ('meanfc') for 'static' case with AWM_data"
+    printf "Start test_naiveFC() ('meanfc') for 'static' \n\
+      case with AWM_data with insufficient future values"
 
     scalar horizon = 10
     bundle opts = null					# setup additional options
@@ -559,6 +524,42 @@ function void test_naiveFC_meanfc_awm_stat (series y)
 
     bundle b = null
     bundle b = naiveFC(y, "meanfc", opts)
+    assert_true(b.error)
+end function
+test_naiveFC_meanfc_awm_stat(y)
+
+
+open AWM.gdt -q			# quarterly
+series y = YGA
+function void test_naiveFC_meanfc_awm_stat (series y)
+    printf "Start test_naiveFC() ('meanfc') for 'static'\n\
+      case with AWM_data with 2 future values but requested\n\
+      horizon is 10."
+
+    scalar horizon = 10
+    bundle opts = null					# setup additional options
+    opts.horizon = horizon
+
+    bundle b = null
+    bundle b = naiveFC(y, "meanfc", opts)
+    assert_true(b.error)
+end function
+test_naiveFC_meanfc_awm_stat(y)
+
+
+open AWM.gdt -q			# quarterly
+series y = YGA
+function void test_naiveFC_meanfc_awm_stat (series y)
+    printf "Start test_naiveFC() ('meanfc') for 'static'\n\
+      case with AWM_data with sufficient future values."
+
+    scalar horizon = 2
+    bundle opts = null					# setup additional options
+    opts.horizon = horizon
+
+    bundle b = null
+    bundle b = naiveFC(y, "meanfc", opts)
+
     bundle forecast_results = b.forecast_results
 
     strings col_labels_point = cnameget(forecast_results.meanfc.forecasts_point)

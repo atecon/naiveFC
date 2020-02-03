@@ -217,7 +217,7 @@ function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     pkg query extra --quiet
-    if $result.version < 0.6
+    if atof($result.version) < 0.6
         printError("You need at least version 0.6 of the 'extra' package.")
         printError("Update by executing 'pkg install extra'")
     endif
