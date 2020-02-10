@@ -35,9 +35,9 @@ fi
 gretlcli -b -e -q ${SCRIPT4}
 if [ $? -eq 0 ]
 then
-   echo "Success: Tests for script ${SCRIPT3} passed."
+   echo "Success: Tests for script ${SCRIPT4} passed."
 else
-  echo "Failure: Tests for script ${SCRIPT3} not passed." >&2
+  echo "Failure: Tests for script ${SCRIPT4} not passed." >&2
 fi
 
 
