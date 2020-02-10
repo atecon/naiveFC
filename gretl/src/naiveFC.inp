@@ -197,15 +197,6 @@ function matrix set_xlist_and_forecast (bundle *self)
     self.error = estimate_model_and_forecast(command, fcast_arg, y, \
       xlist, train_obsnums, test_obsnums)
 
-
-    # FIXME: deprecated
-    /*
-       if self.type_moving_window == "static"
-       self.t1_forecast_date = obslabel(test_obsnums.t1_test_obsnum)
-       self.t2_forecast_date = obslabel(test_obsnums.t2_test_obsnum)
-       endif
-    */
-
     forecast_results[1:self.horizon_current,] = $fcast ~ $fcse
 
     return forecast_results
@@ -249,6 +240,13 @@ function void do_initial_checks (bundle *self)
 
     if self.nboot
         print_no_bootstrap_support()
+        self.error = 1
+    endif
+    
+    if nelem(self.xlist) > 0 \
+      && (self.which == "rwfc" || self.which == "rwdriftfc" || self.which == "snaivefc" || self.which == "snaivedriftfc")
+        
+        printError(sprintf("No exogenous variables can be included for the selected model '%s'.", self.which))
         self.error = 1
     endif
 end function
@@ -425,7 +423,7 @@ function void summarize_naive_fc_results (bundle *self)
             printf "Initial window length: \t\t\t%d\n", self.window_length
         endif
         if self.type_moving_window != "static"
-            printf "Number of %s multi-step forecasts: %d\n", self.type_moving_window, \
+            printf "Number of '%s' multi-step forecasts: %d\n", self.type_moving_window, \
               self.n_folds
             printf "First observation forecasted: \t\t%s\n", self.t1_forecast_date
             printf "Last observation forecasted: \t\t%s\n", self.t2_forecast_date

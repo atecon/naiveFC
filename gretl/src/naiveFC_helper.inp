@@ -47,25 +47,6 @@ function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
     return n_sampleend_obs_replaced
 end function
 
-
-# FIXME: deprecated?
-/* 
-function series replace_future_missings (series y,
-                                         const bundle self)
-    # User wants to forecast out-of-sample the last h period of y.
-    #  Naturally, one expects that the last h periods of y are NA values.
-    # Hence, we need to replace NAs by -999 to get stuff work.
-
-    if self.type_moving_window == "static"
-        smpl (1 + self.t2_obsnum_y) ;
-        series y = -999
-        smpl full
-    endif
-
-    return y
-end function
-*/
-
 function scalar valid_dates_of_y_and_xlist (bundle *self)
     /* Check that sufficient future values of exogenous variables exist. */
 
@@ -323,8 +304,10 @@ function bundle point_fc_and_factor_as_arrays (const matrices collected_point_fc
 end function
 
 
+# FIXME: deprecated?
+/* 
 function scalar cv_window_length (const bundle self)
-    /* Compute window_length for calling CvDataSplitter(). */
+    # Compute window_length for calling CvDataSplitter().
 
     if self.type_moving_window == "static"
         scalar win_size = self.window_length 	# X_test already includes period to be forecasted
@@ -335,6 +318,7 @@ function scalar cv_window_length (const bundle self)
 
     return win_size
 end function
+*/
 
 
 # TODO: untested
