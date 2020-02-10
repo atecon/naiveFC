@@ -441,13 +441,13 @@ function void test_get_train_start_end_obs_d (void)
     assert_true(inbundle(Bret, "t1_obsnum"))
     assert_true(inbundle(Bret, "t2_obsnum"))
     assert_equal_num(Bret.t1_obsnum, 1)
-    assert_equal_num(Bret.t2_obsnum, 29)
+    assert_equal_num(Bret.t2_obsnum, 31)
 
     string B.t1_date_y = "2000-01-02"
     string B.t2_date_y = "2000-02-03"
     bundle Bret = get_train_start_end_obsnums(B)
     assert_equal_num(Bret.t1_obsnum, 2)
-    assert_equal_num(Bret.t2_obsnum, 32)
+    assert_equal_num(Bret.t2_obsnum, 34)
 end function
 test_get_train_start_end_obs_d()
 
@@ -475,39 +475,6 @@ function void test_get_train_start_end_obs_dd (void)
     assert_equal_num(Bret.t2_obsnum, 5)
 end function
 test_get_train_start_end_obs_dd()
-
-
-
-nulldata 7 -p
-setobs 7 2000-01-01 --time-series
-function void test_nobs_to_add_to_dataset (void)
-    print "Start with nobs_to_add_to_dataset()"
-
-    series s1 = normal()
-    series s2 = s1
-    series s3 = s1
-    series s4 = s1
-    s2[1] = NA
-    s3[7] = NA
-    s4[1] = NA
-    s4[7] = NA
-    bundle B = defbundle("horizon", 2)
-
-    list L = s1
-    assert_equal_num(nobs_to_add_to_dataset(L, B.horizon), 2)
-
-    list L = s2
-    assert_equal_num(nobs_to_add_to_dataset(L, B.horizon), 2)
-
-    list L = s3
-    assert_equal_num(nobs_to_add_to_dataset(L, B.horizon), 1)
-
-    list L = s4
-    assert_equal_num(nobs_to_add_to_dataset(L, B.horizon), 1)
-end function
-test_nobs_to_add_to_dataset()
-
-
 
 
 # Run complete examples
@@ -565,8 +532,6 @@ function void test_naiveFC_meanfc_awm_stat (series y)
 
     bundle forecast_results = b.forecast_results
 
-    eval forecast_results.meanfc.forecasts_point
-
     strings col_labels_point = cnameget(forecast_results.meanfc.forecasts_point)
     strings col_labels_lower = cnameget(forecast_results.meanfc.forecasts_lower_bound)
     strings col_labels_upper = cnameget(forecast_results.meanfc.forecasts_upper_bound)
@@ -577,7 +542,7 @@ function void test_naiveFC_meanfc_awm_stat (series y)
     matrix point = forecast_results.meanfc.forecasts_point
     matrix lower_bound = forecast_results.meanfc.forecasts_lower_bound
     matrix upper_bound = forecast_results.meanfc.forecasts_upper_bound
-
+    
     assert_equal_str(b.t1_train_date, "1971:4")
     assert_equal_str(b.t2_train_date, "1998:2")
 
@@ -603,24 +568,24 @@ function void test_naiveFC_meanfc_awm_stat (series y)
     assert_equal_str(row_labels_upper[2], "1998:4")
 
     assert_almost_equal_num(point[1], 0.99446, 1e-5)
-    assert_almost_equal_num(point[10], 0.99542, 1e-5)
+    assert_almost_equal_num(point[2], 0.99446, 1e-5)
 
-    assert_almost_equal_num(lower_bound[1], -0.64190, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.64190, 1e-5)
+    assert_almost_equal_num(lower_bound[1], -0.64128, 1e-5)
+    assert_almost_equal_num(lower_bound[2], -0.64128, 1e-5)
 
-    assert_almost_equal_num(upper_bound[1], 2.6327, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6327, 1e-4)
+    assert_almost_equal_num(upper_bound[1], 2.6302, 1e-4)
+    assert_almost_equal_num(upper_bound[2], 2.6302, 1e-4)
 end function
 test_naiveFC_meanfc_awm_stat(y)
 
 
+
 open AWM.gdt -q			# quarterly
 series y = YGA
-smpl y --no-missing --permanent
 function void test_naiveFC_medianfc_awm_stat (series y)
     print "Start test_naiveFC() ('medianfc') for 'static' case with AWM_data"
 
-    scalar horizon = 5
+    scalar horizon = 2
     bundle opts = null					# setup additional options
     opts.horizon = horizon
 
@@ -640,45 +605,45 @@ function void test_naiveFC_medianfc_awm_stat (series y)
     matrix upper_bound = forecast_results.medianfc.forecasts_upper_bound
 
     assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1997:1")
+    assert_equal_str(b.t2_train_date, "1998:2")
 
-    assert_equal_str(b.t1_forecast_date, "1997:2")
-    assert_equal_str(b.t2_forecast_date, "1998:2")
+    assert_equal_str(b.t1_forecast_date, "1998:3")
+    assert_equal_str(b.t2_forecast_date, "1998:4")
 
-    assert_equal_num(b.window_length, 102)
-    assert_equal_num(b.horizon, 5)
-    assert_equal_num(nobs(b.y), 107)
+    assert_equal_num(b.window_length, 107)
+    assert_equal_num(b.horizon, 2)
 
     assert_equal_num(nelem(forecast_results), 1)
     assert_equal_num(nelem(forecast_results.medianfc), 3)
 
-    assert_equal_str(col_labels_point[1], "1997:1")
-    assert_equal_str(col_labels_lower[1], "1997:1")
-    assert_equal_str(col_labels_upper[1], "1997:1")
+    assert_equal_str(col_labels_point[1], "1998:2")
+    assert_equal_str(col_labels_lower[1], "1998:2")
+    assert_equal_str(col_labels_upper[1], "1998:2")
 
-    assert_equal_str(row_labels_point[1], "1997:2")
-    assert_equal_str(row_labels_lower[1], "1997:2")
-    assert_equal_str(row_labels_upper[1], "1997:2")
+    assert_equal_str(row_labels_point[1], "1998:3")
+    assert_equal_str(row_labels_lower[1], "1998:3")
+    assert_equal_str(row_labels_upper[1], "1998:3")
 
-    assert_equal_str(row_labels_point[5], "1998:2")
-    assert_equal_str(row_labels_lower[5], "1998:2")
-    assert_equal_str(row_labels_upper[5], "1998:2")
+    assert_equal_str(row_labels_point[2], "1998:4")
+    assert_equal_str(row_labels_lower[2], "1998:4")
+    assert_equal_str(row_labels_upper[2], "1998:4")
 
-    assert_almost_equal_num(point[1], 0.99415, 1e-5)
-    assert_almost_equal_num(point[5], 0.99415, 1e-5)
+    assert_almost_equal_num(point[1], 0.99160, 1e-5)
+    assert_almost_equal_num(point[2], 0.99160, 1e-5)
 
-    assert_almost_equal_num(lower_bound[1], -0.64108, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.64108, 1e-5)
+    assert_almost_equal_num(lower_bound[1], -0.63944, 1e-5)
+    assert_almost_equal_num(lower_bound[2], -0.63944, 1e-5)
 
-    assert_almost_equal_num(upper_bound[1], 2.6294, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6294, 1e-4)
+    assert_almost_equal_num(upper_bound[1], 2.6226, 1e-4)
+    assert_almost_equal_num(upper_bound[2], 2.6226, 1e-4)
 end function
 test_naiveFC_medianfc_awm_stat(y)
 
 
+** HIER WEITERMACHEN **
+
 open AWM.gdt -q			# quarterly
 series y = YGA
-smpl y --no-missing --permanent
 function void test_naiveFC_smeanfc_awm_stat (series y)
     print "Start test_naiveFC() ('smeanfc') for 'static' case with AWM_data"
 

@@ -1,7 +1,8 @@
 function scalar sufficient_future_obs (bundle *self)
     /* */
 
-    scalar tdiff = $tmax - self.t2_obsnum_y
+    scalar tdiff = $tmax + self.n_sampleend_obs_replaced - self.t2_obsnum_y
+
     if tdiff < self.horizon
         printError(sprintf("Requested maximum forecast horizon exceeds\n\
           the number of available future periods. Either add observations\n\
@@ -17,8 +18,6 @@ end function
 
 # TODO: untested
 function scalar get_sample_end (const bundle self)
-    /* */
-
     scalar sample_end = obsnum(self.t2_date_y)
     if self.type_moving_window == "static"
         scalar sample_end += self.horizon
@@ -28,11 +27,34 @@ function scalar get_sample_end (const bundle self)
 end function
 
 
+# TODO: untested
+function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
+    /* Replace missing values of y at the sample end. */
+
+    smpl y --no-missing
+    scalar n_sampleend_obs_replaced = $tmax - $t2
+    if n_sampleend_obs_replaced > 0
+        smpl (1 + $t2) $tmax
+        series y = -999
+        smpl full
+    endif
+    
+    if verbose
+        printInfo(sprintf("Replaced %d missing values at the sample end of 'y'.", \
+          n_sampleend_obs_replaced))
+    endif
+    
+    return n_sampleend_obs_replaced
+end function
+
+
+# FIXME: deprecated?
+/* 
 function series replace_future_missings (series y,
                                          const bundle self)
-    /* User wants to forecast out-of-sample the last h period of y.
-       Naturally, one expects that the last h periods of y are NA values.
-    Hence, we need to replace NAs by -999 to get stuff work. */
+    # User wants to forecast out-of-sample the last h period of y.
+    #  Naturally, one expects that the last h periods of y are NA values.
+    # Hence, we need to replace NAs by -999 to get stuff work.
 
     if self.type_moving_window == "static"
         smpl (1 + self.t2_obsnum_y) ;
@@ -42,7 +64,7 @@ function series replace_future_missings (series y,
 
     return y
 end function
-
+*/
 
 function scalar valid_dates_of_y_and_xlist (bundle *self)
     /* Check that sufficient future values of exogenous variables exist. */
@@ -68,6 +90,7 @@ function scalar valid_dates_of_y_and_xlist (bundle *self)
         self.error = 1
         return 1
     endif
+
     if tdiff_y_xlist < 0 && (abs(tdiff_y_xlist) <  self.horizon)
         printError(sprintf("You set the maximum forecast horizon to %d periods but\n\
           the sample of the exogenous regressors has only %d future\n\
@@ -94,6 +117,7 @@ function scalar estimate_model_and_forecast (const string est_command,
     /* Estimate model and return oos-forecast. */
 
     smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+    
     catch @est_command
     if $error
         printError("Model estimation failed.\n\
@@ -339,7 +363,7 @@ function bundle prep_and_get_cv_folds (const bundle self)
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
     list cv.X = y xlist
-
+      
     CvDataSplitter(&cv)
     x_train_test_mats_static_case(&cv, self)
 
@@ -484,8 +508,9 @@ function bundle get_train_start_end_obsnums (const bundle self)
 
     bundle ret = null
     if self.type_moving_window == "static"
+        # these are simply in-sample dates
         ret.t1_obsnum = obsnum(self.t1_date_y)
-        ret.t2_obsnum = obsnum(self.t2_date_y) - self.horizon_current
+        ret.t2_obsnum = obsnum(self.t2_date_y)
     else
         scalar ret.t2_obsnum = $t2 - self.horizon_current
         scalar ret.t1_obsnum = 1 + ret.t2_obsnum - self.window_length
@@ -536,18 +561,5 @@ function list add_linear_trend_to_list (void)
     list xlist = time
 
     return xlist
-end function
-
-
-function scalar nobs_to_add_to_dataset (const list y,
-                                        const scalar horizon "maximal forecast horizon")
-    /* Determine the number of additional observations to add to the dataset. */
-
-    smpl y --contiguous		# don't consider eventual missings in the data passed to naiveFC()
-    add_n_new_obs = horizon - ($tmax - $t2)
-
-    printInfo(sprintf("Added %d additional observations at the sample end.", add_n_new_obs))
-
-    return add_n_new_obs
 end function
 

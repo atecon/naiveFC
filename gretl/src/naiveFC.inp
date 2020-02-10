@@ -171,7 +171,7 @@ function matrix set_xlist_and_forecast (bundle *self)
     # is not the effective sample length but (window_length-max(lags))
     bundle train_obsnums = get_train_start_end_obsnums(self)
     bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
-
+    
     list xlist = prepare_xlist(model_settings, self)
     if model_settings.add_first_lag
         xlist += y(-1)
@@ -217,10 +217,13 @@ function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     pkg query extra --quiet
+    # FIXME: This fails 
+    /*
     if atof($result.version) < 0.6
         printError("You need at least version 0.6 of the 'extra' package.")
         printError("Update by executing 'pkg install extra'")
     endif
+    */
 
     strings methods = get_supported_nonseas_methods()
     strings seas_methods = get_supported_seas_methods()
@@ -264,9 +267,9 @@ function void t1_and_t2_of_y_and_xlist (const series y,
 
     obslabels_and_nobs_to_bundle(y, &obsdetails_y)
     string self.t1_date_y = obsdetails_y.t1_date
-    string self.t2_date_y = obsdetails_y.t2_date
-    scalar self.t1_obsnum_y = obsnum(obsdetails_y.t1_date)
-    scalar self.t2_obsnum_y = obsnum(obsdetails_y.t2_date)
+    string self.t2_date_y = obslabel(obsnum(obsdetails_y.t2_date) - self.n_sampleend_obs_replaced)	# replaced the last n missings by -999
+    scalar self.t1_obsnum_y = obsnum(self.t1_date_y)
+    scalar self.t2_obsnum_y = obsnum(self.t2_date_y)
 
     scalar t1_diff_y = self.t1_obsnum_y - t1_curr
     scalar t2_diff_y = t2_curr - self.t2_obsnum_y
@@ -275,10 +278,6 @@ function void t1_and_t2_of_y_and_xlist (const series y,
         printWarning(sprintf("Found %d missing initial observations for %s.", \
           t1_diff_y, self.name_endo))
     endif
-    #    if t2_diff_y > 0
-    #        printWarning(sprintf("Found %d missing observations at sample end for %s.", \
-    #          t2_diff_y, self.name_endo))
-    #    endif
 
     if nelem(xlist)
         obslabels_and_nobs_to_bundle(xlist, &obsdetails_x)
@@ -316,9 +315,14 @@ function bundle naiveFC (const series y,
         return self
     endif
 
+    # Replace of missing at the sample end
+    # must be done here before 't1_and_t2_of_y_and_xlist'
+    self.n_sampleend_obs_replaced = repl_sampleend_missings_of_y(&y, self.verbose)
+
     t1_and_t2_of_y_and_xlist(y, &self)
 
     if self.type_moving_window == "static"
+        # "self.t2_date_y" refers to in-sample end date of "y"
         scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)
     endif
 
@@ -333,8 +337,8 @@ function bundle naiveFC (const series y,
         return self
     endif
 
-    smpl obsnum(self.t1_date_y) get_sample_end(self)
-    series self.y = replace_future_missings(y, self)
+    smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
+    series self.y = y
 
     do_naive_forecasting(&self)
 
@@ -410,8 +414,8 @@ function void summarize_naive_fc_results (bundle *self)
         printf "\nForecasting method: \t\t\t%s\n", self.which
         printf "Endogenous: \t\t\t\t%s\n", self.name_endo
         printf "Number of additional regressors: \t%d\n", nelem(self.xlist)
-        printf "Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date_y, self.t2_date_y, \
-          nobs(self.y)
+        printf "In-Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date_y, \
+          self.t2_date_y, nobs(self.y) - self.horizon
         printf "Max. forecast horizon: \t\t\t%d\n", self.horizon
         if self.type_moving_window == "static"
             printf "Last in-sample observation: \t\t%s\n", self.t2_train_date
