@@ -10,7 +10,6 @@ include string_utils.gfn
 include assertion.gfn
 include extra.gfn
 
-
 open AWM.gdt -q			# quarterly
 series y = YGA
 function void test_naiveFC_meanfc_awm_stat (series y)
@@ -71,7 +70,6 @@ function void test_naiveFC_meanfc_awm_stat (series y)
     assert_almost_equal_num(upper_bound[2], 2.6302, 1e-4)
 end function
 test_naiveFC_meanfc_awm_stat(y)
-
 
 
 open AWM.gdt -q			# quarterly
@@ -783,5 +781,128 @@ end function
 test_naiveFC_avgfc_awm(y)
 
 
-printf "\nInfo: All tests for running static cases passed.\n"
 
+open daily_data.gdt -q			# daily
+series y = target
+
+function void test_naiveFC_meanfc_daily_stat (series y)
+    printf "Start test_naiveFC() ('meanfc') for 'static'\n\
+      case with daily data with sufficient future values."
+
+    scalar horizon = 2
+    bundle opts = null					# setup additional options
+    opts.horizon = horizon
+
+    bundle b = null
+    bundle b = naiveFC(y, "meanfc", opts)
+    bundle forecast_results = b.forecast_results
+
+    strings col_labels_point = cnameget(forecast_results.meanfc.forecasts_point)
+    strings col_labels_lower = cnameget(forecast_results.meanfc.forecasts_lower_bound)
+    strings col_labels_upper = cnameget(forecast_results.meanfc.forecasts_upper_bound)
+    strings row_labels_point = rnameget(forecast_results.meanfc.forecasts_point)
+    strings row_labels_lower = rnameget(forecast_results.meanfc.forecasts_lower_bound)
+    strings row_labels_upper = rnameget(forecast_results.meanfc.forecasts_upper_bound)
+
+    matrix point = forecast_results.meanfc.forecasts_point
+    matrix lower_bound = forecast_results.meanfc.forecasts_lower_bound
+    matrix upper_bound = forecast_results.meanfc.forecasts_upper_bound
+    
+    assert_equal_str(b.t1_train_date, "2018-01-01")
+    assert_equal_str(b.t2_train_date, "2019-12-10")
+
+    assert_equal_str(b.t1_forecast_date, "2019-12-11")
+    assert_equal_str(b.t2_forecast_date, "2019-12-12")
+
+    assert_equal_num(b.window_length, 709)
+    assert_equal_num(b.horizon, 2)
+
+    assert_equal_num(nelem(forecast_results), 1)
+    assert_equal_num(nelem(forecast_results.meanfc), 3)
+
+    assert_equal_str(col_labels_point[1], "2019-12-10")
+    assert_equal_str(col_labels_lower[1], "2019-12-10")
+    assert_equal_str(col_labels_upper[1], "2019-12-10")
+
+    assert_equal_str(row_labels_point[1], "2019-12-11")
+    assert_equal_str(row_labels_lower[1], "2019-12-11")
+    assert_equal_str(row_labels_upper[1], "2019-12-11")
+
+    assert_equal_str(row_labels_point[2], "2019-12-12")
+    assert_equal_str(row_labels_lower[2], "2019-12-12")
+    assert_equal_str(row_labels_upper[2], "2019-12-12")
+
+    assert_almost_equal_num(point[1], 53514.0, 1e-0)
+    assert_almost_equal_num(point[2], 53514.0, 1e-0)
+
+    assert_almost_equal_num(lower_bound[1], -34509.0, 1e-0)
+    assert_almost_equal_num(lower_bound[2], -34509.0, 1e-0)
+
+    assert_almost_equal_num(upper_bound[1], 141536, 1e-0)
+    assert_almost_equal_num(upper_bound[2], 141536, 1e-0)
+end function
+test_naiveFC_meanfc_daily_stat(y)
+
+
+open daily_data.gdt -q			# daily
+series y = target
+function void test_naiveFC_medi_daily_stat (series y)
+    printf "Start test_naiveFC() ('medianfc') for 'static'\n\
+      case with daily data with sufficient future values."
+
+    scalar horizon = 2
+    bundle opts = null					# setup additional options
+    opts.horizon = horizon
+
+    bundle b = null
+    bundle b = naiveFC(y, "medianfc", opts)
+    bundle forecast_results = b.forecast_results
+
+    strings col_labels_point = cnameget(forecast_results.medianfc.forecasts_point)
+    strings col_labels_lower = cnameget(forecast_results.medianfc.forecasts_lower_bound)
+    strings col_labels_upper = cnameget(forecast_results.medianfc.forecasts_upper_bound)
+    strings row_labels_point = rnameget(forecast_results.medianfc.forecasts_point)
+    strings row_labels_lower = rnameget(forecast_results.medianfc.forecasts_lower_bound)
+    strings row_labels_upper = rnameget(forecast_results.medianfc.forecasts_upper_bound)
+
+    matrix point = forecast_results.medianfc.forecasts_point
+    matrix lower_bound = forecast_results.medianfc.forecasts_lower_bound
+    matrix upper_bound = forecast_results.medianfc.forecasts_upper_bound
+    
+    assert_equal_str(b.t1_train_date, "2018-01-01")
+    assert_equal_str(b.t2_train_date, "2019-12-10")
+
+    assert_equal_str(b.t1_forecast_date, "2019-12-11")
+    assert_equal_str(b.t2_forecast_date, "2019-12-12")
+
+    assert_equal_num(b.window_length, 709)
+    assert_equal_num(b.horizon, 2)
+
+    assert_equal_num(nelem(forecast_results), 1)
+    assert_equal_num(nelem(forecast_results.medianfc), 3)
+
+    assert_equal_str(col_labels_point[1], "2019-12-10")
+    assert_equal_str(col_labels_lower[1], "2019-12-10")
+    assert_equal_str(col_labels_upper[1], "2019-12-10")
+
+    assert_equal_str(row_labels_point[1], "2019-12-11")
+    assert_equal_str(row_labels_lower[1], "2019-12-11")
+    assert_equal_str(row_labels_upper[1], "2019-12-11")
+
+    assert_equal_str(row_labels_point[2], "2019-12-12")
+    assert_equal_str(row_labels_lower[2], "2019-12-12")
+    assert_equal_str(row_labels_upper[2], "2019-12-12")
+
+    assert_almost_equal_num(point[1], 48204.0, 1e-0)
+    assert_almost_equal_num(point[2], 48204.0, 1e-0)
+
+    assert_almost_equal_num(lower_bound[1], -31085, 1e-0)
+    assert_almost_equal_num(lower_bound[2], -31085, 1e-0)
+
+    assert_almost_equal_num(upper_bound[1], 127493, 1e-0)
+    assert_almost_equal_num(upper_bound[2], 127493, 1e-0)
+end function
+test_naiveFC_medi_daily_stat(y)
+
+
+printf "\nInfo: All tests for running static cases passed.\n"
