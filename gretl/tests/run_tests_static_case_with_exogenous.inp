@@ -223,5 +223,89 @@ function void test_naiveFC_allmods_awm_stat (series y, list xlist)
 end function
 test_naiveFC_allmods_awm_stat(y, xlist)
 
+
+
+open daily_data.gdt -q			# daily
+series y = target
+list xlist = kracher budget
+
+function void test_naiveFC_allmods_daily_stat (series y, list xlist)
+    printf "Start test_naiveFC() for 'static'\n\
+      case with daily data with sufficient future values\n\
+      and 2 exogenous."
+    printf "\nRun several methods just to make sure no errors occur.\n"
+
+    strings models = get_estimator_names(1)
+
+    loop i=1..nelem(models) -q
+        printf "\nStart model %s.\n", models[i]
+
+        string model_name = models[i]
+
+        bundle opts = null
+        list opts.xlist = xlist
+        scalar opts.horizon = 2
+
+        bundle b = null
+        bundle b = naiveFC(y, "@model_name", opts)
+
+        if b.error == 0
+            bundle forecast_results = b.forecast_results
+
+            strings col_labels_point = cnameget(forecast_results["@model_name"].forecasts_point)
+            strings col_labels_lower = cnameget(forecast_results["@model_name"].forecasts_lower_bound)
+            strings col_labels_upper = cnameget(forecast_results["@model_name"].forecasts_upper_bound)
+            strings row_labels_point = rnameget(forecast_results["@model_name"].forecasts_point)
+            strings row_labels_lower = rnameget(forecast_results["@model_name"].forecasts_lower_bound)
+            strings row_labels_upper = rnameget(forecast_results["@model_name"].forecasts_upper_bound)
+
+            matrix point = forecast_results["@model_name"].forecasts_point
+            matrix lower_bound = forecast_results["@model_name"].forecasts_lower_bound
+            matrix upper_bound = forecast_results["@model_name"].forecasts_upper_bound
+
+            assert_equal_str(b.t1_train_date, "2018-01-01")
+            assert_equal_str(b.t2_train_date, "2019-12-10")
+
+            assert_equal_str(b.t1_forecast_date, "2019-12-11")
+            assert_equal_str(b.t2_forecast_date, "2019-12-12")
+            assert_equal_str(b.t2_date_xlist, "2019-12-24")
+
+            assert_equal_num(b.window_length, 709)
+            assert_equal_num(b.horizon, 2)
+
+            assert_equal_num(nelem(forecast_results), 1)
+            assert_equal_num(nelem(forecast_results["@model_name"]), 3)
+
+            assert_equal_num(cols(point), 1)
+            assert_equal_num(rows(point), 2)
+            assert_equal_num(cols(lower_bound), 1)
+            assert_equal_num(rows(lower_bound), 2)
+            assert_equal_num(cols(upper_bound), 1)
+            assert_equal_num(rows(upper_bound), 2)
+
+            assert_equal_str(col_labels_point[1], "2019-12-10")
+            assert_equal_str(col_labels_lower[1], "2019-12-10")
+            assert_equal_str(col_labels_upper[1], "2019-12-10")
+
+            assert_equal_str(row_labels_point[1], "2019-12-11")
+            assert_equal_str(row_labels_lower[1], "2019-12-11")
+            assert_equal_str(row_labels_upper[1], "2019-12-11")
+
+            assert_equal_str(row_labels_point[2], "2019-12-12")
+            assert_equal_str(row_labels_lower[2], "2019-12-12")
+            assert_equal_str(row_labels_upper[2], "2019-12-12")
+
+            printf "\nSuccesfully finished model %s.\n", models[i]
+        endif
+        
+    endloop
+
+end function
+test_naiveFC_allmods_daily_stat(y, xlist)
+
+
+
+
+
 printf "\nInfo: All tests for running static cases with exogenous variables passed.\n"
 
