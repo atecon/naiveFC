@@ -1,8 +1,6 @@
 set verbose off
 clear
 
-#string FILENAME = "foo.csv"		# dummy file
-
 include "./src/naiveFC.inp" --force
 include "./src/naiveFC_helper.inp" --force
 
