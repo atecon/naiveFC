@@ -326,16 +326,16 @@ function void test_naiveFC_medi_daily_rol (series y, list xlist)
     assert_equal_str(row_labels_lower[2], "h=2")
     assert_equal_str(row_labels_upper[2], "h=2")
 
-    assert_almost_equal_num(point[1,1], 53172, 1e-0)
-    assert_almost_equal_num(point[2,1], 53172, 1e-0)
+    assert_almost_equal_num(point[1,1], 53170.7, 1e-1)
+    assert_almost_equal_num(point[2,1], 53170.7, 1e-1)
     assert_almost_equal_num(lower_bound[1,1], -34288, 1e-0)
     assert_almost_equal_num(lower_bound[2,1], -34288, 1e-0)
-    assert_almost_equal_num(upper_bound[1,1], 140630, 1e-0)
-    assert_almost_equal_num(upper_bound[2,1], 140630, 1e-0)
+    assert_almost_equal_num(upper_bound[1,1], 140629, 1e-0)
+    assert_almost_equal_num(upper_bound[2,1], 140629, 1e-0)
 
     assert_almost_equal_num(point[1,531], 39789, 1e-0)
     assert_almost_equal_num(lower_bound[1,531], -25658, 1e-0)
-    assert_almost_equal_num(upper_bound[1,531], 105236, 1e-0)
+    assert_almost_equal_num(upper_bound[1,531], 105238, 1e-0)
 
     assert_false(ok(point[2,531]))
     assert_false(ok(lower_bound[2,531]))
@@ -605,7 +605,6 @@ test_naiveFC_allmods_awm_rol_ex(y, xlist)
    end function
    test_naiveFC_meanfc_awm_rec_exo(y, xlist)
 */
-
 
 
 printf "\nInfo: All tests for moving window cases passed.\n"
