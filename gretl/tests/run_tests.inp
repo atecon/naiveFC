@@ -515,20 +515,3 @@ test_naiveFC_meanfc_awm_stat(y)
 
 
 printf "\nInfo: All tests passed.\n"
-
-# do_naive_forecasting
-# do_initial_checks
-# drop_missing_values
-# nobs_to_add_to_dataset
-# summarize_naive_fc_results
-
-/* Function not finisched yet!
-   matrix m = mshape(seq(1,9)',3,2)
-   matrices M = defarray(m)
-   bundle B = get_mean_fc_and_mean_sd(M)
-   B
-   eval B.fc_point_avg
-*/
-
-
-

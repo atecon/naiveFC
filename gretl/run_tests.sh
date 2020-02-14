@@ -7,7 +7,7 @@ PROJECT="naiveFC"
 
 SCRIPT1="./tests/run_tests.inp"
 SCRIPT2="./tests/run_tests_static_case.inp"
-#SCRIPT3="./tests/run_tests_static_case_with_exogenous.inp"
+SCRIPT3="./tests/run_tests_static_case_with_exogenous.inp"
 SCRIPT4="./tests/run_tests_movwindow_case.inp"
 
 cd $DIR
@@ -20,6 +20,7 @@ then
   echo "Success: Tests for script ${SCRIPT1} passed."
 else
   echo "Failure: Tests for script ${SCRIPT1} not passed."
+  exit 1
 fi
 
 
@@ -29,6 +30,17 @@ then
   echo "Success: Tests for script ${SCRIPT2} passed."
 else
   echo "Failure: Tests for script ${SCRIPT2} not passed."
+  exit 1
+fi
+
+
+gretlcli -b -e -q ${SCRIPT3}
+if [ $? -eq 0 ]
+then
+  echo "Success: Tests for script ${SCRIPT3} passed."
+else
+  echo "Failure: Tests for script ${SCRIPT3} not passed."
+  exit 1
 fi
 
 
@@ -38,17 +50,9 @@ then
    echo "Success: Tests for script ${SCRIPT4} passed."
 else
   echo "Failure: Tests for script ${SCRIPT4} not passed." >&2
+  exit 1
 fi
 
 
-
-
-# if [ $? -eq 0 ]
-# then
-#   echo "Success: All tests passed for '${PROJECT}'."
-#   exit 0
-# else
-#   echo "Failure: Tests not passed for '${PROJECT}'."
-#   exit 1
-# fi
+exit 0
 

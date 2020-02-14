@@ -1,7 +1,6 @@
 set verbose off
 clear
 
-** HIER WEITERMACHEN ***
 
 include "./src/naiveFC.inp" --force
 include "./src/naiveFC_helper.inp" --force
@@ -15,6 +14,7 @@ include extra.gfn
 open AWM.gdt -q			# quarterly
 series y = YGA
 list xlist = D743 FDD
+
 function void test_naiveFC_meanfc_awm_stat (series y, list xlist)
     printf "Start test_naiveFC() ('meanfc') for 'static'\n\
       case with AWM_data with sufficient future values\n\
@@ -23,10 +23,10 @@ function void test_naiveFC_meanfc_awm_stat (series y, list xlist)
     bundle opts = null
     list opts.xlist = xlist
     scalar opts.horizon = 2
-    #string opts.type_moving_window = "rolling"
     
     bundle b = null
     bundle b = naiveFC(y, "meanfc", opts)
+
     bundle forecast_results = b.forecast_results
     
     strings col_labels_point = cnameget(forecast_results.meanfc.forecasts_point)
@@ -41,68 +41,56 @@ function void test_naiveFC_meanfc_awm_stat (series y, list xlist)
     matrix upper_bound = forecast_results.meanfc.forecasts_upper_bound
     
     assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1978:2")
+    assert_equal_str(b.t2_train_date, "1998:2")
 
-    assert_equal_str(b.t1_forecast_date, "1978:3")
-    assert_equal_str(b.t2_forecast_date, "1998:2")
+    assert_equal_str(b.t1_forecast_date, "1998:3")
+    assert_equal_str(b.t2_forecast_date, "1998:4")
     assert_equal_str(b.t2_date_xlist, "1998:4")
 
-    assert_equal_num(b.window_length, 27)
+    assert_equal_num(b.window_length, 107)
     assert_equal_num(b.horizon, 2)
 
     assert_equal_num(nelem(forecast_results), 1)
     assert_equal_num(nelem(forecast_results.meanfc), 3)
     
-    assert_equal_num(cols(point), 80)
+    assert_equal_num(cols(point), 1)
     assert_equal_num(rows(point), 2)
-    assert_equal_num(cols(lower_bound), 80)
+    assert_equal_num(cols(lower_bound), 1)
     assert_equal_num(rows(lower_bound), 2)
-    assert_equal_num(cols(upper_bound), 80)
+    assert_equal_num(cols(upper_bound), 1)
     assert_equal_num(rows(upper_bound), 2)
-
-    eval lower_bound[,1:2] ~ point[,1:2] ~ upper_bound[,1:2]
-
-    assert_equal_str(col_labels_point[1], "1978:2")
-    assert_equal_str(col_labels_lower[1], "1978:2")
-    assert_equal_str(col_labels_upper[1], "1978:2")
-    assert_equal_str(col_labels_point[2], "1978:3")
-    assert_equal_str(col_labels_lower[2], "1978:3")
-    assert_equal_str(col_labels_upper[2], "1978:3")
-    assert_equal_str(col_labels_point[80], "1998:1")
-    assert_equal_str(col_labels_lower[80], "1998:1")
-    assert_equal_str(col_labels_upper[80], "1998:1")
     
-    assert_equal_str(row_labels_point[1], "h=1")
-    assert_equal_str(row_labels_lower[1], "h=1")
-    assert_equal_str(row_labels_upper[1], "h=1")
+    assert_equal_str(col_labels_point[1], "1998:2")
+    assert_equal_str(col_labels_lower[1], "1998:2")
+    assert_equal_str(col_labels_upper[1], "1998:2")
+    
+    assert_equal_str(row_labels_point[1], "1998:3")
+    assert_equal_str(row_labels_lower[1], "1998:3")
+    assert_equal_str(row_labels_upper[1], "1998:3")
 
-    assert_equal_str(row_labels_point[2], "h=2")
-    assert_equal_str(row_labels_lower[2], "h=2")
-    assert_equal_str(row_labels_upper[2], "h=2")
+    assert_equal_str(row_labels_point[2], "1998:4")
+    assert_equal_str(row_labels_lower[2], "1998:4")
+    assert_equal_str(row_labels_upper[2], "1998:4")
 
-    assert_almost_equal_num(point[1,1], 0.99446, 1e-5)
-    assert_almost_equal_num(point[2], 0.99446, 1e-5)
+    assert_almost_equal_num(point[1], 0.98407, 1e-5)
+    assert_almost_equal_num(point[2], 0.98413, 1e-5)
 
-    assert_almost_equal_num(lower_bound[1], -0.64128, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.64128, 1e-5)
+    assert_almost_equal_num(lower_bound[1], -0.63458, 1e-5)
+    assert_almost_equal_num(lower_bound[2], -0.63462, 1e-5)
 
-    assert_almost_equal_num(upper_bound[1], 2.6302, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6302, 1e-4)
+    assert_almost_equal_num(upper_bound[1], 2.6027, 1e-4)
+    assert_almost_equal_num(upper_bound[2], 2.6029, 1e-4)
 end function
 test_naiveFC_meanfc_awm_stat(y, xlist)
 
-stop
 
-open AWM.gdt -q			# quarterly
-series y = YGA
-function void test_naiveFC_medianfc_awm_stat (series y)
+function void test_naiveFC_medianfc_awm_stat (series y, const list xlist)
     print "Start test_naiveFC() ('medianfc') for 'static' case with AWM_data"
 
-    scalar horizon = 2
     bundle opts = null					# setup additional options
-    opts.horizon = horizon
-
-    bundle b = null
+    list opts.xlist = xlist    
+    opts.horizon = 2
+    
     bundle b = naiveFC(y, "medianfc", opts)
     bundle forecast_results = b.forecast_results
 
@@ -122,17 +110,25 @@ function void test_naiveFC_medianfc_awm_stat (series y)
 
     assert_equal_str(b.t1_forecast_date, "1998:3")
     assert_equal_str(b.t2_forecast_date, "1998:4")
+    assert_equal_str(b.t2_date_xlist, "1998:4")
 
     assert_equal_num(b.window_length, 107)
     assert_equal_num(b.horizon, 2)
 
     assert_equal_num(nelem(forecast_results), 1)
     assert_equal_num(nelem(forecast_results.medianfc), 3)
-
+    
+    assert_equal_num(cols(point), 1)
+    assert_equal_num(rows(point), 2)
+    assert_equal_num(cols(lower_bound), 1)
+    assert_equal_num(rows(lower_bound), 2)
+    assert_equal_num(cols(upper_bound), 1)
+    assert_equal_num(rows(upper_bound), 2)
+    
     assert_equal_str(col_labels_point[1], "1998:2")
     assert_equal_str(col_labels_lower[1], "1998:2")
     assert_equal_str(col_labels_upper[1], "1998:2")
-
+    
     assert_equal_str(row_labels_point[1], "1998:3")
     assert_equal_str(row_labels_lower[1], "1998:3")
     assert_equal_str(row_labels_upper[1], "1998:3")
@@ -141,668 +137,91 @@ function void test_naiveFC_medianfc_awm_stat (series y)
     assert_equal_str(row_labels_lower[2], "1998:4")
     assert_equal_str(row_labels_upper[2], "1998:4")
 
-    assert_almost_equal_num(point[1], 0.99160, 1e-5)
-    assert_almost_equal_num(point[2], 0.99160, 1e-5)
+    assert_almost_equal_num(point[1], 0.98430, 1e-5)
+    assert_almost_equal_num(point[2], 0.98435, 1e-5)
 
-    assert_almost_equal_num(lower_bound[1], -0.63944, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63944, 1e-5)
+    assert_almost_equal_num(lower_bound[1], -0.63473, 1e-5)
+    assert_almost_equal_num(lower_bound[2], -0.63476, 1e-5)
 
-    assert_almost_equal_num(upper_bound[1], 2.6226, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6226, 1e-4)
+    assert_almost_equal_num(upper_bound[1], 2.6033, 1e-4)
+    assert_almost_equal_num(upper_bound[2], 2.6035, 1e-4)
 end function
-test_naiveFC_medianfc_awm_stat(y)
+test_naiveFC_medianfc_awm_stat(y, xlist)
 
 
+function void test_naiveFC_allmods_awm_stat (series y, list xlist)
+    printf "Start test_naiveFC() for 'static'\n\
+      case with AWM_data with sufficient future values\n\
+      and 2 exogenous."
+    printf "\nRun several methods just to make sure no errors occur.\n"
 
+    strings models = get_estimator_names(1)
 
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_smeanfc_awm_stat (series y)
-    print "Start test_naiveFC() ('smeanfc') for 'static' case with AWM_data"
+    loop i=1..nelem(models) -q
+        printf "\nStart model %s.\n", models[i]
 
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    opts.horizon = horizon
+        string model_name = models[i]
 
-    bundle b = null
-    bundle b = naiveFC(y, "smeanfc", opts)
-    bundle forecast_results = b.forecast_results
+        bundle opts = null
+        list opts.xlist = xlist
+        scalar opts.horizon = 2
 
-    strings col_labels_point = cnameget(forecast_results.smeanfc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.smeanfc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.smeanfc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.smeanfc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.smeanfc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.smeanfc.forecasts_upper_bound)
+        bundle b = null
+        bundle b = naiveFC(y, "@model_name", opts)
 
-    matrix point = forecast_results.smeanfc.forecasts_point
-    matrix lower_bound = forecast_results.smeanfc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.smeanfc.forecasts_upper_bound
-    
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
+        if b.error == 0
+            bundle forecast_results = b.forecast_results
 
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
+            strings col_labels_point = cnameget(forecast_results["@model_name"].forecasts_point)
+            strings col_labels_lower = cnameget(forecast_results["@model_name"].forecasts_lower_bound)
+            strings col_labels_upper = cnameget(forecast_results["@model_name"].forecasts_upper_bound)
+            strings row_labels_point = rnameget(forecast_results["@model_name"].forecasts_point)
+            strings row_labels_lower = rnameget(forecast_results["@model_name"].forecasts_lower_bound)
+            strings row_labels_upper = rnameget(forecast_results["@model_name"].forecasts_upper_bound)
 
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
+            matrix point = forecast_results["@model_name"].forecasts_point
+            matrix lower_bound = forecast_results["@model_name"].forecasts_lower_bound
+            matrix upper_bound = forecast_results["@model_name"].forecasts_upper_bound
 
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.smeanfc), 3)
+            assert_equal_str(b.t1_train_date, "1971:4")
+            assert_equal_str(b.t2_train_date, "1998:2")
 
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
+            assert_equal_str(b.t1_forecast_date, "1998:3")
+            assert_equal_str(b.t2_forecast_date, "1998:4")
+            assert_equal_str(b.t2_date_xlist, "1998:4")
 
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
+            assert_equal_num(b.window_length, 107)
+            assert_equal_num(b.horizon, 2)
 
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
+            assert_equal_num(nelem(forecast_results), 1)
+            assert_equal_num(nelem(forecast_results["@model_name"]), 3)
 
-    assert_almost_equal_num(point[1], 0.99465, 1e-5)
-    assert_almost_equal_num(point[2], 0.99496, 1e-5)
-    assert_almost_equal_num(point[3], 0.99397, 1e-5)
-    assert_almost_equal_num(point[4], 0.99426, 1e-5)
-    assert_almost_equal_num(point[10], 0.99496, 1e-5)
+            assert_equal_num(cols(point), 1)
+            assert_equal_num(rows(point), 2)
+            assert_equal_num(cols(lower_bound), 1)
+            assert_equal_num(rows(lower_bound), 2)
+            assert_equal_num(cols(upper_bound), 1)
+            assert_equal_num(rows(upper_bound), 2)
 
-    assert_almost_equal_num(lower_bound[1], -0.64140, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.64160, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.64140, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.64160, 1e-5)
+            assert_equal_str(col_labels_point[1], "1998:2")
+            assert_equal_str(col_labels_lower[1], "1998:2")
+            assert_equal_str(col_labels_upper[1], "1998:2")
 
-    assert_almost_equal_num(upper_bound[1], 2.6307, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6315, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6307, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6315, 1e-4)
+            assert_equal_str(row_labels_point[1], "1998:3")
+            assert_equal_str(row_labels_lower[1], "1998:3")
+            assert_equal_str(row_labels_upper[1], "1998:3")
+
+            assert_equal_str(row_labels_point[2], "1998:4")
+            assert_equal_str(row_labels_lower[2], "1998:4")
+            assert_equal_str(row_labels_upper[2], "1998:4")
+
+            printf "\nSuccesfully finished model %s.\n", models[i]
+        endif
+        
+    endloop
+
 end function
-test_naiveFC_smeanfc_awm_stat(y)
-
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_smeanfc_awm_stat (series y)
-    print "Start test_naiveFC() ('smeanfc') for 'static' case with AWM_data and 95% CI"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-    scalar opts.level = 0.95
-
-    bundle b = null
-    bundle b = naiveFC(y, "smeanfc", opts)
-    bundle forecast_results = b.forecast_results
-
-    strings col_labels_point = cnameget(forecast_results.smeanfc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.smeanfc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.smeanfc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.smeanfc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.smeanfc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.smeanfc.forecasts_upper_bound)
-
-    matrix point = forecast_results.smeanfc.forecasts_point
-    matrix lower_bound = forecast_results.smeanfc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.smeanfc.forecasts_upper_bound
-
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.smeanfc), 3)
-
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
-
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
-
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
-
-    assert_almost_equal_num(point[1], 0.99465, 1e-5)
-    assert_almost_equal_num(point[2], 0.99496, 1e-5)
-    assert_almost_equal_num(point[3], 0.99397, 1e-5)
-    assert_almost_equal_num(point[4], 0.99426, 1e-5)
-    assert_almost_equal_num(point[10], 0.99496, 1e-5)
-
-    assert_almost_equal_num(lower_bound[1], -0.95482, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.95513, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.95482, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.95513, 1e-5)
-
-    assert_almost_equal_num(upper_bound[1], 2.9441, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.9450, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.9441, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.9450, 1e-4)
-end function
-test_naiveFC_smeanfc_awm_stat(y)
-
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_smedianfc_awm_stat (series y)
-    print "Start test_naiveFC() ('smedianfc') for 'static' case with AWM_data"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-
-    bundle b = null
-    bundle b = naiveFC(y, "smedianfc", opts)
-    bundle forecast_results = b.forecast_results
-
-    strings col_labels_point = cnameget(forecast_results.smedianfc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.smedianfc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.smedianfc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.smedianfc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.smedianfc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.smedianfc.forecasts_upper_bound)
-
-    matrix point = forecast_results.smedianfc.forecasts_point
-    matrix lower_bound = forecast_results.smedianfc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.smedianfc.forecasts_upper_bound
-
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.smedianfc), 3)
-
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
-
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
-
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
-
-    assert_almost_equal_num(point[1], 0.9943, 1e-4)
-    assert_almost_equal_num(point[2], 0.9922, 1e-4)
-    assert_almost_equal_num(point[3], 0.9912, 1e-4)
-    assert_almost_equal_num(point[4], 0.9916, 1e-4)
-    assert_almost_equal_num(point[10], 0.9922, 1e-4)
-
-    assert_almost_equal_num(lower_bound[1], -0.64116, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63982, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.64116, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.63982, 1e-5)
-
-    assert_almost_equal_num(upper_bound[1], 2.6297, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6242, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6297, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6242, 1e-4)
-end function
-test_naiveFC_smedianfc_awm_stat(y)
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_snaivefc_awm_stat (series y)
-    print "Start test_naiveFC() ('snaivefc') for 'static' case with AWM_data"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-
-    bundle b = null
-    bundle b = naiveFC(y, "snaivefc", opts)
-    bundle forecast_results = b.forecast_results
-
-    strings col_labels_point = cnameget(forecast_results.snaivefc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.snaivefc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.snaivefc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.snaivefc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.snaivefc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.snaivefc.forecasts_upper_bound)
-
-    matrix point = forecast_results.snaivefc.forecasts_point
-    matrix lower_bound = forecast_results.snaivefc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.snaivefc.forecasts_upper_bound
-
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.snaivefc), 3)
-
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
-
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
-
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
-
-    assert_almost_equal_num(point[1], 0.9872, 1e-4)
-    assert_almost_equal_num(point[2], 0.9884, 1e-4)
-    assert_almost_equal_num(point[3], 0.9915, 1e-4)
-    assert_almost_equal_num(point[4], 0.9916, 1e-4)
-    assert_almost_equal_num(point[10], 0.9884, 1e-4)
-
-    assert_almost_equal_num(lower_bound[1], -0.63660, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63737, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.63660, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.63737, 1e-5)
-
-    assert_almost_equal_num(upper_bound[1], 2.6110, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6142, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6110, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6142, 1e-4)
-end function
-test_naiveFC_snaivefc_awm_stat(y)
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_snaivedriftfc (series y)
-    print "Start test_naiveFC() ('snaivedriftfc') for 'static' case with AWM_data"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-
-    bundle b = null
-    bundle b = naiveFC(y, "snaivedriftfc", opts)
-    bundle forecast_results = b.forecast_results
-
-    strings col_labels_point = cnameget(forecast_results.snaivedriftfc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.snaivedriftfc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.snaivedriftfc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.snaivedriftfc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.snaivedriftfc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.snaivedriftfc.forecasts_upper_bound)
-
-    matrix point = forecast_results.snaivedriftfc.forecasts_point
-    matrix lower_bound = forecast_results.snaivedriftfc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.snaivedriftfc.forecasts_upper_bound
-
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.snaivedriftfc), 3)
-
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
-
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
-
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
-
-    assert_almost_equal_num(point[1], 0.98664, 1e-5)
-    assert_almost_equal_num(point[2], 0.98784, 1e-5)
-    assert_almost_equal_num(point[3], 0.99094, 1e-5)
-    assert_almost_equal_num(point[4], 0.99104, 1e-5)
-    assert_almost_equal_num(point[10], 0.98673, 1e-5)
-
-    assert_almost_equal_num(lower_bound[1], -0.63624, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63702, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.63588, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.63630, 1e-5)
-
-    assert_almost_equal_num(upper_bound[1], 2.6095, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6127, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6081, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6098, 1e-4)
-end function
-test_naiveFC_snaivedriftfc(y)
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_rwfc_awm_stat (series y)
-    print "Start test_naiveFC() ('rwfc') for 'static' case with AWM_data"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-
-    bundle b = null
-    bundle b = naiveFC(y, "rwfc", opts)
-    bundle forecast_results = b.forecast_results
-
-    strings col_labels_point = cnameget(forecast_results.rwfc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.rwfc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.rwfc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.rwfc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.rwfc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.rwfc.forecasts_upper_bound)
-
-    matrix point = forecast_results.rwfc.forecasts_point
-    matrix lower_bound = forecast_results.rwfc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.rwfc.forecasts_upper_bound
-
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.rwfc), 3)
-
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
-
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
-
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
-
-    assert_almost_equal_num(point[1], 0.9916, 1e-4)
-    assert_almost_equal_num(point[2], 0.9916, 1e-4)
-    assert_almost_equal_num(point[3], 0.9916, 1e-4)
-    assert_almost_equal_num(point[4], 0.9916, 1e-4)
-    assert_almost_equal_num(point[10], 0.9916, 1e-4)
-
-    assert_almost_equal_num(lower_bound[1], -0.63944, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63944, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.63944, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.63944, 1e-5)
-
-    assert_almost_equal_num(upper_bound[1], 2.6226, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6226, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6226, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6226, 1e-4)
-end function
-test_naiveFC_rwfc_awm_stat(y)
-
-
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_rwdriftfc_awm_stat (series y)
-    print "Start test_naiveFC() ('rwdriftfc') for 'static' case with AWM_data"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-
-    bundle b = null
-    bundle b = naiveFC(y, "rwdriftfc", opts)
-    bundle forecast_results = b.forecast_results
-
-    strings col_labels_point = cnameget(forecast_results.rwdriftfc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.rwdriftfc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.rwdriftfc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.rwdriftfc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.rwdriftfc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.rwdriftfc.forecasts_upper_bound)
-
-    matrix point = forecast_results.rwdriftfc.forecasts_point
-    matrix lower_bound = forecast_results.rwdriftfc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.rwdriftfc.forecasts_upper_bound
-
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.rwdriftfc), 3)
-
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
-
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
-
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
-
-    assert_almost_equal_num(point[1], 0.99154, 1e-5)
-    assert_almost_equal_num(point[2], 0.99149, 1e-5)
-    assert_almost_equal_num(point[3], 0.99143, 1e-5)
-    assert_almost_equal_num(point[4], 0.99137, 1e-5)
-    assert_almost_equal_num(point[10], 0.99103, 1e-5)
-
-    assert_almost_equal_num(lower_bound[1], -0.63940, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63936, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.63925, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.63907, 1e-5)
-
-    assert_almost_equal_num(upper_bound[1], 2.6225, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6223, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6219, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6211, 1e-4)
-end function
-test_naiveFC_rwdriftfc_awm_stat(y)
-
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_ar1fc_awm_stat (series y)
-    print "Start test_naiveFC() ('ar1fc') for 'static' case with AWM_data"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-
-    bundle b = null
-    bundle b = naiveFC(y, "ar1fc", opts)
-    bundle forecast_results = b.forecast_results
-
-    strings col_labels_point = cnameget(forecast_results.ar1fc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.ar1fc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.ar1fc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.ar1fc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.ar1fc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.ar1fc.forecasts_upper_bound)
-
-    matrix point = forecast_results.ar1fc.forecasts_point
-    matrix lower_bound = forecast_results.ar1fc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.ar1fc.forecasts_upper_bound
-
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.ar1fc), 3)
-
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
-
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
-
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
-
-    assert_almost_equal_num(point[1], 0.99181, 1e-5)
-    assert_almost_equal_num(point[2], 0.99201, 1e-5)
-    assert_almost_equal_num(point[3], 0.99219, 1e-5)
-    assert_almost_equal_num(point[4], 0.99234, 1e-5)
-    assert_almost_equal_num(point[10], 0.99303, 1e-5)
-
-    assert_almost_equal_num(lower_bound[1], -0.63958, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63970, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.64001, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.64036, 1e-5)
-
-    assert_almost_equal_num(upper_bound[1], 2.6232, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6237, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6250, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6264, 1e-4)
-end function
-test_naiveFC_ar1fc_awm_stat(y)
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_ar1trendfc_awm (series y)
-    print "Start test_naiveFC() ('ar1trendfc') for 'static' case with AWM_data"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-
-    bundle b = null
-    bundle b = naiveFC(y, "ar1trendfc", opts)
-    bundle forecast_results = b.forecast_results
-
-    strings col_labels_point = cnameget(forecast_results.ar1trendfc.forecasts_point)
-    strings col_labels_lower = cnameget(forecast_results.ar1trendfc.forecasts_lower_bound)
-    strings col_labels_upper = cnameget(forecast_results.ar1trendfc.forecasts_upper_bound)
-    strings row_labels_point = rnameget(forecast_results.ar1trendfc.forecasts_point)
-    strings row_labels_lower = rnameget(forecast_results.ar1trendfc.forecasts_lower_bound)
-    strings row_labels_upper = rnameget(forecast_results.ar1trendfc.forecasts_upper_bound)
-
-    matrix point = forecast_results.ar1trendfc.forecasts_point
-    matrix lower_bound = forecast_results.ar1trendfc.forecasts_lower_bound
-    matrix upper_bound = forecast_results.ar1trendfc.forecasts_upper_bound
-
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 1)
-    assert_equal_num(nelem(forecast_results.ar1trendfc), 3)
-
-    assert_equal_str(col_labels_point[1], "1998:2")
-    assert_equal_str(col_labels_lower[1], "1998:2")
-    assert_equal_str(col_labels_upper[1], "1998:2")
-
-    assert_equal_str(row_labels_point[1], "1998:3")
-    assert_equal_str(row_labels_lower[1], "1998:3")
-    assert_equal_str(row_labels_upper[1], "1998:3")
-
-    assert_equal_str(row_labels_point[10], "2000:4")
-    assert_equal_str(row_labels_lower[10], "2000:4")
-    assert_equal_str(row_labels_upper[10], "2000:4")
-
-    assert_almost_equal_num(point[1], 0.99047, 1e-5)
-    assert_almost_equal_num(point[2], 0.98945, 1e-5)
-    assert_almost_equal_num(point[3], 0.98853, 1e-5)
-    assert_almost_equal_num(point[4], 0.98770, 1e-5)
-    assert_almost_equal_num(point[10], 0.98401, 1e-5)
-
-    assert_almost_equal_num(lower_bound[1], -0.63871, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63805, 1e-5)
-    assert_almost_equal_num(lower_bound[5], -0.63644, 1e-5)
-    assert_almost_equal_num(lower_bound[10], -0.63454, 1e-5)
-
-    assert_almost_equal_num(upper_bound[1], 2.6196, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6170, 1e-4)
-    assert_almost_equal_num(upper_bound[5], 2.6103, 1e-4)
-    assert_almost_equal_num(upper_bound[10], 2.6026, 1e-4)
-end function
-test_naiveFC_ar1trendfc_awm(y)
-
-
-
-open AWM.gdt -q			# quarterly
-dataset addobs 12
-series y = YGA
-function void test_naiveFC_avgfc_awm (series y)
-    print "Start test_naiveFC() ('avgfc') for 'static' case with AWM_data"
-
-    scalar horizon = 10
-    bundle opts = null					# setup additional options
-    scalar opts.horizon = horizon
-
-    bundle b = null
-    bundle b = naiveFC(y, "avgfc", opts)
-    bundle forecast_results = b.forecast_results
-    
-    assert_equal_str(b.t1_train_date, "1971:4")
-    assert_equal_str(b.t2_train_date, "1998:2")
-
-    assert_equal_str(b.t1_forecast_date, "1998:3")
-    assert_equal_str(b.t2_forecast_date, "2000:4")
-
-    assert_equal_num(b.window_length, 107)
-    assert_equal_num(b.horizon, 10)
-
-    assert_equal_num(nelem(forecast_results), 11)
-    assert_equal_num(nelem(forecast_results.ar1trendfc), 3)
-end function
-test_naiveFC_avgfc_awm(y)
-
-
+test_naiveFC_allmods_awm_stat(y, xlist)
 
 printf "\nInfo: All tests for running static cases with exogenous variables passed.\n"
 

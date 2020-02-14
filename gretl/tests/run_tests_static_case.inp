@@ -783,6 +783,5 @@ end function
 test_naiveFC_avgfc_awm(y)
 
 
-
 printf "\nInfo: All tests for running static cases passed.\n"
 
