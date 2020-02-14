@@ -14,7 +14,7 @@ cd $DIR
 echo "Switched to ${DIR}"
 
 
-gretlcli -b -e -q ${SCRIPT1}
+gretlcli -b -e -q ${SCRIPT4}
 if [ $? -eq 0 ]
 then
   echo "Success: Tests for script ${SCRIPT1} passed."
@@ -22,7 +22,6 @@ else
   echo "Failure: Tests for script ${SCRIPT1} not passed."
   exit 1
 fi
-
 
 gretlcli -b -e -q ${SCRIPT2}
 if [ $? -eq 0 ]
