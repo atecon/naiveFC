@@ -16,32 +16,9 @@ include "./src/naiveFC.inp" --force
 include "./src/naiveFC_helper.inp" --force
 
 
-
-# Select an example
-#==================
-scalar runEX = 2
-
 # Load data
-if runEX==1
-    open nysewk.gdt -q		# weekly
-    series y = close
-elif runEX==2
-    open AWM.gdt -q			# quarterly
-    series y = YGA
-elif runEX==3
-    open hendry_jae.gdt -q	# annual
-    series y = diff(gdp)
-elif runEX==4
-    open hall.gdt -q		# monthly
-    series y = ewr
-
-elif runEX == 5
-    string FILENAME = "opaf_daily.csv"
-    open "./tests/opaf_daily.gdt" -p -q
-    series y = ANSPRACHE_BEREINIGT
-    setobs 7 2018-01-01
-#    smpl ; 2019-12-20   		# the last 'h' period are taken for forecasting in 'static' case
-endif
+open AWM.gdt -q
+series y = YGA
 
 #=======================
 # Static naive forecasts
@@ -136,14 +113,13 @@ endif
 #=========================
 # Moving-window forecasts
 #=========================
-scalar horizon = 2
 bundle opts = null					# setup additional options
-opts.horizon = horizon
-opts.type_moving_window = "rolling" 			# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
-# opts.window_length = 400 #xmax($pd, 90) 			# moving window length (optional)
+opts.horizon = 2
+opts.type_moving_window = "rolling" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+# opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
-catch list opts.xlist = D743 FDD #BUDGET_PLANNED			# optional additional regressors
-opts.verbose = 1					# Don't print details (optional)
+catch list opts.xlist = D743 FDD		# optional additional regressors
+opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
 # TODO as we forecast only to the last valid obs of y in this case anyway!
