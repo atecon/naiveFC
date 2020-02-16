@@ -123,20 +123,20 @@ opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
 # TODO as we forecast only to the last valid obs of y in this case anyway!
+# FIXME: moving-window fc with "avgfc"
 
 strings methods = defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
-bundle b = naiveFC(y, methods[3], opts)
+bundle b = naiveFC(y, methods[5], opts)
 
 bundle forecast_results = b.forecast_results
-eval forecast_results.meanfc
-eval forecast_results.meanfc.forecasts_point
+eval forecast_results.smeanfc
+eval forecast_results.smeanfc.forecasts_point
 
-stop
 
-list FC = get_naive_forecasts(b, {1,10})
+list FC = get_naive_forecasts(b, {1,2})
 print FC -o
 stop
 smpl FC --no-missing

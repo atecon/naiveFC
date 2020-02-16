@@ -169,7 +169,7 @@ function matrix set_xlist_and_forecast (bundle *self)
     # is not the effective sample length but (window_length-max(lags))
     bundle train_obsnums = get_train_start_end_obsnums(self)
     bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
-    
+
     list xlist = prepare_xlist(model_settings, self)
     if model_settings.add_first_lag
         xlist += y(-1)
@@ -206,12 +206,12 @@ function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     pkg query extra --quiet
-    # FIXME: This fails 
+    # FIXME: This fails
     /*
-    if atof($result.version) < 0.6
-        printError("You need at least version 0.6 of the 'extra' package.")
-        printError("Update by executing 'pkg install extra'")
-    endif
+       if atof($result.version) < 0.6
+       printError("You need at least version 0.6 of the 'extra' package.")
+       printError("Update by executing 'pkg install extra'")
+       endif
     */
 
     strings methods = get_supported_nonseas_methods()
@@ -240,10 +240,10 @@ function void do_initial_checks (bundle *self)
         print_no_bootstrap_support()
         self.error = 1
     endif
-    
+
     if nelem(self.xlist) > 0 \
-      && (self.which == "rwfc" || self.which == "rwdriftfc" || self.which == "snaivefc" || self.which == "snaivedriftfc")
-        
+          && (self.which == "rwfc" || self.which == "rwdriftfc" || self.which == "snaivefc" || self.which == "snaivedriftfc")
+
         printError(sprintf("No exogenous variables can be included for the selected model '%s'.", self.which))
         self.error = 1
     endif
@@ -524,39 +524,34 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
 end function
 
 
-# TODO: untested
+
 function scalar horizons_isok (const bundle self,
                                const matrix horizons)
-    /* Check that vector horizons is ok. Relevant for
-    get_naive_forecasts(). */
+    /* Check the vector 'horizons' is ok. Relevant for
+       get_naive_forecasts().
+    : return: 1 if ok, 0 otherwise */
 
-    if self.type_moving_window == "static" && self.verbose
-        printInfo("You cannot select specific horizons for 'static' forecasts.")
-        printInfo("Instead multi-step forecast values will be returned.")
-    endif
-
-    if self.type_moving_window != "static" && (maxc(horizons) > self.horizon)
-        printError(sprintf("The maximum forecast horizon you \n\
-          selected (%d) does exceed the horizon set before.", maxc(horizons)))
-        return 1
-    endif
     if minc(horizons) <= 0
         printError("You cannot select a negative forecast horizon.")
-        return 1
+        return 0
+    endif
+    if maxc(horizons) > self.horizon
+        printError(sprintf("The maximum forecast horizon you \n\
+          selected (=%d) does exceed the horizon set before (=%d).", \
+          maxc(horizons), self.horizon))
+        return 0
     endif
 
-    return 0
+    return 1
 end function
 
 
 # TODO: untested
 # Public function
 function list get_naive_forecasts (const bundle self,
-                                   matrix horizons[null] "Select only specific horizons",
-                                   const string suffix[null] "Suffix for series' names")
+                                   matrix horizons[null] "Select only specific horizons (moving-window only)",
+      const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
-    self
-    stop
 
     list R = null
     series y = self.y
@@ -570,8 +565,11 @@ function list get_naive_forecasts (const bundle self,
     else
         matrix horizons = seq(1, self.horizon)'
     endif
-    if horizons_isok(self, horizons)
-        return R
+    if self.type_moving_window != "static"
+        scalar err = horizons_isok(self, horizons)
+        if !err
+            return R
+        endif
     endif
 
     smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
@@ -616,10 +614,11 @@ function list get_movwindow_forecast_list (const matrix horizons,
 end function
 
 
+# untested
 function list get_static_forecast_list (const bundle self,
                                         const string model,
                                         const string suffix)
-    /* Return single multi-step forecast_results. For 'static'
+    /* Return single multi-step forecast_results for 'static'
     case. */
 
     list R = null
