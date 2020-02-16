@@ -141,5 +141,6 @@ bundle forecast_results = b.forecast_results
 list FC = get_naive_forecasts(b, {1,2})
 
 b.pre_fc_periods_to_plot = 60					# set no. of pre.-forecast periods obs. to plot
-plot_naive_forecasts(b, {1})
-
+plot_naive_forecasts(b, {1}, "meanfc")
+plot_naive_forecasts(b, {1}, "ar1FC")
+plot_naive_forecasts(b, {1}, "avgfc")

@@ -1,3 +1,15 @@
+function void yaxis_ranges (const list plotlist,
+                            scalar *ylo,
+                            scalar *yup)
+    /* */
+
+    scalar mini = min(min(plotlist))
+    scalar maxi = max(max(plotlist))
+    scalar ylo = mini - 0.05 * abs(mini)
+    scalar yup = maxi + 0.05 * abs(maxi)
+end function
+
+
 function list list_of_forecasts (const bundle self,
                                         const matrix horizons,
                                         const string suffix)

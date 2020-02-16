@@ -561,6 +561,9 @@ function void plot_naive_forecasts (const bundle self "Bundle returned from naiv
       const string model[null] "Select a model in case of avgfc")
     /* Function for plotting realizations and interval forecasts. */
 
+    if self.which == "avgfc" && !exists(model)
+        funcerr "You must specify for which model to plot the forecasts."
+    endif
     series y = self.y
     setinfo y --graph-name="Actuals"
     # re-set missing values back to NA
@@ -572,8 +575,7 @@ function void plot_naive_forecasts (const bundle self "Bundle returned from naiv
     endif
 
     list plotlist = y get_naive_forecasts(self, horizons)
-
-    # TODO: in case of "avgfc", user needs to specify which model to plot!
+    list plotlist = get_specific_model_for_avgfc(self, plotlist, model)
 
     # incl. some pre-forecast periods obs. for plotting
     scalar start = xmax(obsnum(self.t1_forecast_date) - self.pre_fc_periods_to_plot, \
@@ -581,6 +583,40 @@ function void plot_naive_forecasts (const bundle self "Bundle returned from naiv
     smpl start obsnum(self.t2_forecast_date)
 
     call_plot(plotlist, self)
+end function
+
+# untested
+function list get_specific_model_for_avgfc (const bundle self,
+                                            const list plotlist,
+                                            string model)
+    /* In case of "avgfc" we only plot the results for a specific model
+    but not for all in a single plot. */
+
+    if self.which == "avgfc"
+        string model = tolower(model)        
+        list plotlist = get_model_forecasts_from_list(plotlist, model)
+        if nelem(plotlist) == 0
+            funcerr "Model requested is not supported."
+        endif
+    endif
+
+    return plotlist    
+end function
+
+# untested
+function list get_model_forecasts_from_list (const list plotlist,
+                                             const string model)
+    /* Retrieve from list only those series which include
+    model in its serie's name. */
+
+    list new = null
+    loop foreach i plotlist -q
+        if instring(varname(plotlist.$i), sprintf("_%s", model))
+            list new += $i
+        endif
+    endloop
+
+    return new
 end function
 
 # untested
@@ -614,21 +650,10 @@ function void call_plot (const list plotlist,
         printf "set xlabel \"%s\"", self.xlab
         printf "set title \"%s\"", self.title
     end plot --output="@filename"
-
-end function
-
-function void yaxis_ranges (const list plotlist,
-                            scalar *ylo,
-                            scalar *yup)
-    /* */
-
-    scalar mini = min(min(plotlist))
-    scalar maxi = max(max(plotlist))
-    scalar ylo = mini - 0.05 * abs(mini)
-    scalar yup = maxi + 0.05 * abs(maxi)
 end function
 
 
+# FIXME
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
       int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
