@@ -123,6 +123,13 @@ function scalar get_sample_end (const bundle self)
 end function
 
 
+function scalar replace_nan_value_by (void)
+    /* Set value for replacing future unknown values
+    of series to be forecasted by a specific value. */
+    return -9876543210
+end function
+
+
 # TODO: untested
 function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
     /* Replace missing values of y at the sample end. */
@@ -131,7 +138,7 @@ function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
     scalar n_sampleend_obs_replaced = $tmax - $t2
     if n_sampleend_obs_replaced > 0
         smpl (1 + $t2) $tmax
-        series y = -999
+        series y = replace_nan_value_by()
         smpl full
     endif
 

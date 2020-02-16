@@ -263,7 +263,8 @@ function void t1_and_t2_of_y_and_xlist (const series y,
 
     obslabels_and_nobs_to_bundle(y, &obsdetails_y)
     string self.t1_date_y = obsdetails_y.t1_date
-    string self.t2_date_y = obslabel(obsnum(obsdetails_y.t2_date) - self.n_sampleend_obs_replaced)	# replaced the last n missings by -999
+    string self.t2_date_y = \
+      obslabel(obsnum(obsdetails_y.t2_date) - self.n_sampleend_obs_replaced)
     scalar self.t1_obsnum_y = obsnum(self.t1_date_y)
     scalar self.t2_obsnum_y = obsnum(self.t2_date_y)
 
@@ -528,7 +529,7 @@ end function
 # Public function
 function list get_naive_forecasts (const bundle self,
                                    matrix horizons[null] "Select specific horizons (moving-window only)",
-                                   const string suffix[null] "Suffix for series' names")
+      const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
@@ -551,139 +552,53 @@ function list get_naive_forecasts (const bundle self,
     return list_of_forecasts(self, horizons, suffix)
 end function
 
+# TODO: add convenient function "get_naive_forecast_errors()"
 
 
-function void naivePlot (bundle *self "Bundle returned from naiveFC()",
-      const matrix horizons[null] "Select only specific horizons")
-
-    /* Function for plotting actual and forecast values over time. */
-
-    string out = self.filename
-
-    scalar pre_fc_periods_to_plot = inbundle(self, "pre_fc_periods_to_plot") ? \
-      self.pre_fc_periods_to_plot : pre_fc_periods_to_plot
-
-    if self.add_n_new_obs > 0
-        dataset addobs self.add_n_new_obs
-    endif
+# untested
+function void plot_naive_forecasts (const bundle self "Bundle returned from naiveFC()",
+      const matrix horizons[null] "Select only specific horizons",
+      const string model[null] "Select a model in case of avgfc")
+    /* Function for plotting realizations and interval forecasts. */
 
     series y = self.y
     setinfo y --graph-name="Actuals"
-    if self.add_n_new_obs > 0				# The last h observations were added and set to zero
-        # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
-        smpl (obsnum(self.t2_date_y)+1) $tmax
-        series y = NA
-        smpl full
+    # re-set missing values back to NA
+    series y = (y == replace_nan_value_by() && self.type_moving_window == "static") \
+      ? NA : y
+
+    if !exists(horizons)
+        matrix horizons = seq(1, self.horizon)
     endif
 
-    list forecasts = y
+    list plotlist = y get_naive_forecasts(self, horizons)
 
-    if exists(horizons)
-        list forecasts += getNaiveForecastsList(&self, horizons)
-    else
-        list forecasts += getNaiveForecastsList(&self)
-    endif
-    if nelem(forecasts)
-        printf "\nError: Received empty list from getNaiveForecastsList(). Stop.\n"
-        stop
-    endif
-
-    /*
-       if self.type_moving_window!="static"						# rolling/ recursive window
-       scalar start = self.initfc - 1
-       smpl start start
-       # Loop over diff. training sets; each produces h-step ahead forecasts
-       loop i=1..rows(self.fc) -q
-       start++
-       smpl start (start+self.horizon-1)
-       series fc_$i = fcmat[i,]
-       str = sprintf("TrainSet=%d", $i)
-       setinfo fc_$i --graph-name="@str"
-       lplot += fc_$i
-       endloop
-
-       elif self.type_moving_window=="static"
-       self.initfc = self.T+1
-
-       loop i=1..cols(self.fc) -q
-       series fc_$i = fcmat[,i]
-
-       if self.which=="avgFC"
-       if i!=2
-       str = sprintf("%s", self.method_names[i])
-       setinfo fc_$i --graph-name="@str"
-       endif
-       else
-       string meth = self.which
-       setinfo fc_$i --graph-name="@meth"	#"Point-Fc"
-       if cols(self.fc)==3
-       if i==2
-       string s = sprintf("%.1f", (1-self.level)/2*100 )
-       setinfo fc_$i --graph-name="@s"
-       elif i==3
-       string s = sprintf("%.1f", (1-(1-self.level)/2)*100 )
-       setinfo fc_$i --graph-name="@s"
-       endif
-       endif
-       endif
-       lplot += fc_$i
-       if self.which=="avgFC" && i==2
-       lplot -= fc_$i		# drop cross-sectional std. statistics
-       endif
-       endloop
-       endif
-    */
+    # TODO: in case of "avgfc", user needs to specify which model to plot!
 
     # incl. some pre-forecast periods obs. for plotting
-    smpl xmax((obsnum(self.t2_forecast_date) - pre_fc_periods_to_plot), 1) $tmax
+    scalar start = xmax(obsnum(self.t1_forecast_date) - self.pre_fc_periods_to_plot, \
+      1)
+    smpl start obsnum(self.t2_forecast_date)
 
-    # y-range
-    scalar mini = min(min(forecasts))
-    scalar maxi = max(max(forecasts))
-    scalar ylo = mini-0.05*abs(mini)
-    scalar yup = maxi+0.05*abs(maxi)
-    # TODO: lplot may become A VERY long list -- think about a restriction showing
-    # only the k last forecasts
+    call_plot(plotlist, self)
+end function
 
-    /*
-       if cols(self.fc) != 3
-       plot lplot
-       options with-lp time-series single-yaxis
-       literal set linetype 1 lc rgb "black" lw 1 pt -1
-       literal set linetype 2 lc rgb "red" lw 1.25 pt 2 ps 0.5
-       literal set linetype 3 lc rgb "blue" lw 1#.25
-       literal set linetype 4 lc rgb "black" lw 1#.25
-       literal set linetype 5 lc rgb "grey" lw 1#.25
-       literal set linetype 6 lc rgb "violet" lw 1#.25 #pt 3 ps 0.5
-       literal set linetype 7 lc rgb "brown" lw 1#.25 #pt 4 ps 0.5
-       literal set linetype 8 lc rgb "yellow" lw 1#.25 #pt 5 ps 0.5
-       literal set linetype 9 lc rgb "red" lw 1#.25 #pt 1 ps 0.5
-       literal set linetype 10 lc rgb "green" lw 1#.25
-       literal set linetype 10 lc rgb "black" lw 1#.25
-       literal set key left bottom below
-       #literal set key inside left bottom
-       #put the border more to the background by applying it
-       # only on the left and bottom part and put it and the tics in gray
-       literal set style line 11 lc rgb "#808080" lt 1
-       literal set border 3 back ls 11			# get rid of upper + left border
-       literal set tics nomirror
-       #add a slight grid to make it easier to follow the exact position of the curves
-       literal set style line 12 lc rgb "#808080" lt 0 lw 1	# light grey color
-       literal set grid back ls 12
-       printf "set yrange[%g:%g]", ylo, yup
-       printf "set ylabel \"%s\"", self.ylab
-       printf "set xlabel \"%s\"", self.xlab
-       printf "set title \"%s\"", self.title
-       end plot --output="@out"
+# untested
+function void call_plot (const list plotlist,
+                         const bundle self)
+    /* */
 
-       else
-    */
-    plot forecasts
+    string filename = self.filename
+    scalar ylo
+    scalar yup
+    yaxis_ranges(plotlist, &ylo, &yup)
+
+    plot plotlist
         options with-lp time-series single-yaxis
-        literal set linetype 1 lc rgb "black" lw 1.5 pt 7 ps 1
-        literal set linetype 2 lc rgb "red" lw 1.5 ps 0
-        literal set linetype 3 lc rgb "blue" lw 1.5 ps 0
-        literal set linetype 4 lc rgb "blue" lw 1.5 ps 0
+        literal set linetype 1 lc rgb "black" lw 1 pt 0 ps 0
+        literal set linetype 3 lc rgb "red" lw 1.5 ps 0
+        literal set linetype 2 lc rgb "grey" lw 1.5 ps 0
+        literal set linetype 4 lc rgb "grey" lw 1.5 ps 0
         literal set key left bottom below
         #literal set key inside left bottom
         #put the border more to the background by applying it
@@ -698,8 +613,19 @@ function void naivePlot (bundle *self "Bundle returned from naiveFC()",
         printf "set ylabel \"%s\"", self.ylab
         printf "set xlabel \"%s\"", self.xlab
         printf "set title \"%s\"", self.title
-    end plot --output="@out"
-    #    endif
+    end plot --output="@filename"
+
+end function
+
+function void yaxis_ranges (const list plotlist,
+                            scalar *ylo,
+                            scalar *yup)
+    /* */
+
+    scalar mini = min(min(plotlist))
+    scalar maxi = max(max(plotlist))
+    scalar ylo = mini - 0.05 * abs(mini)
+    scalar yup = maxi + 0.05 * abs(maxi)
 end function
 
 

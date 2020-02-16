@@ -17,8 +17,11 @@ include "./src/naiveFC_helper.inp" --force
 
 
 # Load data
-open AWM.gdt -q
-series y = YGA
+#open AWM.gdt -q
+#series y = YGA
+
+open "../tests/daily_data.gdt" -q
+series y = target
 
 #=======================
 # Static naive forecasts
@@ -114,12 +117,12 @@ series y = YGA
 # Moving-window forecasts
 #=========================
 bundle opts = null					# setup additional options
-opts.horizon = 2
-opts.type_moving_window = "rolling" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+opts.horizon = 10
+#opts.type_moving_window = "rolling" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
 # opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
-catch list opts.xlist = D743 FDD		# optional additional regressors
-opts.verbose = 1						# print details (optional)
+catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
+#opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
 # TODO as we forecast only to the last valid obs of y in this case anyway!
@@ -129,26 +132,14 @@ strings methods = defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
-bundle b = naiveFC(y, methods[5], opts)
+bundle b = naiveFC(y, methods[11], opts)
 
 bundle forecast_results = b.forecast_results
 #eval forecast_results.smeanfc
 #eval forecast_results.smeanfc.forecasts_point
 
-
 list FC = get_naive_forecasts(b, {1,2})
-print FC -o
-stop
-smpl FC --no-missing
-print FC -o
-stop
 
-# Get interval forecasts as series
-dataset addobs opts.horizon			# forecast may exceed current sample length
-list FC = getNaiveForecastsList(&b, {1,2}, "_suffix")
+b.pre_fc_periods_to_plot = 60					# set no. of pre.-forecast periods obs. to plot
+plot_naive_forecasts(b, {1})
 
-# Plot (optional)
-#b.pre_fc_periods_to_plot = 20					# set no. of pre.-forecast periods obs. to plot
-naivePlot(&b, {11})
-
-*/
