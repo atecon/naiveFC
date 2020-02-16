@@ -132,8 +132,8 @@ bundle b = null
 bundle b = naiveFC(y, methods[5], opts)
 
 bundle forecast_results = b.forecast_results
-eval forecast_results.smeanfc
-eval forecast_results.smeanfc.forecasts_point
+#eval forecast_results.smeanfc
+#eval forecast_results.smeanfc.forecasts_point
 
 
 list FC = get_naive_forecasts(b, {1,2})

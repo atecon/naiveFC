@@ -524,120 +524,32 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
 end function
 
 
-
-function scalar horizons_isok (const bundle self,
-                               const matrix horizons)
-    /* Check the vector 'horizons' is ok. Relevant for
-       get_naive_forecasts().
-    : return: 1 if ok, 0 otherwise */
-
-    if minc(horizons) <= 0
-        printError("You cannot select a negative forecast horizon.")
-        return 0
-    endif
-    if maxc(horizons) > self.horizon
-        printError(sprintf("The maximum forecast horizon you \n\
-          selected (=%d) does exceed the horizon set before (=%d).", \
-          maxc(horizons), self.horizon))
-        return 0
-    endif
-
-    return 1
-end function
-
-
 # TODO: untested
 # Public function
 function list get_naive_forecasts (const bundle self,
-                                   matrix horizons[null] "Select only specific horizons (moving-window only)",
-      const string suffix[null] "Suffix for series' names")
+                                   matrix horizons[null] "Select specific horizons (moving-window only)",
+                                   const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
     series y = self.y
-    strings models = getkeys(self.forecast_results)
-
     if !exists(suffix)
         string suffix = ""
     endif
-    if exists(horizons)
-        matrix horizons = vec(horizons)
-    else
-        matrix horizons = seq(1, self.horizon)'
+    if !exists(horizons)
+        matrix horizons = seq(1, self.horizon)
     endif
-    if self.type_moving_window != "static"
-        scalar err = horizons_isok(self, horizons)
-        if !err
-            return R
-        endif
+    matrix horizons = vec(horizons)
+
+    scalar err = horizons_isok(self, horizons)
+    if !err
+        return R
     endif
 
     smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
 
-    loop i=1..nelem(models) -q
-        if self.type_moving_window == "static"
-            list R += get_static_forecast_list(self, models[i], suffix)
-        else
-            list R += get_movwindow_forecast_list(horizons, self, models[i], suffix)
-        endif
-    endloop
-
-    return R
+    return list_of_forecasts(self, horizons, suffix)
 end function
-
-
-function list get_movwindow_forecast_list (const matrix horizons,
-                                           const bundle self,
-                                           const string model,
-                                           const string suffix)
-    /* Return sascade of h-step forecast_results. For 'rolling'
-    and 'recursive' cases. */
-
-    list R = null
-
-    loop i=1..rows(horizons) -q
-
-        R += genseries(sprintf("low_h%d_%s%s", horizons[i], \
-          model, suffix), \
-          self.forecast_results[model].forecasts_lower_bound[i,]')
-
-        R += genseries(sprintf("point_h%d_%s%s", horizons[i], \
-          model, suffix), \
-          self.forecast_results[model].forecasts_point[i,]')
-
-        R += genseries(sprintf("up_h%d_%s%s", horizons[i], \
-          model, suffix), \
-          self.forecast_results[model].forecasts_upper_bound[i,]')
-    endloop
-
-    return R
-end function
-
-
-# untested
-function list get_static_forecast_list (const bundle self,
-                                        const string model,
-                                        const string suffix)
-    /* Return single multi-step forecast_results for 'static'
-    case. */
-
-    list R = null
-
-    R += genseries(sprintf("low_h1to%d_%s%s", self.horizon, \
-      model, suffix), \
-      self.forecast_results[model].forecasts_lower_bound)
-
-    R += genseries(sprintf("point_h1to%d_%s%s", self.horizon, \
-      model, suffix), \
-      self.forecast_results[model].forecasts_point)
-
-    R += genseries(sprintf("up_h1to%d_%s%s", self.horizon, \
-      model, suffix), \
-      self.forecast_results[model].forecasts_upper_bound)
-
-    return R
-end function
-
 
 
 

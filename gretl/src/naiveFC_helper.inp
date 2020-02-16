@@ -1,3 +1,99 @@
+function list list_of_forecasts (const bundle self,
+                                        const matrix horizons,
+                                        const string suffix)
+    /* Wrapper actually calling specific functions. */
+    
+    list R = null
+    strings models = getkeys(self.forecast_results)
+
+    loop i=1..nelem(models) -q
+        if self.type_moving_window == "static"
+            list R += get_static_forecast_list(self, models[i], suffix)
+        else
+            list R += get_movwindow_forecast_list(horizons, self, models[i], suffix)
+        endif
+    endloop
+    
+    return R
+end function
+
+
+function list get_movwindow_forecast_list (const matrix horizons,
+                                           const bundle self,
+                                           const string model,
+                                           const string suffix)
+    /* Return sascade of h-step forecast_results. For 'rolling'
+    and 'recursive' cases. */
+
+    list R = null
+
+    loop i=1..rows(horizons) -q
+
+        R += genseries(sprintf("low_h%d_%s%s", horizons[i], \
+          model, suffix), \
+          self.forecast_results[model].forecasts_lower_bound[i,]')
+
+        R += genseries(sprintf("point_h%d_%s%s", horizons[i], \
+          model, suffix), \
+          self.forecast_results[model].forecasts_point[i,]')
+
+        R += genseries(sprintf("up_h%d_%s%s", horizons[i], \
+          model, suffix), \
+          self.forecast_results[model].forecasts_upper_bound[i,]')
+    endloop
+
+    return R
+end function
+
+
+# untested
+function list get_static_forecast_list (const bundle self,
+                                        const string model,
+                                        const string suffix)
+    /* Return single multi-step forecast_results for 'static'
+    case. */
+
+    list R = null
+
+    R += genseries(sprintf("low_h1to%d_%s%s", self.horizon, \
+      model, suffix), \
+      self.forecast_results[model].forecasts_lower_bound)
+
+    R += genseries(sprintf("point_h1to%d_%s%s", self.horizon, \
+      model, suffix), \
+      self.forecast_results[model].forecasts_point)
+
+    R += genseries(sprintf("up_h1to%d_%s%s", self.horizon, \
+      model, suffix), \
+      self.forecast_results[model].forecasts_upper_bound)
+
+    return R
+end function
+
+
+function scalar horizons_isok (const bundle self,
+                               const matrix horizons)
+    /* Check the vector 'horizons' is ok. Relevant for
+       get_naive_forecasts().
+    : return: 1 if ok, 0 otherwise */
+
+    if self.type_moving_window != "static"
+        if minc(horizons) <= 0
+            printError("You cannot select a negative forecast horizon.")
+            return 0
+        endif
+        if maxc(horizons) > self.horizon
+            printError(sprintf("The maximum forecast horizon you \n\
+              selected (=%d) does exceed the horizon set before (=%d).", \
+              maxc(horizons), self.horizon))
+            return 0
+        endif
+    endif
+
+    return 1
+end function
+
+
 function scalar sufficient_future_obs (bundle *self)
     /* */
 
@@ -38,12 +134,12 @@ function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
         series y = -999
         smpl full
     endif
-    
+
     if verbose
         printInfo(sprintf("Replaced %d missing values at the sample end of 'y'.", \
           n_sampleend_obs_replaced))
     endif
-    
+
     return n_sampleend_obs_replaced
 end function
 
@@ -98,7 +194,7 @@ function scalar estimate_model_and_forecast (const string est_command,
     /* Estimate model and return oos-forecast. */
 
     smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
-    
+
     catch @est_command
     if $error
         printError("Model estimation failed.\n\
@@ -305,19 +401,19 @@ end function
 
 
 # FIXME: deprecated?
-/* 
-function scalar cv_window_length (const bundle self)
-    # Compute window_length for calling CvDataSplitter().
+/*
+   function scalar cv_window_length (const bundle self)
+   # Compute window_length for calling CvDataSplitter().
 
-    if self.type_moving_window == "static"
-        scalar win_size = self.window_length 	# X_test already includes period to be forecasted
-    else
-        # The last self.horizon rows are reserved for the OoS evaluation
-        scalar win_size = self.window_length + self.horizon
-    endif
+   if self.type_moving_window == "static"
+   scalar win_size = self.window_length 	# X_test already includes period to be forecasted
+   else
+   # The last self.horizon rows are reserved for the OoS evaluation
+   scalar win_size = self.window_length + self.horizon
+   endif
 
-    return win_size
-end function
+   return win_size
+   end function
 */
 
 
@@ -347,7 +443,7 @@ function bundle prep_and_get_cv_folds (const bundle self)
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
     list cv.X = y xlist
-      
+
     CvDataSplitter(&cv)
     x_train_test_mats_static_case(&cv, self)
 
