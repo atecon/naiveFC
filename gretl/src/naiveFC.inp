@@ -585,6 +585,7 @@ function void plot_naive_forecasts (const bundle self "Bundle returned from naiv
     call_plot(plotlist, self)
 end function
 
+
 # untested
 function list get_specific_model_for_avgfc (const bundle self,
                                             const list plotlist,
@@ -602,6 +603,7 @@ function list get_specific_model_for_avgfc (const bundle self,
 
     return plotlist    
 end function
+
 
 # untested
 function list get_model_forecasts_from_list (const list plotlist,
