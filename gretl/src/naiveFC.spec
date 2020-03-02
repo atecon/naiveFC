@@ -1,7 +1,7 @@
 author = Artur Tarassow
 email = atecon@posteo.de
 version = 0.9
-date = 2020-01-20
+date = 2020-03-02
 description = Simple forecasting methods
 tags = C53
 min-version = 2019b
@@ -9,7 +9,7 @@ data-requirement = needs-time-series-data
 gui-main = GUI_naiveFC
 label = naive forecast(s)
 menu-attachment = MAINWIN/Model/TSModels
-public = naiveFC naivePlot GUI_naiveFC getNaiveForecastsList
+public = naiveFC plot_naive_forecasts get_naive_forecasts GUI_naiveFC 
 menu-only = GUI_naiveFC
 help = naiveFC.pdf
 sample-script = naiveFC_sample.inp

@@ -118,7 +118,7 @@ series y = target
 #=========================
 bundle opts = null					# setup additional options
 opts.horizon = 10
-#opts.type_moving_window = "rolling" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+opts.type_moving_window = "rolling" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
 # opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
 catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
@@ -132,7 +132,7 @@ strings methods = defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
-bundle b = naiveFC(y, methods[11], opts)
+bundle b = naiveFC(y, methods[1], opts)
 
 bundle forecast_results = b.forecast_results
 #eval forecast_results.smeanfc

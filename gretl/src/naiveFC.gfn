@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2019b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.8</version>
-<date>2019-10-23</date>
+<version>0.9</version>
+<date>2020-03-02</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
 <label>naive forecast(s)</label>
@@ -11,8 +11,8 @@
 <help>
 pdfdoc:naiveFC.pdf
 </help>
-<depends count="1">
-CvDataSplitter </depends>
+<depends count="2">
+CvDataSplitter string_utils </depends>
 <gretl-function name="naiveFC" type="bundle">
  <params count="3">
   <param name="y" type="series" const="true"/>
@@ -24,176 +24,99 @@ CvDataSplitter </depends>
   </param>
  </params>
 <code>/* Main package function */
-# Set up the bundle
-bundle self = get_default_values(y)
-if exists(opts)
-  # TODO: Add a check on whether items in bundle opts actually exist in self
-  self = opts + self			# override defaults
+if !exists(opts)
+  bundle opts = null
 endif
-self.which = which
-self.name_endo = argname(y)
-# Check whether method is applicable
-do_initial_checks(&amp;self)
-# Drop missings + determine number of valid observations
-drop_missing_values(y, &amp;self)
-# Add obs for forecasting
-self.obs_added = nobs_to_add_to_dataset(y, &amp;self)
-if self.obs_added&gt;0
-  dataset addobs self.obs_added
+bundle self = set_bundle(y, which, opts)
+do_initial_checks(&amp;self)	# TODO: return scalar capturing error!
+if self.error
+  return self
 endif
-series self.y = misszero(y)		# update as additional observations were attached
+# Replace of missing at the sample end
+# must be done here before 't1_and_t2_of_y_and_xlist'
+self.n_sampleend_obs_replaced = repl_sampleend_missings_of_y(&amp;y, self.verbose)
+t1_and_t2_of_y_and_xlist(y, &amp;self)
+if self.type_moving_window == &quot;static&quot;
+  # &quot;self.t2_date_y&quot; refers to in-sample end date of &quot;y&quot;
+  scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)
+endif
+scalar check = valid_dates_of_y_and_xlist(&amp;self)
+if check
+  printError(&quot;Problem with dating for y and/ or xlist.&quot;)
+  return self
+endif
+scalar check = sufficient_future_obs(&amp;self)
+if check
+  return self
+endif
+smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
+series self.y = y
 do_naive_forecasting(&amp;self)
-if self.verbose
-  summarize_naive_fc_results(&amp;self)
+if self.which == &quot;avgfc&quot;
+  self.forecast_results.avgfc = compute_avgerage_forecast(&amp;self)
 endif
-# Drop some elements from self
-delete self.fan
-delete self.blength
-delete self.nboot
-if inbundle(self,&quot;obs_season&quot;)
-  delete self.obs_season
-endif
+summarize_naive_fc_results(&amp;self)
+cleanup_bundle(&amp;self)
 return self
 </code>
 </gretl-function>
-<gretl-function name="naivePlot" type="void">
- <params count="2">
-  <param name="self" type="bundleref">
+<gretl-function name="plot_naive_forecasts" type="void">
+ <params count="3">
+  <param name="self" type="bundle" const="true">
 <description>Bundle returned from naiveFC()</description>
   </param>
   <param name="horizons" type="matrix" optional="true" const="true">
 <description>Select only specific horizons</description>
   </param>
+  <param name="model" type="string" optional="true" const="true">
+<description>Select a model in case of avgfc</description>
+  </param>
  </params>
-<code>/* Function for plotting actual and forecast values over time. */
-string out = self.filename
-scalar pre_fc_periods_to_plot = inbundle(self, &quot;pre_fc_periods_to_plot&quot;) ? self.pre_fc_periods_to_plot : pre_fc_periods_to_plot
-if self.obs_added &gt; 0
-  dataset addobs self.obs_added
+<code>/* Function for plotting realizations and interval forecasts. */
+if self.which == &quot;avgfc&quot; &amp;&amp; !exists(model)
+  funcerr &quot;You must specify for which model to plot the forecasts.&quot;
 endif
 series y = self.y
 setinfo y --graph-name=&quot;Actuals&quot;
-if self.obs_added &gt; 0				# The last h observations were added and set to zero
-  # Note, eventual missings at the beginning of the data passed to naiveFC() aren't considered.
-  smpl (obsnum(self.t2_label)+1) $tmax
-  series y = NA
-  smpl full
+# re-set missing values back to NA
+series y = (y == replace_nan_value_by() &amp;&amp; self.type_moving_window == &quot;static&quot;) ? NA : y
+if !exists(horizons)
+  matrix horizons = seq(1, self.horizon)
 endif
-list forecasts = y
-if exists(horizons)
-  list forecasts += getNaiveForecastsList(&amp;self, horizons)
-else
-  list forecasts += getNaiveForecastsList(&amp;self)
-endif
-if nelem(forecasts)
-  printf &quot;\nError: Received empty list from getNaiveForecastsList(). Stop.\n&quot;
-  stop
-endif
-/*
-if self.type_moving_window!=&quot;static&quot;						# rolling/ recursive window
-  scalar start = self.initfc - 1
-  smpl start start
-  # Loop over diff. training sets; each produces h-step ahead forecasts
-  loop i=1..rows(self.fc) -q
-    start++
-    smpl start (start+self.horizon-1)
-    series fc_$i = fcmat[i,]
-    str = sprintf(&quot;TrainSet=%d&quot;, $i)
-    setinfo fc_$i --graph-name=&quot;@str&quot;
-    lplot += fc_$i
-  endloop
-elif self.type_moving_window==&quot;static&quot;
-  self.initfc = self.T+1
-  loop i=1..cols(self.fc) -q
-    series fc_$i = fcmat[,i]
-    if self.which==&quot;avgFC&quot;
-      if i!=2
-        str = sprintf(&quot;%s&quot;, self.method_names[i])
-        setinfo fc_$i --graph-name=&quot;@str&quot;
-      endif
-    else
-      string meth = self.which
-      setinfo fc_$i --graph-name=&quot;@meth&quot;	#&quot;Point-Fc&quot;
-      if cols(self.fc)==3
-        if i==2
-          string s = sprintf(&quot;%.1f&quot;, (1-self.level)/2*100 )
-          setinfo fc_$i --graph-name=&quot;@s&quot;
-        elif i==3
-          string s = sprintf(&quot;%.1f&quot;, (1-(1-self.level)/2)*100 )
-          setinfo fc_$i --graph-name=&quot;@s&quot;
-        endif
-      endif
-    endif
-    lplot += fc_$i
-    if self.which==&quot;avgFC&quot; &amp;&amp; i==2
-      lplot -= fc_$i		# drop cross-sectional std. statistics
-    endif
-  endloop
-endif
-*/
+list plotlist = y get_naive_forecasts(self, horizons)
+list plotlist = get_specific_model_for_avgfc(self, plotlist, model)
 # incl. some pre-forecast periods obs. for plotting
-smpl xmax((obsnum(self.t2_forecast_date) - pre_fc_periods_to_plot), 1) $tmax
-# y-range
-scalar mini = min(min(forecasts))
-scalar maxi = max(max(forecasts))
-scalar ylo = mini-0.05*abs(mini)
-scalar yup = maxi+0.05*abs(maxi)
-# TODO: lplot may become A VERY long list -- think about a restriction showing
-# only the k last forecasts
-/*
-if cols(self.fc) != 3
-  plot lplot
-    options with-lp time-series single-yaxis
-    literal set linetype 1 lc rgb &quot;black&quot; lw 1 pt -1
-    literal set linetype 2 lc rgb &quot;red&quot; lw 1.25 pt 2 ps 0.5
-    literal set linetype 3 lc rgb &quot;blue&quot; lw 1#.25
-    literal set linetype 4 lc rgb &quot;black&quot; lw 1#.25
-    literal set linetype 5 lc rgb &quot;grey&quot; lw 1#.25
-    literal set linetype 6 lc rgb &quot;violet&quot; lw 1#.25 #pt 3 ps 0.5
-    literal set linetype 7 lc rgb &quot;brown&quot; lw 1#.25 #pt 4 ps 0.5
-    literal set linetype 8 lc rgb &quot;yellow&quot; lw 1#.25 #pt 5 ps 0.5
-    literal set linetype 9 lc rgb &quot;red&quot; lw 1#.25 #pt 1 ps 0.5
-    literal set linetype 10 lc rgb &quot;green&quot; lw 1#.25
-    literal set linetype 10 lc rgb &quot;black&quot; lw 1#.25
-    literal set key left bottom below
-    #literal set key inside left bottom
-    #put the border more to the background by applying it
-    # only on the left and bottom part and put it and the tics in gray
-    literal set style line 11 lc rgb &quot;#808080&quot; lt 1
-    literal set border 3 back ls 11			# get rid of upper + left border
-    literal set tics nomirror
-    #add a slight grid to make it easier to follow the exact position of the curves
-    literal set style line 12 lc rgb &quot;#808080&quot; lt 0 lw 1	# light grey color
-    literal set grid back ls 12
-    printf &quot;set yrange[%g:%g]&quot;, ylo, yup
-    printf &quot;set ylabel \&quot;%s\&quot;&quot;, self.ylab
-    printf &quot;set xlabel \&quot;%s\&quot;&quot;, self.xlab
-    printf &quot;set title \&quot;%s\&quot;&quot;, self.title
-  end plot --output=&quot;@out&quot;
-else
-  */
-  plot forecasts
-    options with-lp time-series single-yaxis
-    literal set linetype 1 lc rgb &quot;black&quot; lw 1.5 pt 7 ps 1
-    literal set linetype 2 lc rgb &quot;red&quot; lw 1.5 ps 0
-    literal set linetype 3 lc rgb &quot;blue&quot; lw 1.5 ps 0
-    literal set linetype 4 lc rgb &quot;blue&quot; lw 1.5 ps 0
-    literal set key left bottom below
-    #literal set key inside left bottom
-    #put the border more to the background by applying it
-    # only on the left and bottom part and put it and the tics in gray
-    literal set style line 11 lc rgb &quot;#808080&quot; lt 1
-    literal set border 3 back ls 11			# get rid of upper + left border
-    literal set tics nomirror
-    #add a slight grid to make it easier to follow the exact position of the curves
-    literal set style line 12 lc rgb &quot;#808080&quot; lt 0 lw 1	# light grey color
-    literal set grid back ls 12
-    printf &quot;set yrange[%g:%g]&quot;, ylo, yup
-    printf &quot;set ylabel \&quot;%s\&quot;&quot;, self.ylab
-    printf &quot;set xlabel \&quot;%s\&quot;&quot;, self.xlab
-    printf &quot;set title \&quot;%s\&quot;&quot;, self.title
-  end plot --output=&quot;@out&quot;
-  #    endif
+scalar start = xmax(obsnum(self.t1_forecast_date) - self.pre_fc_periods_to_plot, 1)
+smpl start obsnum(self.t2_forecast_date)
+call_plot(plotlist, self)
+</code>
+</gretl-function>
+<gretl-function name="get_naive_forecasts" type="list">
+ <params count="3">
+  <param name="self" type="bundle" const="true"/>
+  <param name="horizons" type="matrix" optional="true">
+<description>Select specific horizons (moving-window only)</description>
+  </param>
+  <param name="suffix" type="string" optional="true" const="true">
+<description>Suffix for series' names</description>
+  </param>
+ </params>
+<code>/* Transform interval forecasts into a list of series and return this. */
+list R = null
+series y = self.y
+if !exists(suffix)
+  string suffix = &quot;&quot;
+endif
+if !exists(horizons)
+  matrix horizons = seq(1, self.horizon)
+endif
+matrix horizons = vec(horizons)
+scalar err = horizons_isok(self, horizons)
+if !err
+  return R
+endif
+smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
+return list_of_forecasts(self, horizons, suffix)
 </code>
 </gretl-function>
 <gretl-function name="GUI_naiveFC" type="matrix" menu-only="1" pkg-role="gui-main">
@@ -232,224 +155,30 @@ endif
 return self.fc
 </code>
 </gretl-function>
-<gretl-function name="getNaiveForecastsList" type="list">
- <params count="3">
-  <param name="self" type="bundleref"/>
-  <param name="horizons" type="matrix" optional="true" const="true">
-<description>Select only specific horizons</description>
-  </param>
-  <param name="suffix" type="string" optional="true" const="true">
-<description>Suffix for series' names</description>
-  </param>
- </params>
-<code>/* Transform interval forecasts into a list of series and return this. */
-# Initial settings
-list R = null
-matrix hor = seq(1, self.horizon)'
-hor = (exists(horizons)) ? horizons : hor
-hor = vec(hor)
-strings methods_used = defarray(self.which)	# TODO: Do this already in naiveFC()
-strings methods_used = (inbundle(self, &quot;methods_used&quot;)) ? self.methods_used : methods_used
-if !exists(suffix)
-  string suffix = &quot;&quot;
-endif
-if maxc(hor) &gt; self.horizon
-  printf &quot;\nError: The maximum forecast horizon you selected (%d) does not exist.\n           Empty list returned.&quot;, maxc(hor)
-  return R
-elif minc(hor) &lt;= 0
-  printf &quot;\nError: The minimum forecast horizon you selected (%d) does not exist.\n           Empty list returned.&quot;, minc(hor)
-  return R
-endif
-if self.obs_added &gt; 0
-  dataset addobs self.obs_added
-endif
-series y = self.y
-if self.obs_added &gt; 0				# The last h observations were added and set to zero
-  smpl (obsnum(self.t2_label)+1) $tmax
-  series y = NA
-  smpl full
-endif
-loop j=1..nelem(methods_used) -q
-  loop i=1..rows(hor) -q
-    scalar start = obsnum(self.t1_forecast_date) + hor[i] - 1
-    scalar ende = start + self.n_folds - 1
-    smpl start ende
-    R += genseries(sprintf(&quot;fc_pt_h_%d_%s%s&quot;, hor[i], methods_used[j], suffix), self.forecasts_point[j][i,]')
-    R += genseries(sprintf(&quot;fc_lo_h_%d_%s%s&quot;, hor[i], methods_used[j], suffix), self.forecasts_lower_bound[j][i,]')
-    R += genseries(sprintf(&quot;fc_up_h_%d_%s%s&quot;, hor[i], methods_used[j], suffix), self.forecasts_upper_bound[j][i,]')
-  endloop
-endloop
-return R
+<gretl-function name="dict_models" type="bundle" private="1">
+<code>/* Dictionary including stuff for calling estimation
+command and fcast command. */
+bundle dict_models
+dict_models.meanfc = defbundle( &quot;forecast_arg&quot;, &quot;--static&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+dict_models.medianfc = defbundle( &quot;forecast_arg&quot;, &quot;--static&quot;, &quot;command&quot;, &quot;quantreg 0.5 y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+dict_models.smeanfc = defbundle( &quot;forecast_arg&quot;, &quot;--static&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 1 )
+dict_models.smedianfc = defbundle( &quot;forecast_arg&quot;, &quot;--static&quot;, &quot;command&quot;, &quot;quantreg 0.5 y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 1 )
+dict_models.snaivefc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 0 0 0 ; 0 1 0 ; y xlist --nc&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+dict_models.snaivedriftfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 0 0 0 ; 0 1 0 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+dict_models.rwfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 0 1 0 ; y xlist --nc&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
+dict_models.rwdriftfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 0 1 0 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
+dict_models.ar1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+dict_models.ar1trendfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 1, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+return dict_models
 </code>
 </gretl-function>
-<gretl-function name="get_supported_seas_methods" type="strings" private="1">
-<code>/* List all seasonal supported methods here. */
-return defarray(&quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, &quot;snaivedriftFC&quot;)
-</code>
-</gretl-function>
-<gretl-function name="get_supported_nonseas_methods" type="strings" private="1">
-<code>/* List all non-seasonal supported methods here. */
-return defarray(&quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgFC&quot;)
-</code>
-</gretl-function>
-<gretl-function name="data_has_seasonality" type="scalar" private="1">
-<code>/* Flag seasonality of data set */
-return ($pd&gt;1) ? 1 : 0
-</code>
-</gretl-function>
-<gretl-function name="fc_interval_width" type="matrix" private="1">
- <params count="2">
-  <param name="fc_sd" type="matrix" const="true">
-<description>Std. error of forecast</description>
-  </param>
-  <param name="level" type="scalar" min="0.001" max="0.999" const="true">
-<description>confidence level</description>
-  </param>
- </params>
-<code>/* Compute width for a given condifdence level assuming standard normal. */
-return fc_sd * critical(z, (1-level)/2)
-</code>
-</gretl-function>
-<gretl-function name="point_fc_and_factor_as_arrays" type="bundle" private="1">
- <params count="2">
-  <param name="fc_and_sd" type="matrices" const="true"/>
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Using each model's point forecast and standard error, compute
-the forecast interval assuming standard normal. */
-bundle bout = null
-scalar m = nelem(fc_and_sd)
-matrices point_forecasts = array(m)
-matrices factors = array(m)
-loop i=1..m -q
-  point_forecasts[i] = fc_and_sd[i][,1]
-  factors[i] = fc_interval_width(fc_and_sd[i][,1], self.level)
-endloop
-bout.point_forecasts = point_forecasts
-bout.factors = factors
-return bout
-</code>
-</gretl-function>
-<gretl-function name="get_point_low_up_bound_arrays" type="void" private="1">
- <params count="2">
-  <param name="bout" type="bundleref"/>
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Generate for each model based on respective point forecasts and
-estimated standard derrors, arrays holding the interval forecasts. */
-if !inbundle(bout, &quot;point_forecasts&quot;)
-  funcerr &quot;Could not find item 'point_forecasts' in bundle&quot;
-endif
-if !inbundle(bout, &quot;factors&quot;)
-  funcerr &quot;Could not find item 'factors' in bundle&quot;
-endif
-scalar n = nelem(bout.point_forecasts)
-if n != nelem(bout.factors)
-  funcerr &quot;Number of matrices does not equal.
-endif
-matrices self.forecasts_point = array(n)
-matrices self.forecasts_lower_bound = array(n)
-matrices self.forecasts_upper_bound = array(n)
-loop i=1..n -q
-  self.forecasts_point[i] = bout.point_forecasts[i]
-  self.forecasts_lower_bound[i] = bout.point_forecasts[i] - bout.factors[i]
-  self.forecasts_upper_bound[i] = bout.point_forecasts[i] + bout.factors[i]
-endloop
-</code>
-</gretl-function>
-<gretl-function name="gen_column_names" type="strings" private="1">
- <params count="1">
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Construct column names */
-strings s = defarray(self.which)
-if tolower(self.which) != &quot;avgfc&quot;
-  s += sprintf(&quot;Lo (%.1f)&quot;, (1-self.level)/2*100)
-  s += sprintf(&quot;Up (%.1f)&quot;, (1-(1-self.level)/2)*100)
-endif
-return s
-</code>
-</gretl-function>
-<gretl-function name="array_of_horizon_labels" type="strings" private="1">
- <params count="1">
-  <param name="horizon" type="int" const="true"/>
- </params>
-<code>/* Construct string array for indicating the forecast horizons. */
-strings r = array(horizon)
-loop i=1..horizon -q
-  r[i] = sprintf(&quot; h=%d&quot;, i)
-endloop
-return r
-</code>
-</gretl-function>
-<gretl-function name="array_of_forecast_dates" type="strings" private="1">
- <params count="1">
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Construct date strings refering to the date for which a the
-h-step ahead forecast was made for. For 'static' forecasts only. */
-strings r = array(self.horizon)
-# Here we explicitly consider the case when the last obs are missings
-matrix date = {$obsdate}[1+obsnum(self.t2_label):]
-loop i=1..self.horizon -q
-  string sdate = sprintf(&quot;%d&quot;, date[i])
-  if $pd==1
-    r[i] = sprintf(&quot;%s&quot;, substr(sdate,1,4))
-  elif $pd==4
-    r[i] = sprintf(&quot;%s:%s&quot;, substr(sdate,1,4), substr(sdate,5,6))
-  else
-    r[i] = sprintf(&quot;%s-%s-%s&quot;, substr(sdate,1,4), substr(sdate,5,6), substr(sdate,7,8))
-  endif
-endloop
-return r
-</code>
-</gretl-function>
-<gretl-function name="array_of_condition_dates" type="strings" private="1">
- <params count="1">
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Construct date strings refering to the date based on which a
-forecasting model was estimated. */
-if self.type_moving_window == &quot;static&quot;
-  strings dates = array(1)		# for 'static' case, only on a single date is conditioned
-else
-  strings dates = array(self.n_folds)
-endif
-# Here we explicitly consider the case when the last obs are missings
-# TODO: Check dates for correctness!
-scalar first_condition_date = obsnum(self.t1_forecast_date) - 1
-if self.type_moving_window == &quot;static&quot;
-  #scalar first_condition_date = obsnum(self.t2_label)
-  scalar last_condition_date = first_condition_date
-else
-  scalar last_condition_date = first_condition_date + self.n_folds - 1	# TODO: -1 ???
-endif
-matrix conditioning_dates = {$obsdate}[first_condition_date:last_condition_date]
-strings r = array(rows(conditioning_dates))
-# TODO: Consolidate with loop in array_of_forecast_dates()
-loop i=1..rows(conditioning_dates) -q
-  string sdate = sprintf(&quot;%d&quot;, conditioning_dates[i])
-  if $pd==1
-    r[i] = sprintf(&quot;%s&quot;, substr(sdate,1,4))
-  elif $pd==4
-    r[i] = sprintf(&quot;%s:%s&quot;, substr(sdate,1,4), substr(sdate,5,6))
-  else
-    r[i] = sprintf(&quot;%s-%s-%s&quot;, substr(sdate,1,4), substr(sdate,5,6), substr(sdate,7,8))
-  endif
-endloop
-return r
-</code>
-</gretl-function>
-<gretl-function name="print_no_bootstrap_support" type="void" private="1">
-<code>funcerr &quot;Bootstrap confidence intervals are not supported, yet&quot;
-</code>
-</gretl-function>
-<gretl-function name="get_default_values" type="bundle" private="1">
+<gretl-function name="default_values" type="bundle" private="1">
  <params count="1">
   <param name="y" type="series" const="true"/>
  </params>
 <code>/* Set default values */
 bundle self = null
+scalar self.error = 0
 list self.xlist = null
 scalar self.horizon = 10				# maximum forecast horizon
 scalar self.level = 0.9					# probability level for forecast interval
@@ -457,190 +186,83 @@ scalar self.fan = 0						# plot fan chart  (not supported yet)
 scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
 scalar self.blength = 4					# Block length bootstrap  (not supported yet)
 scalar self.is_seas = data_has_seasonality()
+strings self.supported_estimators = get_estimator_names(self.is_seas)
 scalar self.verbose = 1
-# For get_moving_window_forecasts()
+genr index
+series self.index = index
 string self.type_moving_window = &quot;static&quot; 			# &quot;static&quot;, &quot;rolling&quot; or &quot;recursive&quot;
-scalar self.window_length = ceil(0.25*nobs(y))		# default window length
+scalar self.window_length = ceil(0.25 * nobs(y))	# default window length for moving-windows
 # For naivePlot()
 string self.title = &quot;&quot;
 string self.ylab = &quot;&quot;
 string self.xlab = &quot;&quot;
 string self.filename = &quot;display&quot;
-scalar self.pre_fc_periods_to_plot = int(0.25*nobs(y))
+scalar self.pre_fc_periods_to_plot = int(0.25 * nobs(y))
 return self
 </code>
 </gretl-function>
-<gretl-function name="get_period_series" type="series" private="1">
- <params count="1">
-  <param name="method" type="string" const="true"/>
- </params>
-<code>catch series period = $obsmicro
-if $error
-  series period = $obsminor
-endif
-return period
-</code>
-</gretl-function>
-<gretl-function name="get_static_forecasts" type="void" private="1">
- <params count="1">
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* This function is called by naiveFC() and for 'static' forecasts only. */
-matrices fc_and_sd = call_method(&amp;self)
-bundle bout = point_fc_and_factor_as_arrays(fc_and_sd, &amp;self)
-get_point_low_up_bound_arrays(&amp;bout, &amp;self)
-</code>
-</gretl-function>
-<gretl-function name="call_method" type="matrices" private="1">
- <params count="1">
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Wrapper for calling method. Returns p-dimension array where
-each matrix is of size h by 2 holding point forecasts and forecast
-standard errors. */
-# Returned array includes m matrices. Each matrix is of dimension h by 2 (point~sderr)
-if tolower(self.which) != &quot;avgfc&quot;	# m=1
-  matrices fc_and_sd = defarray(forecast_and_get_fc_sd(&amp;self, self.which))	# 1-dim array incl. single h by 2 matrix
-else								# currently m=10 incl. avg. forecast
-  matrices fc_and_sd = avg_forecast_and_get_fc_sd(&amp;self)	# function already transforms into array
-endif
-return fc_and_sd
-</code>
-</gretl-function>
-<gretl-function name="forecast_and_get_fc_sd" type="matrix" private="1">
+<gretl-function name="prepare_xlist" type="list" private="1">
  <params count="2">
-  <param name="self" type="bundleref"/>
-  <param name="method" type="string" const="true"/>
+  <param name="model_settings" type="bundle" const="true"/>
+  <param name="self" type="bundle" const="true"/>
  </params>
-<code>/* Compute point forecast and forecast standard errors. */
-matrix fc_and_sd_matrix = zeros(self.horizon, 2) * NA
+<code>/* Prepare list of additional regressors. */
 list xlist = null
-if method==&quot;smeanFC&quot; || method==&quot;smedianFC&quot;
-  series period = get_period_series(method)
-  xlist += dummify(period)
+if model_settings.add_ohe_periods
+  xlist += add_ohe_periods_to_list()
 endif
-if method==&quot;ar1trendFC&quot; &amp;&amp; (inbundle(self, &quot;w_trend&quot;) &amp;&amp; self.w_trend)
-  genr time
+if model_settings.add_intercept
+  xlist += add_intercept_to_list()
 endif
-# Select sample comprising both training and test set
-if self.type_moving_window==&quot;static&quot;
-  catch smpl obsnum(self.t1_label) obsnum(self.t2_label)
+if model_settings.add_linear_trend
+  xlist += add_linear_trend_to_list()
 endif
+if inbundle(self, &quot;xlist&quot;)
+  xlist += self.xlist
+endif
+# TODO: check for duplicates in xlist
+return xlist
+</code>
+</gretl-function>
+<gretl-function name="set_xlist_and_forecast" type="matrix" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Set list of regressors, estimate model and compute
+point forecast and forecast standard errors. */
+bundle model_settings = dict_models()[self.active_model]
+string fcast_arg = model_settings.forecast_arg
+string command = model_settings.command
+# TODO: consider 3 verbose levels: silent, normal, detailed
+if self.verbose &lt; 2
+  command += &quot; --quiet&quot;	# estimation details only for detailed verbosity level
+  fcast_arg += &quot; --quiet&quot;
+endif
+matrix forecast_results = zeros(self.horizon, 2) * NA
+series y = self.y					# length: window_length + horizon
+# &quot;(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)&quot;
+# is not the effective sample length but (window_length-max(lags))
+bundle train_obsnums = get_train_start_end_obsnums(self)
+bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
+list xlist = prepare_xlist(model_settings, self)
+if model_settings.add_first_lag
+  xlist += y(-1)
+endif
+catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 if $error
-  funcerr &quot;Check your sample and window size.&quot;
+  printError(&quot;Failed to set training sample. Check your sample and window size.&quot;)
+  scalar self.error = 1
+  return forecast_results
 endif
-# Set target variable and xlist
-series y = self.y					# has window_length + horizon observations
-if method != &quot;rwFC&quot; || method != &quot;rwdriftFC&quot;
-  list xlist += const
+# TODO: Can this happen, and if so why -- otherwise drop
+if self.type_moving_window != &quot;static&quot; &amp;&amp; ($nobs &gt; self.window_length)
+  printError(sprintf(&quot;You training sample (T=%d) is longer than the\n           specified window length (T=%d).&quot;, $nobs, self.window_length))
+  scalar self.error = 1
+  return forecast_results
 endif
-list xlist += self.xlist
-# Set training set
-if self.type_moving_window==&quot;rolling&quot; || self.type_moving_window==&quot;recursive&quot;
-  scalar train_end = $t2 - self.horizon
-  scalar train_start = 1 + train_end - self.window_length
-  smpl train_start train_end
-  if $nobs &gt; self.window_length
-    print &quot;\nError: You training sample (T=%d) is longer than the specified window length (T=%d).&quot;, $nobs, self.window_length
-    stop
-  endif
-endif
-# Estimation
-scalar dynamic_fc = 0
-if method==&quot;meanFC&quot;
-  catch ols y xlist --quiet
-elif method==&quot;medianFC&quot;
-  catch quantreg 0.5 y xlist --quiet
-elif method==&quot;smeanFC&quot;
-  catch ols y xlist --quiet
-elif method==&quot;smedianFC&quot;
-  catch quantreg 0.5 y xlist --quiet
-elif method==&quot;snaiveFC&quot; || method==&quot;snaivedriftFC&quot;
-  dynamic_fc++
-  string arima_opt = (method==&quot;snaiveFC&quot;) ? &quot;--nc&quot; : &quot;&quot;
-  catch arima 0 0 0 ; 0 1 0 ; y xlist @arima_opt --quiet
-elif method==&quot;rwFC&quot; || method==&quot;rwdriftFC&quot;
-  dynamic_fc++
-  string arima_opt = (method==&quot;rwFC&quot;) ? &quot;--nc&quot; : &quot;&quot;
-  catch arima 0 1 0 ; y xlist @arima_opt --quiet
-elif method==&quot;ar1FC&quot; || method==&quot;ar1trendFC&quot;
-  dynamic_fc++
-  # setup list of regressors
-  list xlist += y(-1)
-  if inbundle(self, &quot;w_trend&quot;)
-    xlist += trend
-  endif
-  catch ols y xlist --quiet
-endif
-scalar model_error = $error
-if model_error
-  printf &quot;\nError: Model estimation failed. \n           Forecast values are set to NA for the current sample.\n&quot;
-else
-  if dynamic_fc == 0
-    fcast ($t2+1) ($t2+self.horizon) --static --quiet
-  else
-    fcast ($t2+1) ($t2+self.horizon) --dynamic --quiet
-  endif
-endif
-if self.type_moving_window == &quot;static&quot;
-  gen_t1_forecast_date($t2, &amp;self)			# adds to self
-  gen_t2_forecast_date($t2, &amp;self)			# adds to self
-endif
-if !model_error
-  fc_and_sd_matrix = $fcast ~ $fcse
-endif
-return fc_and_sd_matrix
-</code>
-</gretl-function>
-<gretl-function name="gen_t1_forecast_date" type="void" private="1">
- <params count="2">
-  <param name="t2" type="int" const="true"/>
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Return the date for which the first 1-step ahead forecast is made for. */
-string self.t1_forecast_date = obslabel(t2+1)
-</code>
-</gretl-function>
-<gretl-function name="gen_t2_forecast_date" type="void" private="1">
- <params count="2">
-  <param name="t2" type="int" const="true"/>
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Return the date for which the last h-step ahead forecast is made for. */
-catch string self.t2_forecast_date = obslabel(t2+self.horizon)
-</code>
-</gretl-function>
-<gretl-function name="strpos" type="matrix" private="1">
- <params count="3">
-  <param name="S" type="strings" const="true">
-<description>Array of strings</description>
-  </param>
-  <param name="str" type="string" const="true">
-<description>String being searched for in S</description>
-  </param>
-  <param name="print_warnings" type="bool" default="1" const="true">
-<description>Print eventual warnings</description>
-  </param>
- </params>
-<code># Returns the positional entries of string in S in a column vector
-# if S contains string, 0 otherwise.
-if nelem(S) == 0
-  if print_warnings
-    printf &quot;Warning: String array '%s' is empty.\n&quot;, argname(S)
-  endif
-  return {0}
-endif
-matrix ret = {}
-loop i=1..nelem(S) -q
-  if S[i] == str
-    ret |= $i
-  endif
-endloop
-if rows(ret) &gt; 0
-  return ret
-else
-  return {0}
-endif
+self.error = estimate_model_and_forecast(command, fcast_arg, y, xlist, train_obsnums, test_obsnums)
+forecast_results[1:self.horizon_current,] = $fcast ~ $fcse
+return forecast_results
 </code>
 </gretl-function>
 <gretl-function name="do_initial_checks" type="void" private="1">
@@ -648,80 +270,126 @@ endif
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Helper function perfoming some initial checks */
+pkg query extra --quiet
+# FIXME: This fails
+/*
+if atof($result.version) &lt; 0.6
+  printError(&quot;You need at least version 0.6 of the 'extra' package.&quot;)
+  printError(&quot;Update by executing 'pkg install extra'&quot;)
+endif
+*/
 strings methods = get_supported_nonseas_methods()
 strings seas_methods = get_supported_seas_methods()
 # Check whether called method exists
-if sum(strpos(methods, self.which)) == 0 &amp;&amp; sum(strpos(seas_methods, self.which)) == 0
-  funcerr &quot;The forecasting method you selected does not exist.&quot;
+if !nelem(strpos(methods, self.which)) &amp;&amp; !nelem(strpos(seas_methods, self.which))
+  printError(&quot;The forecasting method you selected does not exist.&quot;)
+  self.error = 1
 endif
-if self.is_seas==0 &amp;&amp; sum(strpos(seas_methods, self.which)) &gt; 0
-  funcerr &quot;The method you requested is not available for non-seasonal data.&quot;
+if !self.is_seas &amp;&amp; nelem(strpos(seas_methods, self.which))
+  printError(&quot;The method you requested is not available for non-seasonal data.&quot;)
+  self.error = 1
 endif
 if self.window_length &lt; $pd
-  printf &quot;\nError: Problem with current periodicity.\n&quot;
-  printf &quot;Window size = %d\n&quot;, self.window_length
-  printf &quot;Periodicity = %d\n&quot;, $pd
-  funcerr &quot;The size of the moving window cannot be smaller than the underlying periodicity.&quot;
+  printError(&quot;Periodicity cannot be negative.&quot;)
+  printError(sprintf(&quot;Window size = %d&quot;, self.window_length))
+  printError(sprintf(&quot;Periodicity = %d\n&quot;, $pd))
+  printError(&quot;The size of the moving window cannot be smaller than the underlying periodicity.&quot;)
+  self.error = 1
 endif
-if self.nboot&gt;0
+if self.nboot
   print_no_bootstrap_support()
+  self.error = 1
 endif
-if (self.type_moving_window==&quot;rolling&quot; || self.type_moving_window==&quot;recursive&quot;) &amp;&amp; self.which==&quot;avgFC&quot;
-  printf &quot;Error: Automatic forecast averaging ('avgfc') is currently not compatible\n&quot;
-  printf &quot;with moving forecasts.\n&quot;
-  funcerr &quot;Re-specify.&quot;
+if nelem(self.xlist) &gt; 0 &amp;&amp; (self.which == &quot;rwfc&quot; || self.which == &quot;rwdriftfc&quot; || self.which == &quot;snaivefc&quot; || self.which == &quot;snaivedriftfc&quot;)
+  printError(sprintf(&quot;No exogenous variables can be included for the selected model '%s'.&quot;, self.which))
+  self.error = 1
 endif
+</code>
+</gretl-function>
+<gretl-function name="t1_and_t2_of_y_and_xlist" type="void" private="1">
+ <params count="2">
+  <param name="y" type="series" const="true"/>
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Check valid start and end dates of y and xlist. */
+list xlist = self.xlist
+scalar t1_curr = $t1
+scalar t2_curr = $tmax
+bundle obsdetails_y
+bundle obsdetails_x
+obslabels_and_nobs_to_bundle(y, &amp;obsdetails_y)
+string self.t1_date_y = obsdetails_y.t1_date
+string self.t2_date_y = obslabel(obsnum(obsdetails_y.t2_date) - self.n_sampleend_obs_replaced)
+scalar self.t1_obsnum_y = obsnum(self.t1_date_y)
+scalar self.t2_obsnum_y = obsnum(self.t2_date_y)
+scalar t1_diff_y = self.t1_obsnum_y - t1_curr
+scalar t2_diff_y = t2_curr - self.t2_obsnum_y
+if t1_diff_y &gt; 0
+  printWarning(sprintf(&quot;Found %d missing initial observations for %s.&quot;, t1_diff_y, self.name_endo))
+endif
+if nelem(xlist)
+  obslabels_and_nobs_to_bundle(xlist, &amp;obsdetails_x)
+  scalar self.t1_obsnum_xlist = obsnum(obsdetails_x.t1_date)
+  scalar self.t2_obsnum_xlist = obsnum(obsdetails_x.t2_date)
+  string self.t1_date_xlist = obsdetails_x.t1_date
+  string self.t2_date_xlist = obsdetails_x.t2_date
+  scalar t1_diff_x = self.t1_obsnum_xlist - t1_curr
+  scalar t2_diff_x = t2_curr - self.t2_obsnum_xlist
+  if t1_diff_x &gt; 0
+    printWarning(sprintf(&quot;Found %d missing initial observations for exogenous.&quot;, t1_diff_x))
+  endif
+  if t2_diff_x &gt; 0
+    printWarning(sprintf(&quot;Found %d missing observations at sample end for exogenous.&quot;, t2_diff_x))
+  endif
+endif
+</code>
+</gretl-function>
+<gretl-function name="cleanup_bundle" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Delete some elements before returning to user. */
+delete self.fan
+delete self.blength
+delete self.nboot
+if inbundle(self,&quot;obs_season&quot;)
+  delete self.obs_season
+endif
+delete self.supported_estimators
+delete self.index
+delete self.active_model
+delete self.horizon_current
+delete self.t1_date_y
+delete self.t2_date_y
+delete self.xlist
+</code>
+</gretl-function>
+<gretl-function name="prepare_forecast_bundles" type="bundle" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Prepare for each estimator a dictionary for point
+interval forecast results to be stored in matrices. */
+bundle forecast_results
+loop i=1..nelem(self.models) -q
+  string model = self.models[i]
+  bundle forecast_results[&quot;@model&quot;] = null
+endloop
+return forecast_results
 </code>
 </gretl-function>
 <gretl-function name="do_naive_forecasting" type="void" private="1">
  <params count="1">
   <param name="self" type="bundleref"/>
  </params>
-<code>/* Wrapper function actually calling static or
-moving-window procedures. */
-if self.type_moving_window == &quot;static&quot;
-  get_static_forecasts(&amp;self)
-else
-  catch include CvDataSplitter.gfn		# load another external package
-  if !$error
-    printf &quot;\nInfo: Necessary package 'CvDataSplitter' succesfully loaded.\n&quot;
-  endif
-  get_moving_window_forecasts(&amp;self)
-endif
-attach_column_labels(&amp;self)
-attach_row_labels(&amp;self)
-</code>
-</gretl-function>
-<gretl-function name="attach_row_labels" type="void" private="1">
- <params count="1">
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Add date strings as row labels for 'static' forecasts,
-or indicate the forecast horizon for moving-window
-forecasts. */
-if self.type_moving_window == &quot;static&quot;
-  strings row_labels = array_of_forecast_dates(&amp;self)
-else
-  strings row_labels = array_of_horizon_labels(self.horizon)
-endif
-loop i=1..nelem(self.forecasts_point) -q
-  rnameset(self.forecasts_point[i], row_labels)
-  rnameset(self.forecasts_lower_bound[i], row_labels)
-  rnameset(self.forecasts_upper_bound[i], row_labels)
-endloop
-</code>
-</gretl-function>
-<gretl-function name="attach_column_labels" type="void" private="1">
- <params count="1">
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Add date strings as column labels for indicating the date on
-which the estimates are conditioned on. */
-strings conditioning_dates = array_of_condition_dates(&amp;self)
-loop i=1..nelem(self.forecasts_point) -q
-  cnameset(self.forecasts_point[i], conditioning_dates)
-  cnameset(self.forecasts_lower_bound[i], conditioning_dates)
-  cnameset(self.forecasts_upper_bound[i], conditioning_dates)
+<code>/* Wrapper function actually calling procedures. */
+strings models = getkeys(self.forecast_results)
+loop i=1..nelem(self.forecast_results) -q	# loop over models
+  self.active_model = models[i]
+  bundle interval_forecasts = execute_forecasting(&amp;self)
+  attach_row_labels(&amp;interval_forecasts, self)
+  attach_column_labels(&amp;interval_forecasts, self)
+  self.forecast_results[self.active_model] = interval_forecasts
 endloop
 </code>
 </gretl-function>
@@ -730,376 +398,317 @@ endloop
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Print summarising information */
-printf &quot;****************************************************\n&quot;
-printf &quot;\t\tNaive Forecasting Method\n&quot;
-printf &quot;\nEndogenous: \t\t\t\t%s\n&quot;, self.name_endo
-printf &quot;Number of additional exogenous: \t%d\n&quot;, nelem(self.xlist)
-printf &quot;Forecasting method: \t\t\t%s\n&quot;, self.which
-printf &quot;Start valid data set: \t\t\t%s\n&quot;, self.t1_label
-printf &quot;End valid data set: \t\t\t%s\n&quot;, self.t2_label
-printf &quot;Number of observations: \t\t%d\n&quot;, obsnum(self.t2_label)-obsnum(self.t1_label)
-printf &quot;Forecast horizon: \t\t\t%d\n&quot;, self.horizon
-printf &quot;First observation forecasted (h=1): \t%s\n&quot;, self.t1_forecast_date
-printf &quot;Last observation forecasted (h=%d): \t%s\n&quot;, self.horizon, self.t2_forecast_date
-if self.type_moving_window == &quot;static&quot;
-  if self.which != &quot;avgFC&quot;
-    printf &quot;Width forecast interval: \t\t%d pct.\n&quot;, self.level*100
+if self.verbose
+  printf &quot;-------------------------------------------------------------------\n&quot;
+  printf &quot;\t\tSummary of naive forecasting\n&quot;
+  printf &quot;\nForecasting method: \t\t\t%s\n&quot;, self.which
+  printf &quot;Endogenous: \t\t\t\t%s\n&quot;, self.name_endo
+  printf &quot;Number of additional regressors: \t%d\n&quot;, nelem(self.xlist)
+  printf &quot;In-Sample: \t\t\t\t%s to %s (T = %d)\n&quot;, self.t1_date_y, self.t2_date_y, nobs(self.y) - self.horizon
+  printf &quot;Max. forecast horizon: \t\t\t%d\n&quot;, self.horizon
+  if self.type_moving_window == &quot;static&quot;
+    printf &quot;Last in-sample observation: \t\t%s\n&quot;, self.t2_train_date
+  elif self.type_moving_window == &quot;rolling&quot;
+    printf &quot;Moving window length: \t\t\t%d\n&quot;, self.window_length
+  else
+    printf &quot;Initial window length: \t\t\t%d\n&quot;, self.window_length
   endif
-else
-  printf &quot;Moving window length: \t\t\t%d\n&quot;, self.window_length
-  printf &quot;Number of %s forecasts: \t\t%d\n&quot;, self.type_moving_window, self.n_folds
-endif
-printf &quot;****************************************************\n&quot;
-printf &quot;\n&quot;
-</code>
-</gretl-function>
-<gretl-function name="nobs_to_add_to_dataset" type="scalar" private="1">
- <params count="2">
-  <param name="y" type="list" const="true"/>
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Determine the number of additional observations to add to the dataset. */
-smpl y --contiguous
-t2_new = $t2				# don't consider eventual missings in the data passed to naiveFC()
-return self.horizon - ($tmax-t2_new)
-</code>
-</gretl-function>
-<gretl-function name="drop_missing_values" type="void" private="1">
- <params count="2">
-  <param name="y" type="series" const="true"/>
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Drop missing values + construct a contiguous data set. */
-self.T_all = $nobs  # no. of obs of the original dataset passed, may incl. missings
-if nelem(self.xlist) &gt; 0
-  list xlist = self.xlist
-  smpl y --contiguous
-  scalar t2_y = $t2
-  smpl full
-  smpl xlist --contiguous
-  scalar t2_xlist = $t2
-  scalar self.tdiff_xlist_y = t2_xlist - t2_y
-  if self.tdiff_xlist_y&gt;0 &amp;&amp; self.tdiff_xlist_y&lt;self.horizon
-    printf &quot;\nError: The last valid observation of series %s is %s.\n&quot;, self.name_endo, obslabel(t2_y)
-    printf &quot;You requested a %d-step ahead sequence of forecasts.\n&quot;, self.horizon
-    printf &quot;The last valid observation of the contiguous sample for the additional\n               exogenous regressors is %s.\n&quot;, obslabel(t2_xlist)
-    printf &quot;Thus, it is impossible to compute the requested h-steap ahead\n               sequence of forecasts.\n&quot;
-    printf &quot;Either reduce the forecast horizon to h=%d or add future information\n               for your 'xlist' variables.\n&quot;, (self.tdiff_xlist_y)
-    funcerr &quot;&quot;
-  elif self.tdiff_xlist_y&lt;=0
-    printf &quot;\nError: The 'xlist' variables include no valid future observations\n               but only missings.\n&quot;
-    printf &quot;Last valid of additional exogenous regressors is %s\n&quot;, obslabel(t2_xlist)
-    funcerr &quot;Re-specify.&quot;
+  if self.type_moving_window != &quot;static&quot;
+    printf &quot;Number of '%s' multi-step forecasts: %d\n&quot;, self.type_moving_window, self.n_folds
+    printf &quot;First observation forecasted: \t\t%s\n&quot;, self.t1_forecast_date
+    printf &quot;Last observation forecasted: \t\t%s\n&quot;, self.t2_forecast_date
+  else
+    printf &quot;First observation forecasted (h=1): \t%s\n&quot;, self.t1_forecast_date
+    printf &quot;Last observation forecasted (h=%d): \t%s\n&quot;, self.horizon, self.t2_forecast_date
   endif
-  smpl full
-endif
-smpl y --contiguous
-self.t1_label = obslabel($t1)
-self.t2_label = obslabel($t2)
-self.T = $nobs		# no. of valid obs before adding obs. for forecasting purpose
-if self.T&lt;self.T_all &amp;&amp; !self.verbose
-  printf &quot;\nWarning: The time-series sample has been restricted\n&quot;
-  printf &quot;due to %d missing values in series %s.\n&quot;, (self.T_all-$nobs), self.name_endo
-  printf &quot;Information on the new contiguous set for series %s:\n&quot;, , self.name_endo
-  printf &quot;Start date: %s\n&quot;, obslabel($t1)
-  printf &quot;End date: %s\n&quot;, obslabel($t2)
-  printf &quot;\n&quot;
-endif
-</code>
-</gretl-function>
-<gretl-function name="do_avgfcs_and_get_fc_sd_array" type="matrices" private="1">
- <params count="2">
-  <param name="methods" type="strings" const="true"/>
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Compute forecasts for each method. For each mezthod we obtain a matrix
-of size h by 2 holding point forecasts and associated standard errors. */
-scalar m = nelem(methods)
-matrices fc_and_sd = array(m)
-loop i=1..m -q
-  fc_and_sd[i] = forecast_and_get_fc_sd(&amp;self, methods[i])
-endloop
-return fc_and_sd
-</code>
-</gretl-function>
-<gretl-function name="drop_string_from_array" type="strings" private="1">
- <params count="2">
-  <param name="S" type="strings" const="true"/>
-  <param name="drop_str" type="string" const="true"/>
- </params>
-<code>/* Drop a specific string from string array. String yay occur multiple times. */
-strings ret = null
-loop i=1..nelem(S) -q
-  if S[i] != drop_str
-    ret += S[i]
+  if self.type_moving_window == &quot;static&quot;
+    printf &quot;Width forecast interval: \t\t%d pct.\n&quot;, self.level * 100
+  else
   endif
-endloop
-return ret
-</code>
-</gretl-function>
-<gretl-function name="avg_forecast_and_get_fc_sd" type="matrices" private="1">
- <params count="1">
-  <param name="self" type="bundleref"/>
- </params>
-<code>/* Compute forecasts using different methods supported, and return array of point
-forecasts and associated standard errors. */
-# Models for both seasonal and non-seasonal frequencies
-strings self.methods_used = drop_string_from_array(get_supported_nonseas_methods(), &quot;avgFC&quot;)
-if self.is_seas
-  strings methods_seasonals = get_supported_seas_methods()
-  self.methods_used += methods_seasonals
+  printf &quot;-------------------------------------------------------------------\n\n&quot;
 endif
-return do_avgfcs_and_get_fc_sd_array(self.methods_used, &amp;self)
 </code>
 </gretl-function>
-<gretl-function name="get_mean_fc_and_mean_sd" type="bundle" private="1">
- <params count="1">
-  <param name="fc_and_sd" type="matrices" const="true"/>
- </params>
-<code>/* */
-scalar n = nelem(fc_and_sd)
-scalar h = rows(fc_and_sd[1])
-matrix point_fc_avg = NA * zeros(h, n)	# avg. point forecast across all models
-matrix sd_fc_avg = NA * zeros(h, n)		# avg. std. error of forecasts across all models
-loop i=1..n -q			# TODO: Future drill() may replace this
-  point_fc_avg[,i] = fc_and_sd[i][,1]
-  sd_fc[,i] = fc_and_sd[i][,2]
-endloop
-return defbundle(&quot;fc_point_avg&quot;, meanr(point_fc_avg), &quot;fc_sd_avg&quot;, meanr(sd_fc_avg))
-</code>
-</gretl-function>
-<gretl-function name="get_moving_window_forecasts" type="void" private="1">
+<gretl-function name="execute_forecasting" type="bundle" private="1">
  <params count="1">
   <param name="self" type="bundleref"/>
  </params>
 <code>/* This function estimates the point forecasts either in (i) a rolling or
 (ii) a recursive manner and stores sequences of interval forecasts. */
-if $nobs &lt; self.window_length
-  printf &quot;\nError: The window size you selected (wsize=%d) exceeds the\n           number of valid observations.\n&quot;, self.window_length
-  funcerr &quot;Re-specify.&quot;
-endif
-series y = self.y			# y includes the additional n=horizon newly added observations for the very last cv-dataset
-bundle cv = null					# Tried to put this into a bundle, but git issues with index series
-list cv.X = 	y					# CvDataSplitter() expects a list
-string cv.cv_type = (self.type_moving_window==&quot;rolling&quot;) ? &quot;rolwin&quot; : &quot;recwin&quot;
-scalar cv.win_size = self.window_length + self.horizon		# The last self.horizon rows are reserved for the OoS evaluation
-CvDataSplitter(&amp;cv)
-# As CvDataSplitter() doesn't consider the very last obs in
-# the final training set for 'rolwin' and 'recwin', this must be added.
-cv.X_train += cv.X_train[cv.n_folds] | ({$t2, y[$t2]})
-cv.n_folds++
+bundle cv = prep_and_get_cv_folds(self)
 self.n_folds = cv.n_folds
-# Loop over training sets, run estimation and retrieve interval forecasts
+# Loop over training sets, run estimation and retrieve interval forecasts.
 # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.
-matrices fc_and_sd_from_all_cv = get_cv_fc_and_sd_array(&amp;cv, &amp;self)
-bundle bout = point_fc_and_factor_as_arrays(fc_and_sd_from_all_cv, &amp;self)	# stuff stored in an array in bout
+matrices collected_point_fc_and_sderr = set_model_estimate_and_forecast(&amp;cv, &amp;self)
+bundle forecasts_and_factors = point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &amp;self)
 # Retrieve moving-window point_forecasts from array,
-# and compute and get associated intervals.
-matrices pt_lb_up = ret_movwin_point_lb_up_matrices(&amp;bout, &amp;self)
-# --&gt; For the 'static' case, point, lower and upper bound results
-# are stored in separate matrix arrays, as multiple models can be
-# estimated 'at once' in case the avgFC is called.
-# For compatibility reasons, we do the same here.
-matrices self.forecasts_point = defarray(pt_lb_up[1])		# rows: horizon, cols: date based on which h-steap ahead forecast is made for
-matrices self.forecasts_lower_bound = defarray(pt_lb_up[2])
-matrices self.forecasts_upper_bound = defarray(pt_lb_up[3])
+# compute forecast intervals and put stuff to bundle
+return compute_intval_forecasts(forecasts_and_factors)
 </code>
 </gretl-function>
-<gretl-function name="ret_movwin_point_lb_up_matrices" type="matrices" private="1">
- <params count="2">
-  <param name="bout" type="bundleref"/>
-  <param name="self" type="bundleref"/>
+<gretl-function name="compute_intval_forecasts" type="bundle" private="1">
+ <params count="1">
+  <param name="forecasts_and_factors" type="bundle" const="true"/>
  </params>
-<code>/* Retrieve miving-window point_forecasts from array,
-and compute and get associated intervals. */
-matrices out = array(3)
-out[1] = flatten(bout.point_forecasts)		# rows: horizon, cols: sample period
-matrices get_movwin_low_up_matrices = get_movwin_low_up_matrices(out[1], flatten(bout.factors))
-out[2] = get_movwin_low_up_matrices[1]
-out[3] = get_movwin_low_up_matrices[2]
-return out
+<code>/* Generate for each model based on respective point forecasts and
+estimated standard derrors, arrays holding interval forecasts. */
+bundle interval_forecasts
+matrix interval_forecasts.forecasts_point = flatten(forecasts_and_factors.point_forecasts) # rows: horizons, cols: sample period
+matrix factors_flattened = flatten(forecasts_and_factors.factors)
+matrix interval_forecasts.forecasts_lower_bound = interval_forecasts.forecasts_point .- factors_flattened
+matrix interval_forecasts.forecasts_upper_bound = interval_forecasts.forecasts_point .+ factors_flattened
+return interval_forecasts
 </code>
 </gretl-function>
-<gretl-function name="get_cv_fc_and_sd_array" type="matrices" private="1">
+<gretl-function name="set_model_estimate_and_forecast" type="matrices" private="1">
  <params count="2">
   <param name="cv" type="bundleref"/>
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Loop over training sets, run estimation and retrieve
 interval forecasts. */
-matrices fc_and_sd_from_all_cv = array(cv.n_folds)
+matrices collected_point_fc_and_sderr = array(cv.n_folds)
 loop lwin=1..cv.n_folds -q
-  matrix mat = cv.X_train[lwin]
-  smpl minc(mat[,1]) (maxc(mat[,1]))		# time index of the training set: T=self-window_length + self-horizon
-  if lwin == 1
-    # Note: As the series for cross-validation holds &quot;window_length+horizon&quot; observations, we need to
-    # subtract &quot;horizon&quot; here.
-    gen_t1_forecast_date($t2-self.horizon, &amp;self)	# Date for which the 1st 1-step ahead forecast is made for
-  elif lwin == cv.n_folds
-    gen_t2_forecast_date(obsnum(self.t2_label), &amp;self)				# Date for which the last h-step ahead forecast is made for
+  matrix date_idx = cv.X_train[lwin]
+  # time index of the training set = self.window_length + self.horizon
+  # As the last rolling samples may inlude only a sample set less than self.horizon
+  # observations, we still can compute forecasts for $Ttest &lt; self.horizon
+  scalar obs_left = $tmax - maxc(date_idx[,1])
+  scalar self.horizon_current = xmin(self.horizon, obs_left)
+  if self.horizon_current == 0		# FIXME: Why is n_folds=81 but only n_folds=80 would work!
+    break
   endif
-  fc_and_sd_from_all_cv[lwin] = call_method(&amp;self)[1]
+  smpl minc(date_idx[,1]) (maxc(date_idx[,1]) + self.horizon_current)
+  if lwin == 1
+    # CV series holds &quot;window_length+horizon&quot; observations: subtract &quot;horizon&quot;
+    self.t1_train_date = obslabel($t1)
+    string self.t2_train_date = obslabel($t2 - self.horizon_current)
+    string self.t1_forecast_date = obslabel($t2 - self.horizon_current + 1)	# Date of 1st h=1 ahead forecast
+  elif lwin == (cv.n_folds - 1) &amp;&amp; self.type_moving_window != &quot;static&quot;
+    self.t2_forecast_date = self.t2_date_y		# Date of last h-step ahead forecast
+  endif
+  collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&amp;self)	# h by 2 matrix (point_fc ~ sderr)
 endloop
-return fc_and_sd_from_all_cv
+if self.type_moving_window == &quot;static&quot;
+  string self.t2_forecast_date = obslabel(obsnum(self.t2_train_date) + self.horizon)	# Date of last h-step ahead forecast
+endif
+return collected_point_fc_and_sderr
 </code>
 </gretl-function>
-<gretl-function name="get_movwin_low_up_matrices" type="matrices" private="1">
- <params count="2">
-  <param name="point_forecasts" type="matrix" const="true"/>
-  <param name="factors" type="matrix" const="true"/>
+<gretl-function name="get_specific_model_for_avgfc" type="list" private="1">
+ <params count="3">
+  <param name="self" type="bundle" const="true"/>
+  <param name="plotlist" type="list" const="true"/>
+  <param name="model" type="string"/>
  </params>
-<code>/* Compute for all horizons and moving windows the intervals
-for the forecast. */
-matrices lower_and_upper = array(2)
-matrix lower_and_upper[1] = point_forecasts .- factors
-matrix lower_and_upper[2] = point_forecasts .+ factors
-return lower_and_upper
+<code>/* In case of &quot;avgfc&quot; we only plot the results for a specific model
+but not for all in a single plot. */
+if self.which == &quot;avgfc&quot;
+  string model = tolower(model)
+  list plotlist = get_model_forecasts_from_list(plotlist, model)
+  if nelem(plotlist) == 0
+    funcerr &quot;Model requested is not supported.&quot;
+  endif
+endif
+return plotlist
+</code>
+</gretl-function>
+<gretl-function name="get_model_forecasts_from_list" type="list" private="1">
+ <params count="2">
+  <param name="plotlist" type="list" const="true"/>
+  <param name="model" type="string" const="true"/>
+ </params>
+<code>/* Retrieve from list only those series which include
+model in its serie's name. */
+list new = null
+loop foreach i plotlist -q
+  if instring(varname(plotlist.$i), sprintf(&quot;_%s&quot;, model))
+    list new += $i
+  endif
+endloop
+return new
+</code>
+</gretl-function>
+<gretl-function name="call_plot" type="void" private="1">
+ <params count="2">
+  <param name="plotlist" type="list" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* */
+string filename = self.filename
+scalar ylo
+scalar yup
+yaxis_ranges(plotlist, &amp;ylo, &amp;yup)
+plot plotlist
+  options with-lp time-series single-yaxis
+  literal set linetype 1 lc rgb &quot;black&quot; lw 1 pt 0 ps 0
+  literal set linetype 3 lc rgb &quot;red&quot; lw 1.5 ps 0
+  literal set linetype 2 lc rgb &quot;grey&quot; lw 1.5 ps 0
+  literal set linetype 4 lc rgb &quot;grey&quot; lw 1.5 ps 0
+  literal set key left bottom below
+  #literal set key inside left bottom
+  #put the border more to the background by applying it
+  # only on the left and bottom part and put it and the tics in gray
+  literal set style line 11 lc rgb &quot;#808080&quot; lt 1
+  literal set border 3 back ls 11			# get rid of upper + left border
+  literal set tics nomirror
+  #add a slight grid to make it easier to follow the exact position of the curves
+  literal set style line 12 lc rgb &quot;#808080&quot; lt 0 lw 1	# light grey color
+  literal set grid back ls 12
+  printf &quot;set yrange[%g:%g]&quot;, ylo, yup
+  printf &quot;set ylabel \&quot;%s\&quot;&quot;, self.ylab
+  printf &quot;set xlabel \&quot;%s\&quot;&quot;, self.xlab
+  printf &quot;set title \&quot;%s\&quot;&quot;, self.title
+end plot --output=&quot;@filename&quot;
 </code>
 </gretl-function>
 <sample-script>
 clear
 set verbose off
+#set debug 0
 
 #include naiveFC.gfn --force				# TODO:
 
-# Select an example
-#==================
-scalar runEX = 1
+string WD = &quot;/home/at/git/naiveFC/gretl&quot;
+set workdir @WD
+
+# TODO: can be dropped once gfn compiled
+include string_utils.gfn			# already added to spec
+include CvDataSplitter.gfn			# already added to spec
+include extra.gfn					# already added to spec
+
+include &quot;./src/naiveFC.inp&quot; --force
+include &quot;./src/naiveFC_helper.inp&quot; --force
+
 
 # Load data
-if runEX==1
-    open nysewk.gdt -q		# weekly
-    series y = close
-elif runEX==2
-    open AWM.gdt -q			# quarterly
-    series y = YGA
-    smpl y --no-missing --permanent
-elif runEX==3
-    open hendry_jae.gdt -q	# annual
-    series y = diff(gdp)
-elif runEX==4
-    open hall.gdt -q		# monthly
-    series y = ewr
-endif
+#open AWM.gdt -q
+#series y = YGA
+
+open &quot;../tests/daily_data.gdt&quot; -q
+series y = target
 
 #=======================
 # Static naive forecasts
 #=======================
 /*
-# Forecast combination
-# smpl ; -1					# FIXME: In case the dataset is restricted, internal addobs does not work!
-bundle b = null
-b = naiveFC(y, &quot;avgFC&quot;)				# compute forecasts
-print b
-matrix fc_method1_lb = b.forecasts_lower_bound[2]
-fc_method1_lb
-naivePlot(&amp;b)						# plot forecast results
-stop
+   # Forecast combination
+   # smpl ; -1					# FIXME: In case the dataset is restricted, internal addobs does not work!
+   bundle b = null
+   b = naiveFC(y, &quot;avgFC&quot;)				# compute forecasts
+   print b
+   matrix fc_method1_lb = b.forecasts_lower_bound[2]
+   fc_method1_lb
+   naivePlot(&amp;b)						# plot forecast results
+   stop
 
-# Forecast combination but up to h=15 forecast periods
-bundle opt = null					# set specific options
-scalar opt.horizon = 10
-#list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
-bundle b = naiveFC(y, &quot;avgFC&quot;, opt)
-matrix fc_avgfc_pt = b.forecasts_point[10]
-b.pre_fc_periods_to_plot = 15					# optional: set no. of pre.-forecast periods obs. to plot
-naivePlot(&amp;b)
+   # Forecast combination but up to h=15 forecast periods
+   bundle opt = null					# set specific options
+   scalar opt.horizon = 10
+   #list opt.xlist = D743 FDD			# list of additional regressors for conditioning on (must have at least 'h' future valid obs!)
+   bundle b = naiveFC(y, &quot;avgFC&quot;, opt)
+   matrix fc_avgfc_pt = b.forecasts_point[10]
+   b.pre_fc_periods_to_plot = 15					# optional: set no. of pre.-forecast periods obs. to plot
+   naivePlot(&amp;b)
 
-# Mean forecast
-bundle opt = null					# set specific options
-scalar opt.horizon = 10
-bundle b = naiveFC(y, &quot;meanFC&quot;, opt)
-print b
-eval b.forecasts_point[1]
-stop
-naivePlot(&amp;b)
-eval b.fc
+   # Mean forecast
+   bundle opt = null					# set specific options
+   scalar opt.horizon = 10
+   bundle b = naiveFC(y, &quot;meanFC&quot;, opt)
+   print b
+   eval b.forecasts_point[1]
+   stop
+   naivePlot(&amp;b)
+   eval b.fc
 
-# Median forecast
-bundle b = naiveFC(y, &quot;medianFC&quot;, opt)
-eval b.forecasts_point[1]
+   # Median forecast
+   bundle b = naiveFC(y, &quot;medianFC&quot;, opt)
+   eval b.forecasts_point[1]
 
-naivePlot(&amp;b)
-eval b.fc
+   naivePlot(&amp;b)
+   eval b.fc
 
-# Random-Walk
-bundle b = naiveFC(y, &quot;rwFC&quot;, opt)
-eval b.forecasts_point[1]
-naivePlot(&amp;b)
-eval b.fc
+   # Random-Walk
+   bundle b = naiveFC(y, &quot;rwFC&quot;, opt)
+   eval b.forecasts_point[1]
+   naivePlot(&amp;b)
+   eval b.fc
 
-# Random-Walk + Drift
-bundle b = naiveFC(y, &quot;rwdriftFC&quot;, opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&amp;b)
-eval b.fc
+   # Random-Walk + Drift
+   bundle b = naiveFC(y, &quot;rwdriftFC&quot;, opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&amp;b)
+   eval b.fc
 
-# AR(1)
-bundle b = naiveFC(y, &quot;ar1FC&quot;, opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&amp;b)
-eval b.fc
+   # AR(1)
+   bundle b = naiveFC(y, &quot;ar1FC&quot;, opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&amp;b)
+   eval b.fc
 
-# AR(1) + Trend
-bundle b = naiveFC(y, &quot;ar1trendFC&quot;, opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&amp;b)
-eval b.fc
+   # AR(1) + Trend
+   bundle b = naiveFC(y, &quot;ar1trendFC&quot;, opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&amp;b)
+   eval b.fc
 
-# Seasonal mean
-bundle b = naiveFC(y, &quot;smeanFC&quot;, opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&amp;b)
-eval b.fc
+   # Seasonal mean
+   bundle b = naiveFC(y, &quot;smeanFC&quot;, opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&amp;b)
+   eval b.fc
 
-# Seasonal median
-bundle b = naiveFC(y, &quot;smedianFC&quot;, opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&amp;b)
-eval b.fc
+   # Seasonal median
+   bundle b = naiveFC(y, &quot;smedianFC&quot;, opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&amp;b)
+   eval b.fc
 
-# Seasonal naive without drift
-bundle b = naiveFC(y, &quot;snaiveFC&quot;, opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&amp;b)
-eval b.fc
+   # Seasonal naive without drift
+   bundle b = naiveFC(y, &quot;snaiveFC&quot;, opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&amp;b)
+   eval b.fc
 
-# Seasonal naive with drift
-bundle b = naiveFC(y, &quot;snaivedriftFC&quot;, opt)
-eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
-naivePlot(&amp;b)
-eval b.fc
+   # Seasonal naive with drift
+   bundle b = naiveFC(y, &quot;snaivedriftFC&quot;, opt)
+   eval b.forecasts_lower_bound[1] ~ b.forecasts_point[1] ~ b.forecasts_upper_bound[1]
+   naivePlot(&amp;b)
+   eval b.fc
 */
 
 #/* ACTIVATE IF WANTED: may take a while
 #=========================
 # Moving-window forecasts
 #=========================
-scalar horizon = 10
 bundle opts = null					# setup additional options
-opts.horizon = horizon
-opts.type_moving_window = &quot;rolling&quot; 			# &quot;rolling&quot; / &quot;recursive&quot; -&gt; type of moving-window forecasting  (optional)
-opts.window_length = xmax($pd, 90) 			# moving window length (optional)
-#catch list opts.xlist = D743 FDD			# optional additional regressors
-#opts.verbose = 0					# Don't print details (optional)
+opts.horizon = 10
+opts.type_moving_window = &quot;rolling&quot; 		# &quot;rolling&quot; / &quot;recursive&quot; -&gt; type of moving-window forecasting  (optional)
+# opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
+# opts.window_length = $tmax
+catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
+#opts.verbose = 1						# print details (optional)
 
-# Select method
-string method = &quot;ar1FC&quot;#  &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, \
-  #  &quot;snaivedriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;)
+# TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
+# TODO as we forecast only to the last valid obs of y in this case anyway!
+# FIXME: moving-window fc with &quot;avgfc&quot;
+
+strings methods = defarray(&quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, \
+  &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, &quot;snaivedriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgfc&quot;)
 
 bundle b = null
-bundle b = naiveFC(y, method, opts)
-eval b.forecasts_point[1]
+bundle b = naiveFC(y, methods[1], opts)
 
-# Get interval forecasts as series
-dataset addobs opts.horizon			# forecast may exceed current sample length
-list FC = getNaiveForecastsList(&amp;b, {1,2}, &quot;_suffix&quot;)
+bundle forecast_results = b.forecast_results
+#eval forecast_results.smeanfc
+#eval forecast_results.smeanfc.forecasts_point
 
-# Plot (optional)
-#b.pre_fc_periods_to_plot = 20					# set no. of pre.-forecast periods obs. to plot
-naivePlot(&amp;b, {11})
+list FC = get_naive_forecasts(b, {1,2})
 
-*/
+b.pre_fc_periods_to_plot = 60					# set no. of pre.-forecast periods obs. to plot
+plot_naive_forecasts(b, {1}, &quot;meanfc&quot;)
+plot_naive_forecasts(b, {1}, &quot;ar1FC&quot;)
+plot_naive_forecasts(b, {1}, &quot;avgfc&quot;)
 </sample-script>
 </gretl-function-package>
 </gretl-functions>
