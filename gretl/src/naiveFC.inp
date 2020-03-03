@@ -531,7 +531,7 @@ end function
 # Public function
 function list get_naive_forecasts (const bundle self,
                                    matrix horizons[null] "Select specific horizons (moving-window only)",
-      const string suffix[null] "Suffix for series' names")
+                                   const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
@@ -550,6 +550,7 @@ function list get_naive_forecasts (const bundle self,
     endif
 
     smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
+    
 
     return list_of_forecasts(self, horizons, suffix)
 end function

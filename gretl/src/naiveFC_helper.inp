@@ -38,20 +38,21 @@ function list get_movwindow_forecast_list (const matrix horizons,
     and 'recursive' cases. */
 
     list R = null
-
+   
     loop i=1..rows(horizons) -q
-
+        scalar shift_periods = $i - 1
+        
         R += genseries(sprintf("low_h%d_%s%s", horizons[i], \
           model, suffix), \
-          self.forecast_results[model].forecasts_lower_bound[i,]')
+          mlag(self.forecast_results[model].forecasts_lower_bound[i,]', shift_periods, NA) )
 
         R += genseries(sprintf("point_h%d_%s%s", horizons[i], \
           model, suffix), \
-          self.forecast_results[model].forecasts_point[i,]')
+          mlag(self.forecast_results[model].forecasts_point[i,]', shift_periods, NA) )
 
         R += genseries(sprintf("up_h%d_%s%s", horizons[i], \
           model, suffix), \
-          self.forecast_results[model].forecasts_upper_bound[i,]')
+          mlag(self.forecast_results[model].forecasts_upper_bound[i,]', shift_periods, NA) )
     endloop
 
     return R
