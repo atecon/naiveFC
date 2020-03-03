@@ -11,8 +11,8 @@
 <help>
 pdfdoc:naiveFC.pdf
 </help>
-<depends count="2">
-CvDataSplitter string_utils </depends>
+<depends count="3">
+CvDataSplitter string_utils extra </depends>
 <gretl-function name="naiveFC" type="bundle">
  <params count="3">
   <param name="y" type="series" const="true"/>
@@ -153,6 +153,584 @@ if Plot
   naivePlot(&amp;self)
 endif
 return self.fc
+</code>
+</gretl-function>
+<gretl-function name="yaxis_ranges" type="void" private="1">
+ <params count="3">
+  <param name="plotlist" type="list" const="true"/>
+  <param name="ylo" type="scalarref"/>
+  <param name="yup" type="scalarref"/>
+ </params>
+<code>/* */
+scalar mini = min(min(plotlist))
+scalar maxi = max(max(plotlist))
+scalar ylo = mini - 0.05 * abs(mini)
+scalar yup = maxi + 0.05 * abs(maxi)
+</code>
+</gretl-function>
+<gretl-function name="list_of_forecasts" type="list" private="1">
+ <params count="3">
+  <param name="self" type="bundle" const="true"/>
+  <param name="horizons" type="matrix" const="true"/>
+  <param name="suffix" type="string" const="true"/>
+ </params>
+<code>/* Wrapper actually calling specific functions. */
+list R = null
+strings models = getkeys(self.forecast_results)
+loop i=1..nelem(models) -q
+  if self.type_moving_window == &quot;static&quot;
+    list R += get_static_forecast_list(self, models[i], suffix)
+  else
+    list R += get_movwindow_forecast_list(horizons, self, models[i], suffix)
+  endif
+endloop
+return R
+</code>
+</gretl-function>
+<gretl-function name="get_movwindow_forecast_list" type="list" private="1">
+ <params count="4">
+  <param name="horizons" type="matrix" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+  <param name="model" type="string" const="true"/>
+  <param name="suffix" type="string" const="true"/>
+ </params>
+<code>/* Return sascade of h-step forecast_results. For 'rolling'
+and 'recursive' cases. */
+list R = null
+loop i=1..rows(horizons) -q
+  R += genseries(sprintf(&quot;low_h%d_%s%s&quot;, horizons[i], model, suffix), self.forecast_results[model].forecasts_lower_bound[i,]')
+  R += genseries(sprintf(&quot;point_h%d_%s%s&quot;, horizons[i], model, suffix), self.forecast_results[model].forecasts_point[i,]')
+  R += genseries(sprintf(&quot;up_h%d_%s%s&quot;, horizons[i], model, suffix), self.forecast_results[model].forecasts_upper_bound[i,]')
+endloop
+return R
+</code>
+</gretl-function>
+<gretl-function name="get_static_forecast_list" type="list" private="1">
+ <params count="3">
+  <param name="self" type="bundle" const="true"/>
+  <param name="model" type="string" const="true"/>
+  <param name="suffix" type="string" const="true"/>
+ </params>
+<code>/* Return single multi-step forecast_results for 'static'
+case. */
+list R = null
+R += genseries(sprintf(&quot;low_h1to%d_%s%s&quot;, self.horizon, model, suffix), self.forecast_results[model].forecasts_lower_bound)
+R += genseries(sprintf(&quot;point_h1to%d_%s%s&quot;, self.horizon, model, suffix), self.forecast_results[model].forecasts_point)
+R += genseries(sprintf(&quot;up_h1to%d_%s%s&quot;, self.horizon, model, suffix), self.forecast_results[model].forecasts_upper_bound)
+return R
+</code>
+</gretl-function>
+<gretl-function name="horizons_isok" type="scalar" private="1">
+ <params count="2">
+  <param name="self" type="bundle" const="true"/>
+  <param name="horizons" type="matrix" const="true"/>
+ </params>
+<code>/* Check the vector 'horizons' is ok. Relevant for
+get_naive_forecasts().
+: return: 1 if ok, 0 otherwise */
+if self.type_moving_window != &quot;static&quot;
+  if minc(horizons) &lt;= 0
+    printError(&quot;You cannot select a negative forecast horizon.&quot;)
+    return 0
+  endif
+  if maxc(horizons) &gt; self.horizon
+    printError(sprintf(&quot;The maximum forecast horizon you \n               selected (=%d) does exceed the horizon set before (=%d).&quot;, maxc(horizons), self.horizon))
+    return 0
+  endif
+endif
+return 1
+</code>
+</gretl-function>
+<gretl-function name="sufficient_future_obs" type="scalar" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* */
+scalar tdiff = $tmax + self.n_sampleend_obs_replaced - self.t2_obsnum_y
+if tdiff &lt; self.horizon
+  printError(sprintf(&quot;Requested maximum forecast horizon exceeds\n           the number of available future periods. Either add observations\n           or decrease the maximum forecast horizon to %d&quot;, self.horizon - (self.horizon - tdiff)))
+  self.error = 1
+  return 1
+endif
+return 0
+</code>
+</gretl-function>
+<gretl-function name="get_sample_end" type="scalar" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>scalar sample_end = obsnum(self.t2_date_y)
+if self.type_moving_window == &quot;static&quot;
+  scalar sample_end += self.horizon
+endif
+return sample_end
+</code>
+</gretl-function>
+<gretl-function name="replace_nan_value_by" type="scalar" private="1">
+<code>/* Set value for replacing future unknown values
+of series to be forecasted by a specific value. */
+return -9876543210
+</code>
+</gretl-function>
+<gretl-function name="repl_sampleend_missings_of_y" type="scalar" private="1">
+ <params count="2">
+  <param name="y" type="seriesref"/>
+  <param name="verbose" type="bool" const="true"/>
+ </params>
+<code>/* Replace missing values of y at the sample end. */
+smpl y --no-missing
+scalar n_sampleend_obs_replaced = $tmax - $t2
+if n_sampleend_obs_replaced &gt; 0
+  smpl (1 + $t2) $tmax
+  series y = replace_nan_value_by()
+  smpl full
+endif
+if verbose
+  printInfo(sprintf(&quot;Replaced %d missing values at the sample end of 'y'.&quot;, n_sampleend_obs_replaced))
+endif
+return n_sampleend_obs_replaced
+</code>
+</gretl-function>
+<gretl-function name="valid_dates_of_y_and_xlist" type="scalar" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Check that sufficient future values of exogenous variables exist. */
+if !nelem(self.xlist)
+  return 0
+endif
+scalar tdiff_y_xlist = self.t2_obsnum_y - self.t2_obsnum_xlist
+if tdiff_y_xlist &gt;= 0
+  if tdiff_y_xlist &gt; 0
+    printError(sprintf(&quot;Sample ends earlier for exogenous regressors ('%s')\n               than for the endogenous %s ('%s').&quot;, self.t2_date_xlist, self.name_endo, self.t2_date_y))
+  else
+    printError(sprintf(&quot;Sample ends for both the exogenous regressors\n               and for the endogenous %s at observation '%s'.&quot;, self.name_endo, self.t2_date_y))
+  endif
+  printError(&quot;List of exogenous has insufficient future values.&quot;)
+  self.error = 1
+  return 1
+endif
+if tdiff_y_xlist &lt; 0 &amp;&amp; (abs(tdiff_y_xlist) &lt;  self.horizon)
+  printError(sprintf(&quot;You set the maximum forecast horizon to %d periods but\n           the sample of the exogenous regressors has only %d future\n           values left after period %s.\n           Either restrict the maximum forecast horizon to 'horizon = %d'\n           or add %d additional future values to the exogenous variables.&quot;, self.horizon, abs(tdiff_y_xlist), self.t2_date_xlist, abs(tdiff_y_xlist), self.horizon-abs(tdiff_y_xlist)))
+  self.error = 1
+  return 1
+endif
+return 0
+</code>
+</gretl-function>
+<gretl-function name="estimate_model_and_forecast" type="scalar" private="1">
+ <params count="6">
+  <param name="est_command" type="string" const="true"/>
+  <param name="fcast_command" type="string" const="true"/>
+  <param name="y" type="series" const="true"/>
+  <param name="xlist" type="list" const="true"/>
+  <param name="train_obsnums" type="bundle" const="true"/>
+  <param name="test_obsnums" type="bundle" const="true"/>
+ </params>
+<code>/* Estimate model and return oos-forecast. */
+smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+catch @est_command
+if $error
+  printError(&quot;Model estimation failed.\n           Forecast values are set to NA for the current sample.&quot;)
+  return 1
+endif
+catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
+if $error
+  printError(&quot;Failed executing forecast command.&quot;)
+  return 1
+endif
+return 0
+</code>
+</gretl-function>
+<gretl-function name="compute_avgerage_forecast" type="bundle" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Compute avgerage forecast combination across all models
+estimated. This is done foreach horizon and each moving
+window, respectively. We also compute averages of forecast
+intervals. */
+bundle avgfc = null
+if !inbundle(self, &quot;forecast_results&quot;)
+  printError(&quot;Bundle 'forecast_results' does not exist.&quot;)
+  scalar self.error = 1
+endif
+if nelem(self.forecast_results) &lt; 2
+  printError(&quot;Average forecast combination requires at least two forecasting models.&quot;)
+  scalar self.error = 1
+endif
+strings keys = get_name_of_intval_matrices(self)
+if !self.error
+  bundle avgfc = initialize_avgfc_bundle(self)
+  # Compute for lower ~ point ~ upper separate matrices
+  # holding respective values across models
+  loop i=1..nelem(keys) -q
+    string key_name = keys[i]		# lower ~ point ~ upper
+    # return array of n matrices holding interval_part for n models
+    matrices @key_name = get_interval_forecast_matrices(keys[i], self)
+  endloop
+  loop i=1..nelem(keys) -q
+    string key_name = keys[i]		# lower ~ point ~ upper
+    avgfc[keys[i]] = avg_across_matrices(@key_name)
+  endloop
+endif
+return avgfc
+</code>
+</gretl-function>
+<gretl-function name="avg_across_matrices" type="matrix" private="1">
+ <params count="1">
+  <param name="mats" type="matrices" const="true"/>
+ </params>
+<code>/* */
+scalar n_rows = rows(mats[1])	# equivalent to self.horizon
+scalar n_cols = cols(mats[1])	# equivalent to self.n_folds
+matrix averages = NA * zeros(n_rows, n_cols)
+loop i=1..n_rows -q
+  matrix drilled = drill(mats, i)		# rows=models; cols=moving_window
+  averages[i,] = meanc(drilled)		# avg. for horizon 'h' across all moving_windows
+endloop
+return averages
+</code>
+</gretl-function>
+<gretl-function name="get_interval_forecast_matrices" type="matrices" private="1">
+ <params count="2">
+  <param name="interval_part" type="string" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Retrieve from forecast_results for all models estimated
+one of the matrices holding the interval forecast results: either
+lower bound, point fc, or upper bound. */
+matrices ret = array(nelem(self.models))
+loop i=1..nelem(self.models) -q
+  ret[i] = self.forecast_results[self.models[i]][&quot;@interval_part&quot;]
+endloop
+return ret
+</code>
+</gretl-function>
+<gretl-function name="get_name_of_intval_matrices" type="strings" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Name of matrices holding interval forecasts. */
+return getkeys(self.forecast_results[self.models[1]])
+</code>
+</gretl-function>
+<gretl-function name="initialize_avgfc_bundle" type="bundle" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* */
+strings keys = get_name_of_intval_matrices(self)
+bundle avgfc = null
+loop i=1..nelem(keys) -q
+  string key_name = keys[i]		# lower ~ point ~ upper
+  matrix avgfc[keys[i]] = NA * ones(self.horizon, self.n_folds)
+endloop
+return avgfc
+</code>
+</gretl-function>
+<gretl-function name="attach_column_labels" type="void" private="1">
+ <params count="2">
+  <param name="interval_forecasts" type="bundleref"/>
+  <param name="self" type="bundle"/>
+ </params>
+<code>/* Add date strings as column labels for indicating the date on
+which the estimates are conditioned on. */
+string date_first_trainset_end = obslabel(obsnum(self.t1_forecast_date) - 2)
+strings date_strings = future_date_strings(date_first_trainset_end, self.n_folds)
+strings keys = getkeys(interval_forecasts)
+loop i=1..nelem(keys) -q
+  cnameset(interval_forecasts[keys[i]], date_strings)
+endloop
+</code>
+</gretl-function>
+<gretl-function name="attach_row_labels" type="void" private="1">
+ <params count="2">
+  <param name="interval_forecasts" type="bundleref"/>
+  <param name="self" type="bundle"/>
+ </params>
+<code>/* Add date strings as row labels for 'static' forecasts,
+or indicate the forecast horizon for moving-window
+forecasts. */
+if self.type_moving_window == &quot;static&quot;
+  strings row_labels = future_date_strings(self.t2_train_date, self.horizon)
+else
+  strings row_labels = array_of_horizon_labels(self.horizon)
+endif
+strings keys = getkeys(interval_forecasts)
+loop i=1..nelem(keys) -q
+  rnameset(interval_forecasts[keys[i]], row_labels)
+endloop
+</code>
+</gretl-function>
+<gretl-function name="array_of_horizon_labels" type="strings" private="1">
+ <params count="1">
+  <param name="horizon" type="int" min="1" const="true"/>
+ </params>
+<code>/* Construct string array for indicating the forecast horizons. */
+strings r = array(horizon)
+loop i=1..horizon -q
+  r[i] = sprintf(&quot;h=%d&quot;, i)
+endloop
+return r
+</code>
+</gretl-function>
+<gretl-function name="future_date_strings" type="strings" private="1">
+ <params count="2">
+  <param name="date_of_information_str" type="string" const="true">
+<description>Obs. before 1st h=1 forecast</description>
+  </param>
+  <param name="n_future_periods" type="int" min="1" const="true"/>
+ </params>
+<code>/* Construct date strings refering to the date for which a the
+h-step ahead forecast was made for.*/
+strings future_dates = array(n_future_periods)
+scalar date_of_information_num = obsnum(date_of_information_str)
+loop i=1..n_future_periods -q
+  future_dates[i] = obslabel(date_of_information_num + $i)
+endloop
+return future_dates
+</code>
+</gretl-function>
+<gretl-function name="point_fc_and_factor_as_arrays" type="bundle" private="1">
+ <params count="2">
+  <param name="collected_point_fc_and_sderr" type="matrices" const="true"/>
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Using each model's point forecast and standard error, compute
+the forecast interval assuming standard normal. */
+bundle bout
+scalar m = nelem(collected_point_fc_and_sderr)
+matrices point_forecasts = array(m)
+matrices factors = array(m)
+loop i=1..m -q
+  point_forecasts[i] = collected_point_fc_and_sderr[i][,1]
+  factors[i] = fc_interval_width(collected_point_fc_and_sderr[i][,1], self.level)
+endloop
+bout.point_forecasts = point_forecasts
+bout.factors = factors
+return bout
+</code>
+</gretl-function>
+<gretl-function name="x_train_test_mats_static_case" type="void" private="1">
+ <params count="2">
+  <param name="cv" type="bundleref"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* For the static case we only need the first fold returned by
+CvDataSplitter(). */
+if self.type_moving_window == &quot;static&quot;
+  matrices cv.X_train = defarray(cv.X_train[1])
+  matrices cv.X_test = defarray(cv.X_test[1])
+  cv.n_folds = nelem(cv.X_test)
+endif
+</code>
+</gretl-function>
+<gretl-function name="prep_and_get_cv_folds" type="bundle" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Prepare bundle for CvDataSplitter() and compute folds. */
+bundle cv					# Tried to put this into a bundle, but git issues with index series
+# y includes the additional n=horizon newly added observations for
+# the very last cv-dataset
+series y = self.y
+list xlist = self.xlist
+string cv.cv_type = (self.type_moving_window==&quot;rolling&quot;) ? &quot;rolwin&quot; : &quot;recwin&quot;
+scalar cv.win_size = self.window_length
+list cv.X = y xlist
+CvDataSplitter(&amp;cv)
+x_train_test_mats_static_case(&amp;cv, self)
+return cv
+</code>
+</gretl-function>
+<gretl-function name="valid_window_length" type="scalar" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Returns zero of window_length is valid. */
+if smplspan(self.t1_date_y, self.t2_date_y, $pd) &lt; self.window_length
+  printError(sprintf(&quot;The window size you selected (wsize=%d) exceeds the\n           number of valid observations in '%s'.&quot;, self.window_length, self.name_endo))
+  return 1
+endif
+return 0
+</code>
+</gretl-function>
+<gretl-function name="get_estimator_names" type="strings" private="1">
+ <params count="1">
+  <param name="is_seas" type="bool" const="true">
+<description>0=data has no seasonality, 1=it has</description>
+  </param>
+ </params>
+<code>/* Obtain names of methods going to apply. */
+strings methods = strdrop(get_supported_nonseas_methods(), &quot;avgfc&quot;)
+if is_seas
+  methods += get_supported_seas_methods()
+endif
+return methods
+</code>
+</gretl-function>
+<gretl-function name="obslabels_and_nobs_to_bundle" type="void" private="1">
+ <params count="2">
+  <param name="y" type="list" const="true"/>
+  <param name="self" type="bundleref"/>
+ </params>
+<code>smpl y --contiguous
+string self.t1_date = obslabel($t1)
+string self.t2_date = obslabel($t2)
+scalar self.T = $nobs
+</code>
+</gretl-function>
+<gretl-function name="printInfo" type="void" private="1">
+ <params count="1">
+  <param name="s" type="string" const="true"/>
+ </params>
+<code>printf &quot;\nInfo: %s\n&quot;, s
+</code>
+</gretl-function>
+<gretl-function name="printWarning" type="void" private="1">
+ <params count="1">
+  <param name="s" type="string" const="true"/>
+ </params>
+<code>printf &quot;\nWarning: %s\n&quot;, s
+</code>
+</gretl-function>
+<gretl-function name="printError" type="void" private="1">
+ <params count="1">
+  <param name="s" type="string" const="true"/>
+ </params>
+<code>printf &quot;\nError: %s\n&quot;, s
+</code>
+</gretl-function>
+<gretl-function name="set_bundle" type="bundle" private="1">
+ <params count="3">
+  <param name="y" type="series" const="true"/>
+  <param name="which" type="string"/>
+  <param name="opts" type="bundle" optional="true"/>
+ </params>
+<code>/* Compile self bundle by merging eventual information
+from opts-bundle. */
+if !exists(opts)
+  bundle opts = null
+endif
+bundle self = default_values(y)
+self = opts + self			# override defaults
+self.which = tolower(which)
+if self.which != &quot;avgfc&quot;
+  strings self.models = defarray(self.which)
+else
+  strings self.models = self.supported_estimators
+endif
+self.forecast_results = prepare_forecast_bundles(&amp;self)
+self.type_moving_window = tolower(self.type_moving_window)
+self.name_endo = argname(y)
+return self
+</code>
+</gretl-function>
+<gretl-function name="get_supported_seas_methods" type="strings" private="1">
+<code>/* List all seasonal supported methods here. */
+return defarray(&quot;smeanfc&quot;, &quot;smedianfc&quot;, &quot;snaivefc&quot;, &quot;snaivedriftfc&quot;)
+</code>
+</gretl-function>
+<gretl-function name="get_supported_nonseas_methods" type="strings" private="1">
+<code>/* List all non-seasonal supported methods here. */
+return defarray(&quot;meanfc&quot;, &quot;medianfc&quot;, &quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;ar1fc&quot;, &quot;ar1trendfc&quot;, &quot;avgfc&quot;)
+</code>
+</gretl-function>
+<gretl-function name="data_has_seasonality" type="scalar" private="1">
+<code>/* Flag seasonality of data set */
+return ($pd &gt; 1) ? 1 : 0
+</code>
+</gretl-function>
+<gretl-function name="fc_interval_width" type="matrix" private="1">
+ <params count="2">
+  <param name="fc_sd" type="matrix" const="true">
+<description>Std. error of forecast</description>
+  </param>
+  <param name="level" type="scalar" min="0.001" max="0.999" const="true">
+<description>confidence level</description>
+  </param>
+ </params>
+<code>/* Compute width for a given condifdence level assuming standard normal. */
+return fc_sd * critical(z, (1 - level) / 2 )
+</code>
+</gretl-function>
+<gretl-function name="gen_column_names" type="strings" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Construct column names */
+strings s = defarray(self.which)
+if self.which != &quot;avgfc&quot;
+  s += sprintf(&quot;Lo (%.1f)&quot;, (1-self.level) / 2 * 100 )
+  s += sprintf(&quot;Up (%.1f)&quot;, ( 1-(1-self.level)/2 ) * 100 )
+endif
+return s
+</code>
+</gretl-function>
+<gretl-function name="print_no_bootstrap_support" type="void" private="1">
+<code>printError(&quot;Bootstrap confidence intervals are not supported, yet&quot;)
+</code>
+</gretl-function>
+<gretl-function name="get_test_start_end_obsnums" type="bundle" private="1">
+ <params count="2">
+  <param name="train_obsnums" type="bundle" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Compute start and end date of test sample based. */
+bundle ret = null
+scalar ret.t1_test_obsnum = 1 + train_obsnums.t2_obsnum
+scalar ret.t2_test_obsnum = ret.t1_test_obsnum + self.horizon_current - 1
+return ret
+</code>
+</gretl-function>
+<gretl-function name="get_train_start_end_obsnums" type="bundle" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Return obs. numbers for trainings set. */
+bundle ret = null
+if self.type_moving_window == &quot;static&quot;
+  # these are simply in-sample dates
+  ret.t1_obsnum = obsnum(self.t1_date_y)
+  ret.t2_obsnum = obsnum(self.t2_date_y)
+else
+  scalar ret.t2_obsnum = $t2 - self.horizon_current
+  scalar ret.t1_obsnum = 1 + ret.t2_obsnum - self.window_length
+endif
+return ret
+</code>
+</gretl-function>
+<gretl-function name="get_highest_period_series" type="series" private="1">
+<code>/* Return series holding highest available frequency. */
+catch series period = $obsmicro
+if $error
+  catch series period = $obsminor
+  if $error
+    series period = $obsmajor
+  endif
+endif
+return period
+</code>
+</gretl-function>
+<gretl-function name="add_intercept_to_list" type="list" private="1">
+<code>/* Add intercept to list. */
+list xlist = const
+return xlist
+</code>
+</gretl-function>
+<gretl-function name="add_ohe_periods_to_list" type="list" private="1">
+<code>/* Add list of dummyfied frequency components to list. */
+series period = get_highest_period_series()
+list xlist = dummify(period)
+return xlist
+</code>
+</gretl-function>
+<gretl-function name="add_linear_trend_to_list" type="list" private="1">
+<code>/* Add linear trend to list. */
+genr time
+list xlist = time
+return xlist
 </code>
 </gretl-function>
 <gretl-function name="dict_models" type="bundle" private="1">
