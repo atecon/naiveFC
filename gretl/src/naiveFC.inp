@@ -531,7 +531,7 @@ end function
 # Public function
 function list get_naive_forecasts (const bundle self,
                                    matrix horizons[null] "Select specific horizons (moving-window only)",
-                                   const string suffix[null] "Suffix for series' names")
+      const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
@@ -550,7 +550,7 @@ function list get_naive_forecasts (const bundle self,
     endif
 
     smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
-    
+
 
     return list_of_forecasts(self, horizons, suffix)
 end function
@@ -597,14 +597,14 @@ function list get_specific_model_for_avgfc (const bundle self,
     but not for all in a single plot. */
 
     if self.which == "avgfc"
-        string model = tolower(model)        
+        string model = tolower(model)
         list plotlist = get_model_forecasts_from_list(plotlist, model)
         if nelem(plotlist) == 0
             funcerr "Model requested is not supported."
         endif
     endif
 
-    return plotlist    
+    return plotlist
 end function
 
 
@@ -686,3 +686,34 @@ function matrix GUI_naiveFC (const series y "Dependent variable",
 end function
 
 
+# TODO: untested
+# Public (convinient) function
+function matrix stack_moving_window_forecasts (const list FC "List of forecast; each series refers to specific horizon")
+/* list FC includes fc_h1 fc_h2, fc_hN were N refers to the maximum forecast
+   horizon. Stack h-period forecasts into a single vector.
+    return: vector of stacked results. */
+
+    matrix stacked_fc = {}
+    if nelem(FC) == 0
+        printf "\nError: List of forecastś is empty.\n"
+        return stacked_fc
+    endif
+
+    scalar max_horizon = nelem(FC)
+    smpl FC --no-all-missing
+
+    # Date index refers to the 'date being forecasted' T+h
+    # This means that the 'date of information' is h-period back in time,
+    # and thus [= (T+h) - h]
+
+    matrix date_of_informations = stack_info_dates($obsdate, max_horizon)
+    matrix stacked_forecasts = stack_multiperiod_forecasts(FC)
+    if rows(date_of_informations) != rows(stacked_forecasts)
+        funcerr(sprintf("Dimensions do not fit:\n\
+          rows(date_of_informations) = %d\n\
+          rows(stacked_forecasts) = %d", \
+          rows(date_of_informations), rows(stacked_forecasts)))
+    endif
+
+    return concat_mats_add_names_and_sort(date_of_informations, stacked_forecasts)
+end function
