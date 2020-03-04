@@ -9,8 +9,9 @@ data-requirement = needs-time-series-data
 gui-main = GUI_naiveFC
 label = naive forecast(s)
 menu-attachment = MAINWIN/Model/TSModels
-public = naiveFC plot_naive_forecasts get_naive_forecasts GUI_naiveFC stack_moving_window_forecasts
+public = naiveFC plot_naive_forecasts get_naive_forecasts \
+  GUI_naiveFC stack_moving_window_forecasts
 menu-only = GUI_naiveFC
-stack_moving_window_forecasthelp = naiveFC.pdf
+help = naiveFC.pdf
 sample-script = naiveFC_sample.inp
 depends = CvDataSplitter string_utils extra
