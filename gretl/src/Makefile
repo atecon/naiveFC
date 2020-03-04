@@ -1,6 +1,6 @@
 PKG =  naiveFC
 
-$(PKG).gfn: $(PKG).inp $(PKG).spec $(PKG)_sample.inp
+$(PKG).gfn: $(PKG).inp $(PKG)_helper.inp $(PKG).spec $(PKG)_sample.inp
 	gretlcli --makepkg $(PKG).inp
 
 #$(PKG).pdf: $(PKG).tex

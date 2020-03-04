@@ -1,0 +1,25 @@
+No filename given
+gretl version 2019d-git
+Copyright Ramu Ramanathan, Allin Cottrell and Riccardo "Jack" Lucchetti
+This is free software with ABSOLUTELY NO WARRANTY
+
+You may supply the name of a data file on the command line.
+Options:
+ -b or --batch     Process a command script and exit.
+ -r or --run       Run a script then hand control to command line.
+ -m or --makepkg   Run a script and create a package from it.
+ -i or --instpkg   Install a specified function package.
+ -h or --help      Print this info and exit.
+ -v or --version   Print version info and exit.
+ -e or --english   Force use of English rather than translation.
+ -q or --quiet     Print less verbose program information.
+ -t or --tool      Operate silently.
+Example of batch mode usage:
+ gretlcli -b myfile.inp > myfile.out
+Example of run mode usage:
+ gretlcli -r myfile.inp
+
+Special batch-mode option:
+ --scriptopt=<value> sets a scalar value, accessible to a script
+ under the name "scriptopt"
+
