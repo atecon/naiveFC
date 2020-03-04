@@ -1,3 +1,5 @@
+include naiveFC_helper.inp
+
 function bundle dict_models (void)
 /* Dictionary including stuff for calling estimation
     command and fcast command. */
