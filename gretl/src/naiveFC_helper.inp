@@ -36,7 +36,7 @@ function matrix stack_info_dates (const series obsdate,
     matrix mat = {}
     loop i=1..max_horizon -q
         mat |= { isodate(epochday($obsdate) -1) }
-        smpl ; -1
+        catch smpl ; -1
     endloop
 
     return mat
@@ -505,6 +505,7 @@ function bundle prep_and_get_cv_folds (const bundle self)
     # the very last cv-dataset
     series y = self.y
     list xlist = self.xlist
+    
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
     list cv.X = y xlist
