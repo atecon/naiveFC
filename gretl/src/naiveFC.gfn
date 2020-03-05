@@ -222,7 +222,7 @@ return: Column vector of dates. */
 matrix mat = {}
 loop i=1..max_horizon -q
   mat |= { isodate(epochday($obsdate) -1) }
-  smpl ; -1
+  catch smpl ; -1
 endloop
 return mat
 </code>
