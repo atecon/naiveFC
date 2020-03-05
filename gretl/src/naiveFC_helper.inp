@@ -262,8 +262,8 @@ function scalar estimate_model_and_forecast (const string est_command,
 
     catch @est_command
     if $error
-        printError("Model estimation failed.\n\
-          Forecast values are set to NA for the current sample.")
+        printError("Model estimation failed. Forecast values are set to \
+          NA for the current sample.")
         return 1
     endif
 

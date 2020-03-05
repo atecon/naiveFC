@@ -404,7 +404,7 @@ return 0
 smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 catch @est_command
 if $error
-  printError(&quot;Model estimation failed.\n           Forecast values are set to NA for the current sample.&quot;)
+  printError(&quot;Model estimation failed. Forecast values are set to            NA for the current sample.&quot;)
   return 1
 endif
 catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
