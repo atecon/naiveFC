@@ -1,3 +1,11 @@
+function scalar endogenous_is_always_zero (const series y)
+    /* Check whether values on comprise zeros.
+    return: 1 if y includes on zeros, otherweise 0. */
+    
+    return (sum(y) == 0) ? 1 : 0
+end function
+
+
 function void yaxis_ranges (const list plotlist,
                             scalar *ylo,
                             scalar *yup)
@@ -28,7 +36,6 @@ function list list_of_forecasts (const bundle self,
     
     return R
 end function
-
 
 function list get_movwindow_forecast_list (const matrix horizons,
                                            const bundle self,

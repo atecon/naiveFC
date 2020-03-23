@@ -32,6 +32,20 @@ test_horizons_isok()
 
 
 nulldata 10
+series y = 0
+series x = normal()
+list L = y x
+function void test_endogenous_is_always_zero (const list L)
+    print "Start with endogenous_is_always_zero()"
+
+    assert_true(endogenous_is_always_zero(L.y))
+    assert_false(endogenous_is_always_zero(L.x))
+end function
+test_endogenous_is_always_zero(L)
+
+
+
+nulldata 10
 smpl 1 5
 series y = normal()
 smpl full

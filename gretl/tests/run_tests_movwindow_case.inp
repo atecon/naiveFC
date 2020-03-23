@@ -1,7 +1,6 @@
 set verbose off
 clear
 
-
 include "./src/naiveFC.inp" --force
 include "./src/naiveFC_helper.inp" --force
 
@@ -9,6 +8,37 @@ include CvDataSplitter.gfn
 include string_utils.gfn
 include assertion.gfn
 include extra.gfn
+
+
+nulldata 15
+series y = 0
+smpl time>10 --restrict
+y = NA
+smpl full
+setobs 7 2020-01-01 --time-series
+function void test_naiveFC_meanfc_zero_rol (series y)
+    printf "Start test_naiveFC() ('meanfc') for 'static'\n\
+      case with a series which includes only zeros."
+
+    scalar horizon = 2
+    bundle opts = null					# setup additional options
+    opts.horizon = horizon
+    string opts.type_moving_window = "rolling"
+
+    bundle b = null
+    bundle b = naiveFC(y, "meanfc", opts)
+
+    bundle forecast_results = b.forecast_results
+    matrix point = forecast_results.meanfc.forecasts_point
+    matrix lower_bound = forecast_results.meanfc.forecasts_lower_bound
+    matrix upper_bound = forecast_results.meanfc.forecasts_upper_bound
+
+    assert_false(sum(point))
+    assert_false(sum(lower_bound))
+    assert_false(sum(upper_bound))
+end function
+test_naiveFC_meanfc_zero_rol(y)
+
 
 open AWM.gdt -q			# quarterly
 series y = YGA
@@ -328,16 +358,16 @@ function void test_naiveFC_medi_daily_rol (series y, list xlist)
 
     eval lower_bound[,1] ~ point[,1] ~ upper_bound[,1]
 
-    assert_almost_equal_num(point[1,1], 53172, 1e-0)
-    assert_almost_equal_num(point[2,1], 53172, 1e-0)
+    assert_almost_equal_num(point[1,1], 53170, 1e-0)
+    assert_almost_equal_num(point[2,1], 53170, 1e-0)
     assert_almost_equal_num(lower_bound[1,1], -34288, 1e-0)
     assert_almost_equal_num(lower_bound[2,1], -34288, 1e-0)
-    assert_almost_equal_num(upper_bound[1,1], 140631, 1e-0)
-    assert_almost_equal_num(upper_bound[2,1], 140631, 1e-0)
+    assert_almost_equal_num(upper_bound[1,1], 140629, 1e-0)
+    assert_almost_equal_num(upper_bound[2,1], 140629, 1e-0)
 
     assert_almost_equal_num(point[1,531], 39789, 1e-0)
     assert_almost_equal_num(lower_bound[1,531], -25658, 1e-0)
-    assert_almost_equal_num(upper_bound[1,531], 105236, 1e-0)
+    assert_almost_equal_num(upper_bound[1,531], 105238, 1e-0)
 
     assert_false(ok(point[2,531]))
     assert_false(ok(lower_bound[2,531]))
