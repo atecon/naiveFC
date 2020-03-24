@@ -1,7 +1,7 @@
 function scalar endogenous_is_always_zero (const series y)
-    /* Check whether values on comprise zeros.
+/* Check whether values on comprise zeros.
     return: 1 if y includes on zeros, otherweise 0. */
-    
+
     return (sum(y) == 0) ? 1 : 0
 end function
 
@@ -19,10 +19,10 @@ end function
 
 
 function list list_of_forecasts (const bundle self,
-                                        const matrix horizons,
-                                        const string suffix)
+                                 const matrix horizons,
+                                 const string suffix)
     /* Wrapper actually calling specific functions. */
-    
+
     list R = null
     strings models = getkeys(self.forecast_results)
 
@@ -33,7 +33,7 @@ function list list_of_forecasts (const bundle self,
             list R += get_movwindow_forecast_list(horizons, self, models[i], suffix)
         endif
     endloop
-    
+
     return R
 end function
 
@@ -45,10 +45,10 @@ function list get_movwindow_forecast_list (const matrix horizons,
     and 'recursive' cases. */
 
     list R = null
-   
+
     loop i=1..rows(horizons) -q
         scalar shift_periods = $i - 1
-        
+
         R += genseries(sprintf("low_h%d_%s%s", horizons[i], \
           model, suffix), \
           mlag(self.forecast_results[model].forecasts_lower_bound[i,]', shift_periods, NA) )
@@ -144,7 +144,7 @@ end function
 
 
 function scalar replace_nan_value_by (void)
-    /* Set value for replacing future unknown values
+/* Set value for replacing future unknown values
     of series to be forecasted by a specific value. */
     return -9876543210
 end function
@@ -224,15 +224,19 @@ function scalar estimate_model_and_forecast (const string est_command,
     smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 
     catch @est_command
-    if $error && self.verbose
-        printError("Model estimation failed. Forecast values are set to \
-          NA for the current sample.")
+    if $error
+        if self.verbose
+            printError("Model estimation failed. Forecast values are set to \
+              NA for the current sample.")
+        endif
         return 1
     endif
 
     catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
-    if $error && self.verbose
-        printError("Failed executing forecast command.")
+    if $error
+        if self.verbose
+            printError("Failed executing forecast command.")
+        endif
         return 1
     endif
 
@@ -468,7 +472,7 @@ function bundle prep_and_get_cv_folds (const bundle self)
     # the very last cv-dataset
     series y = self.y
     list xlist = self.xlist
-    
+
     string cv.cv_type = (self.type_moving_window=="rolling") ? "rolwin" : "recwin"
     scalar cv.win_size = self.window_length
     list cv.X = y xlist

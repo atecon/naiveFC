@@ -341,13 +341,17 @@ return 0
 <code>/* Estimate model and return oos-forecast. */
 smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 catch @est_command
-if $error &amp;&amp; self.verbose
-  printError(&quot;Model estimation failed. Forecast values are set to            NA for the current sample.&quot;)
+if $error
+  if self.verbose
+    printError(&quot;Model estimation failed. Forecast values are set to                NA for the current sample.&quot;)
+  endif
   return 1
 endif
 catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
-if $error &amp;&amp; self.verbose
-  printError(&quot;Failed executing forecast command.&quot;)
+if $error
+  if self.verbose
+    printError(&quot;Failed executing forecast command.&quot;)
+  endif
   return 1
 endif
 return 0
