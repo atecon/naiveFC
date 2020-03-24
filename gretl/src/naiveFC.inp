@@ -202,7 +202,7 @@ function matrix set_xlist_and_forecast (bundle *self)
     endif
 
     self.error = estimate_model_and_forecast(command, fcast_arg, y, \
-      xlist, train_obsnums, test_obsnums)
+      xlist, train_obsnums, test_obsnums, self)
     if self.error == 0
         forecast_results[1:self.horizon_current,] = $fcast ~ $fcse
     endif

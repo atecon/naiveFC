@@ -217,20 +217,21 @@ function scalar estimate_model_and_forecast (const string est_command,
                                              const series y,
                                              const list xlist,
                                              const bundle train_obsnums,
-                                             const bundle test_obsnums)
+                                             const bundle test_obsnums,
+                                             const bundle self)
     /* Estimate model and return oos-forecast. */
 
     smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 
     catch @est_command
-    if $error
+    if $error && self.verbose
         printError("Model estimation failed. Forecast values are set to \
           NA for the current sample.")
         return 1
     endif
 
     catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
-    if $error
+    if $error && self.verbose
         printError("Failed executing forecast command.")
         return 1
     endif
