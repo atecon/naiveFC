@@ -35,14 +35,27 @@ nulldata 10
 series y = 0
 series x = normal()
 list L = y x
-function void test_endogenous_is_always_zero (const list L)
-    print "Start with endogenous_is_always_zero()"
+function void test_series_is_always_zero (const list L)
+    print "Start with series_is_always_zero()"
 
-    assert_true(endogenous_is_always_zero(L.y))
-    assert_false(endogenous_is_always_zero(L.x))
+    assert_true(series_is_always_zero(L.y))
+    assert_false(series_is_always_zero(L.x))
 end function
-test_endogenous_is_always_zero(L)
+test_series_is_always_zero(L)
 
+
+nulldata 10
+series y = 0
+series x = normal()
+list L = y x
+function void test_drop_zero_series_from_list (const list L)
+    print "Start with drop_zero_series_from_list()"
+    
+    list R = drop_zero_series_from_list(L)
+    assert_equal_num(nelem(R), 1)
+    assert_equal_str(varname(R), "x")
+end function
+test_drop_zero_series_from_list(L)
 
 
 nulldata 10

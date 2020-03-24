@@ -194,7 +194,9 @@ function matrix set_xlist_and_forecast (bundle *self)
         return forecast_results
     endif
 
-
+    list xlist_new = drop_zero_series_from_list(xlist)
+    print_dropped_series(xlist, xlist_new, self)
+    list xlist = xlist_new
 
     # TODO: Can this happen, and if so why -- otherwise drop
     if self.type_moving_window != "static" && ($nobs > self.window_length)

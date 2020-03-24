@@ -155,13 +155,41 @@ endif
 return self.fc
 </code>
 </gretl-function>
-<gretl-function name="endogenous_is_always_zero" type="scalar" private="1">
+<gretl-function name="print_dropped_series" type="void" private="1">
+ <params count="3">
+  <param name="old" type="list" const="true"/>
+  <param name="new" type="list" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* */
+list dropped = old - new
+if nelem(dropped) &amp;&amp; self.verbose
+  printf &quot;Warning: The following regressors were droppped as they include only zeros:\n           %s&quot;, varname(dropped)
+endif
+</code>
+</gretl-function>
+<gretl-function name="series_is_always_zero" type="scalar" private="1">
  <params count="1">
   <param name="y" type="series" const="true"/>
  </params>
 <code>/* Check whether values on comprise zeros.
-return: 1 if y includes on zeros, otherweise 0. */
+return: 1 if y includes only zeros, otherweise 0. */
 return (sum(y) == 0) ? 1 : 0
+</code>
+</gretl-function>
+<gretl-function name="drop_zero_series_from_list" type="list" private="1">
+ <params count="1">
+  <param name="L" type="list" const="true"/>
+ </params>
+<code>/* Drop all series from L which include only zero values.
+return: list of non-zero series. */
+list R = null
+loop foreach i L -q
+  if !series_is_always_zero(L.$i)
+    list R += L.$i
+  endif
+endloop
+return R
 </code>
 </gretl-function>
 <gretl-function name="yaxis_ranges" type="void" private="1">
@@ -847,13 +875,16 @@ if $error
   scalar self.error = 1
   return forecast_results
 endif
-if endogenous_is_always_zero(y)
+if series_is_always_zero(y)
   matrix forecast_results = zeros(self.horizon, 2)
   if self.verbose
     printWarning(sprintf(&quot;Training set of endogenous includes only zero-values.\n               Forecasts and associated standard-errors are assumed to be zero.&quot;))
   endif
   return forecast_results
 endif
+list xlist_new = drop_zero_series_from_list(xlist)
+print_dropped_series(xlist, xlist_new, self)
+list xlist = xlist_new
 # TODO: Can this happen, and if so why -- otherwise drop
 if self.type_moving_window != &quot;static&quot; &amp;&amp; ($nobs &gt; self.window_length)
   printError(sprintf(&quot;You training sample (T=%d) is longer than the\n           specified window length (T=%d).&quot;, $nobs, self.window_length))
