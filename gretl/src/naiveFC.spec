@@ -10,7 +10,7 @@ gui-main = GUI_naiveFC
 label = naive forecast(s)
 menu-attachment = MAINWIN/Model/TSModels
 public = naiveFC plot_naive_forecasts get_naive_forecasts \
-  GUI_naiveFC stack_moving_window_forecasts
+  GUI_naiveFC
 menu-only = GUI_naiveFC
 help = naiveFC.pdf
 sample-script = naiveFC_sample.inp

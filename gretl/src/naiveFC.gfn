@@ -155,76 +155,13 @@ endif
 return self.fc
 </code>
 </gretl-function>
-<gretl-function name="stack_moving_window_forecasts" type="matrix">
+<gretl-function name="endogenous_is_always_zero" type="scalar" private="1">
  <params count="1">
-  <param name="FC" type="list" const="true">
-<description>List of forecast; each series refers to specific horizon</description>
-  </param>
+  <param name="y" type="series" const="true"/>
  </params>
-<code>/* list FC includes fc_h1 fc_h2, fc_hN were N refers to the maximum forecast
-horizon. Stack h-period forecasts into a single vector.
-return: vector of stacked results. */
-matrix stacked_fc = {}
-if nelem(FC) == 0
-  printf &quot;\nError: List of forecastś is empty.\n&quot;
-  return stacked_fc
-endif
-scalar max_horizon = nelem(FC)
-smpl FC --no-all-missing
-# Date index refers to the 'date being forecasted' T+h
-# This means that the 'date of information' is h-period back in time,
-# and thus [= (T+h) - h]
-matrix date_of_informations = stack_info_dates($obsdate, max_horizon)
-matrix stacked_forecasts = stack_multiperiod_forecasts(FC)
-if rows(date_of_informations) != rows(stacked_forecasts)
-  funcerr(sprintf(&quot;Dimensions do not fit:\n           rows(date_of_informations) = %d\n           rows(stacked_forecasts) = %d&quot;, rows(date_of_informations), rows(stacked_forecasts)))
-endif
-return concat_mats_add_names_and_sort(date_of_informations, stacked_forecasts)
-</code>
-</gretl-function>
-<gretl-function name="concat_mats_add_names_and_sort" type="matrix" private="1">
- <params count="2">
-  <param name="date_of_informations" type="matrix" const="true"/>
-  <param name="stacked_forecasts" type="matrix" const="true"/>
- </params>
-<code>matrix ret = msortby(date_of_informations ~ stacked_forecasts, 1)
-cnameset(ret, &quot;info_date forecast_date horizon forecast_results&quot;)
-return ret
-</code>
-</gretl-function>
-<gretl-function name="stack_multiperiod_forecasts" type="matrix" private="1">
- <params count="1">
-  <param name="FC" type="list" const="true"/>
- </params>
-<code>/* Now stack series of forecasts. Each series refers to some
-specific multi-period forecast horizon. 1st series--&gt;h=1, last series--&gt;h=max_hor. */
-matrix mat = {}
-series obsdate = $obsdate
-loop i=1..nelem(FC) -q
-  series foo = NA
-  series foo = FC[i]
-  smpl obsdate foo --no-missing
-  mat |=  {isodate(epochday(obsdate))} ~ $i ~ {foo}	# date_forecasted ~ horizon ~ forecast_value
-endloop
-return mat
-</code>
-</gretl-function>
-<gretl-function name="stack_info_dates" type="matrix" private="1">
- <params count="2">
-  <param name="obsdate" type="series" const="true"/>
-  <param name="max_horizon" type="int" min="1" const="true"/>
- </params>
-<code>/* Vector of date_of_information from T to T+R-h
-where T is the first date_of_information, R the number of
-moving-window sequences and 'h' forecast horizon. Date is
-returned in ISO8601 format.
-return: Column vector of dates. */
-matrix mat = {}
-loop i=1..max_horizon -q
-  mat |= { isodate(epochday($obsdate) -1) }
-  catch smpl ; -1
-endloop
-return mat
+<code>/* Check whether values on comprise zeros.
+return: 1 if y includes on zeros, otherweise 0. */
+return (sum(y) == 0) ? 1 : 0
 </code>
 </gretl-function>
 <gretl-function name="yaxis_ranges" type="void" private="1">
@@ -392,23 +329,24 @@ return 0
 </code>
 </gretl-function>
 <gretl-function name="estimate_model_and_forecast" type="scalar" private="1">
- <params count="6">
+ <params count="7">
   <param name="est_command" type="string" const="true"/>
   <param name="fcast_command" type="string" const="true"/>
   <param name="y" type="series" const="true"/>
   <param name="xlist" type="list" const="true"/>
   <param name="train_obsnums" type="bundle" const="true"/>
   <param name="test_obsnums" type="bundle" const="true"/>
+  <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Estimate model and return oos-forecast. */
 smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 catch @est_command
-if $error
+if $error &amp;&amp; self.verbose
   printError(&quot;Model estimation failed. Forecast values are set to            NA for the current sample.&quot;)
   return 1
 endif
 catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
-if $error
+if $error &amp;&amp; self.verbose
   printError(&quot;Failed executing forecast command.&quot;)
   return 1
 endif
@@ -905,13 +843,18 @@ if $error
   scalar self.error = 1
   return forecast_results
 endif
+if endogenous_is_always_zero(y)
+  matrix forecast_results = zeros(self.horizon, 2)
+  printWarning(sprintf(&quot;Training set of endogenous includes only zero-values.\n           Forecasts and associated standard-errors are assumed to be zero.&quot;))
+  return forecast_results
+endif
 # TODO: Can this happen, and if so why -- otherwise drop
 if self.type_moving_window != &quot;static&quot; &amp;&amp; ($nobs &gt; self.window_length)
   printError(sprintf(&quot;You training sample (T=%d) is longer than the\n           specified window length (T=%d).&quot;, $nobs, self.window_length))
   scalar self.error = 1
   return forecast_results
 endif
-self.error = estimate_model_and_forecast(command, fcast_arg, y, xlist, train_obsnums, test_obsnums)
+self.error = estimate_model_and_forecast(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, self)
 if self.error == 0
   forecast_results[1:self.horizon_current,] = $fcast ~ $fcse
 endif
@@ -942,12 +885,12 @@ if !self.is_seas &amp;&amp; nelem(strpos(seas_methods, self.which))
   printError(&quot;The method you requested is not available for non-seasonal data.&quot;)
   self.error = 1
 endif
+# TODO: Why is this necessary??
 if self.window_length &lt; $pd
-  printError(&quot;Periodicity cannot be negative.&quot;)
   printError(sprintf(&quot;Window size = %d&quot;, self.window_length))
   printError(sprintf(&quot;Periodicity = %d\n&quot;, $pd))
   printError(&quot;The size of the moving window cannot be smaller than the underlying periodicity.&quot;)
-  self.error = 1
+  #        self.error = 1		# TODO: don't return error as long as it is not clear why/ when this case matters
 endif
 if self.nboot
   print_no_bootstrap_support()
