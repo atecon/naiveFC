@@ -1,4 +1,4 @@
-function scalar endogenous_is_always_zero (const series y)
+function scalar series_is_always_zero (const series y)
 /* Check whether values on comprise zeros.
     return: 1 if y includes on zeros, otherweise 0. */
 

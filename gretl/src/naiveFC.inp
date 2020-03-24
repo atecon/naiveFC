@@ -184,7 +184,7 @@ function matrix set_xlist_and_forecast (bundle *self)
         return forecast_results
     endif
 
-    if endogenous_is_always_zero(y)
+    if series_is_always_zero(y)
         matrix forecast_results = zeros(self.horizon, 2)
         if self.verbose
             printWarning(sprintf("Training set of endogenous includes only zero-values.\n\
@@ -193,6 +193,8 @@ function matrix set_xlist_and_forecast (bundle *self)
 
         return forecast_results
     endif
+
+
 
     # TODO: Can this happen, and if so why -- otherwise drop
     if self.type_moving_window != "static" && ($nobs > self.window_length)
