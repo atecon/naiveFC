@@ -849,7 +849,9 @@ if $error
 endif
 if endogenous_is_always_zero(y)
   matrix forecast_results = zeros(self.horizon, 2)
-  printWarning(sprintf(&quot;Training set of endogenous includes only zero-values.\n           Forecasts and associated standard-errors are assumed to be zero.&quot;))
+  if self.verbose
+    printWarning(sprintf(&quot;Training set of endogenous includes only zero-values.\n               Forecasts and associated standard-errors are assumed to be zero.&quot;))
+  endif
   return forecast_results
 endif
 # TODO: Can this happen, and if so why -- otherwise drop

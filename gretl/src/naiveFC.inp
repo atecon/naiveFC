@@ -186,8 +186,10 @@ function matrix set_xlist_and_forecast (bundle *self)
 
     if endogenous_is_always_zero(y)
         matrix forecast_results = zeros(self.horizon, 2)
-        printWarning(sprintf("Training set of endogenous includes only zero-values.\n\
-          Forecasts and associated standard-errors are assumed to be zero."))
+        if self.verbose
+            printWarning(sprintf("Training set of endogenous includes only zero-values.\n\
+              Forecasts and associated standard-errors are assumed to be zero."))
+        endif
 
         return forecast_results
     endif
@@ -243,7 +245,7 @@ function void do_initial_checks (bundle *self)
         printError(sprintf("Window size = %d", self.window_length))
         printError(sprintf("Periodicity = %d\n", $pd))
         printError("The size of the moving window cannot be smaller than the underlying periodicity.")
-#        self.error = 1		# TODO: don't return error as long as it is not clear why/ when this case matters
+        #        self.error = 1		# TODO: don't return error as long as it is not clear why/ when this case matters
     endif
 
     if self.nboot
