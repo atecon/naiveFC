@@ -122,12 +122,12 @@ series y = target
 #=========================
 bundle opts = null					# setup additional options
 opts.horizon = 10
-opts.type_moving_window = "static" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+opts.type_moving_window = "rolling" #/ "recursive" -> type of moving-window forecasting  (optional)
 scalar opts.endogenous_in_logs = TRUE
 # opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
 catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
-#opts.verbose = 1						# print details (optional)
+# opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
 # TODO as we forecast only to the last valid obs of y in this case anyway!

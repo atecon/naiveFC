@@ -200,7 +200,7 @@ function scalar replace_nan_value_by (void)
 /* Set value for replacing future unknown values
 of series to be forecasted by a specific value. Number should be positive
 to avoid problems in case the endogenous is transformed to logarithms. */
-    return abs(98765432107789)
+    return abs(98765432107)
 end function
 
 

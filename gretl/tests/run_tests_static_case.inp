@@ -23,6 +23,7 @@ function void test_naiveFC_meanfc_zero_stat (series y)
     scalar horizon = 2
     bundle opts = null					# setup additional options
     opts.horizon = horizon
+    opts.endogenous_in_logs = TRUE		# FIXME: drop or set FALSE
 
     bundle b = null
     bundle b = naiveFC(y, "meanfc", opts)
@@ -92,8 +93,8 @@ function void test_naiveFC_meanfc_awm_stat (series y)
     assert_almost_equal_num(point[1], 0.99446, 1e-5)
     assert_almost_equal_num(point[2], 0.99446, 1e-5)
 
-    assert_almost_equal_num(lower_bound[1], -0.64128, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.64128, 1e-5)
+    assert_almost_equal_num(lower_bound[1], 0.971799, 1e-5)
+    assert_almost_equal_num(lower_bound[2], 0.971799, 1e-5)
 
     assert_almost_equal_num(upper_bound[1], 2.6302, 1e-4)
     assert_almost_equal_num(upper_bound[2], 2.6302, 1e-4)

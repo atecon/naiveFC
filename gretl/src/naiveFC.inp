@@ -96,8 +96,9 @@ function bundle default_values (const series y)
 
     bundle self = null
     scalar self.error = FALSE
+    scalar self.y_is_always_zero = FALSE
     list self.xlist = null
-    scalar self.endogenous_in_logs = TRUE
+    scalar self.endogenous_in_logs = FALSE
     scalar self.horizon = 10				# maximum forecast horizon
     scalar self.level = 0.9					# probability level for forecast interval
     scalar self.fan = FALSE						# plot fan chart  (not supported yet)
@@ -186,6 +187,7 @@ function matrix set_xlist_and_forecast (bundle *self)
     endif
 
     if series_is_always_zero(y)
+        self.y_is_always_zero = TRUE
         matrix forecast_results = zeros(self.horizon, 2)
         if self.verbose
             printWarning(sprintf("Training set of endogenous includes only zero-values.\n\
@@ -222,13 +224,11 @@ function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     pkg query extra --quiet
-    # FIXME: This fails
-    /*
-       if atof($result.version) < 0.6
-       printError("You need at least version 0.6 of the 'extra' package.")
-       printError("Update by executing 'pkg install extra'")
-       endif
-    */
+
+    if $result.version < 0.6
+        printError("You need at least version 0.6 of the 'extra' package.")
+        printError("Update by executing 'pkg install extra'")
+    endif
 
     strings methods = get_supported_nonseas_methods()
     strings seas_methods = get_supported_seas_methods()
@@ -361,7 +361,7 @@ function bundle naiveFC (const series y,
     endif
 
     summarize_naive_fc_results(&self)
-    
+
     if self.endogenous_in_logs
         series self.y = exp(self.y)
     endif
@@ -431,7 +431,7 @@ function void summarize_naive_fc_results (bundle *self)
         printf "\n-------------------------------------------------------------------\n"
         printf "\t\tSummary of naive forecasting\n"
         printf "\nForecasting method: \t\t\t%s\n", self.which
-        printf "Endogenous: \t\t\t\t%s\n", self.name_endo        
+        printf "Endogenous: \t\t\t\t%s\n", self.name_endo
         if self.endogenous_in_logs
             printf "Estimates based on logarithms of %s\n", self.name_endo
         endif
@@ -480,10 +480,10 @@ function bundle execute_forecasting (bundle *self)
       point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &self)
 
     # Retrieve moving-window point_forecasts from array,
-      # compute forecast intervals and put stuff to bundle
-    if self.endogenous_in_logs == FALSE
+    # compute forecast intervals and put stuff to bundle
+    if self.endogenous_in_logs == FALSE || self.y_is_always_zero == TRUE
         return compute_intval_forecasts(forecasts_and_factors)
-    else
+    elif self.endogenous_in_logs == TRUE && self.y_is_always_zero == FALSE
         bundle interval_forecasts = compute_intval_forecasts(forecasts_and_factors)
         bundle intval_fc_in_levels = intval_forecasts_to_levels(interval_forecasts,\
           collected_point_fc_and_sderr, self)
@@ -494,7 +494,7 @@ end function
 
 # TODO: untested
 function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
-    /* Generate arrays holding interval forecasts for each model based
+/* Generate arrays holding interval forecasts for each model based
     on respective point forecasts and estimated standard derrors. */
 
     bundle interval_forecasts
@@ -503,7 +503,7 @@ function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
       flatten(forecasts_and_factors.point_forecasts)	# rows: horizons, cols: sample period
 
     matrix factors_flattened = flatten(forecasts_and_factors.factors)
-    
+
     matrix interval_forecasts.forecasts_lower_bound = \
       interval_forecasts.forecasts_point .- factors_flattened
 
@@ -513,7 +513,7 @@ function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
     return interval_forecasts
 end function
 
-
+# TODO: untested
 function bundle intval_forecasts_to_levels (const bundle interval_forecasts,
                                             const matrices collected_point_fc_and_sderr,
                                             const bundle self)
@@ -522,9 +522,9 @@ function bundle intval_forecasts_to_levels (const bundle interval_forecasts,
 
     bundle in_levels
     scalar m = nelem(collected_point_fc_and_sderr)	# number of moving-windows
-    matrix in_levels.forecasts_point = NA * ones(self.horizon, m)
-    matrix in_levels.forecasts_lower_bound = NA * ones(self.horizon, m)
-    matrix in_levels.forecasts_upper_bound = NA * ones(self.horizon, m)
+    matrix in_levels.forecasts_point = NA * zeros(self.horizon, m)
+    matrix in_levels.forecasts_lower_bound = NA * zeros(self.horizon, m)
+    matrix in_levels.forecasts_upper_bound = NA * zeros(self.horizon, m)
 
     loop i=1..m -q
         in_levels.forecasts_point[,i] = \
@@ -534,7 +534,7 @@ function bundle intval_forecasts_to_levels (const bundle interval_forecasts,
         in_levels.forecasts_lower_bound[,i] = \
           log_linear_to_levels(interval_forecasts.forecasts_lower_bound[,i],\
           collected_point_fc_and_sderr[i][,2])
-        
+
         in_levels.forecasts_upper_bound[,i] = \
           log_linear_to_levels(interval_forecasts.forecasts_upper_bound[,i],\
           collected_point_fc_and_sderr[i][,2])
@@ -544,13 +544,14 @@ function bundle intval_forecasts_to_levels (const bundle interval_forecasts,
 end function
 
 
+# TODO: untested
 function matrix log_linear_to_levels (const matrix forecast "Point forecast",
                                       const matrix forecast_stderr "Forecast standard error")
     /* In case the endogenous was transformed to logarithms, retrieve the level.
-    Important assumptions made:
-    1) You want to forecast via conditional expectation (ie with quadratic loss)
-    2) Data are at least approximately normal
-    Read: https://davegiles.blogspot.com/2013/08/forecasting-from-log-linear-regressions.html
+       Important assumptions made:
+       1) You want to forecast via conditional expectation (ie with quadratic loss)
+       2) Data are at least approximately normal
+       Read: https://davegiles.blogspot.com/2013/08/forecasting-from-log-linear-regressions.html
     */
 
     return exp( forecast + 0.5 * forecast_stderr.^2 )
@@ -603,7 +604,7 @@ end function
 # Public function
 function list get_naive_forecasts (const bundle self,
                                    matrix horizons[null] "Select specific horizons (moving-window only)",
-                                   const string suffix[null] "Suffix for series' names")
+      const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
@@ -621,7 +622,6 @@ function list get_naive_forecasts (const bundle self,
     endif
 
     smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
-
 
     return list_of_forecasts(self, horizons, suffix)
 end function
