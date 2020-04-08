@@ -1,3 +1,31 @@
+#TODO: untested
+function scalar y_has_zero_negative_vals (const series y, const bundle self)
+    /* Check whether y includes zero or negative values.
+    return: 0 if not zero or negative values, otherwise 1. */
+
+    smpl y != replace_nan_value_by() --restrict
+    scalar ret = (sum(y <= 0) > 0) ? TRUE : FALSE
+    if self.verbose > 0 && ret == TRUE
+        printWarning("Endogenous series includes zero or negative values")
+    endif
+
+    return ret
+end function
+
+
+#TODO: untested
+function series endogenous_series_in_logs (const series y, const bundle self)
+    /* Return input series in natural logs if specified. */
+
+    scalar code = y_has_zero_negative_vals(y, self)
+    if self.endogenous_in_logs == TRUE && code == FALSE
+        return log(y)
+    else
+        return y
+    endif
+end function
+
+
 function void print_dropped_series (const list old, const list new, const bundle self)
     /* */
     list dropped = old - new
@@ -170,8 +198,9 @@ end function
 
 function scalar replace_nan_value_by (void)
 /* Set value for replacing future unknown values
-    of series to be forecasted by a specific value. */
-    return -9876543210
+of series to be forecasted by a specific value. Number should be positive
+to avoid problems in case the endogenous is transformed to logarithms. */
+    return abs(98765432107789)
 end function
 
 
@@ -247,7 +276,7 @@ function scalar estimate_model_and_forecast (const string est_command,
     /* Estimate model and return oos-forecast. */
 
     smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
-
+    
     catch @est_command
     if $error
         if self.verbose
@@ -436,7 +465,7 @@ end function
 # TODO: untested
 function bundle point_fc_and_factor_as_arrays (const matrices collected_point_fc_and_sderr,
                                                bundle *self)
-    /* Using each model's point forecast and standard error, compute
+    /* Using each model's point forecast and forecast standard errors, compute
     the forecast interval assuming standard normal. */
 
     bundle bout
@@ -447,13 +476,20 @@ function bundle point_fc_and_factor_as_arrays (const matrices collected_point_fc
 
     loop i=1..m -q
         point_forecasts[i] = collected_point_fc_and_sderr[i][,1]
-        factors[i] = fc_interval_width(collected_point_fc_and_sderr[i][,1], self.level)
+        factors[i] = fc_interval_width(collected_point_fc_and_sderr[i][,2], self.level)
     endloop
 
     bout.point_forecasts = point_forecasts
     bout.factors = factors
 
     return bout
+end function
+
+function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
+                                   const scalar level[0.001:0.999:] "confidence level")
+    /* Compute width for a given condifdence level assuming standard normal. */
+
+    return fc_sd * critical(z, (1 - level) / 2 )
 end function
 
 
@@ -599,13 +635,6 @@ function scalar data_has_seasonality (void)
     /* Flag seasonality of data set */
 
     return ($pd > 1) ? 1 : 0
-end function
-
-function matrix fc_interval_width (const matrix fc_sd "Std. error of forecast",
-                                   const scalar level[0.001:0.999:] "confidence level")
-    /* Compute width for a given condifdence level assuming standard normal. */
-
-    return fc_sd * critical(z, (1 - level) / 2 )
 end function
 
 

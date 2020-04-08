@@ -4,7 +4,11 @@ set verbose off
 
 #include naiveFC.gfn --force				# TODO:
 
-string WD = "/home/at/git/naiveFC/gretl"
+if $sysinfo.hostname == "dsb"
+    string WD = "/home/ninja/repo/naiveFC/gretl"
+else    
+    string WD = "/home/at/git/naiveFC/gretl"
+endif
 set workdir @WD
 
 # TODO: can be dropped once gfn compiled
@@ -17,11 +21,11 @@ include "./src/naiveFC_helper.inp" --force
 
 
 # Load data
-#open AWM.gdt -q
-#series y = YGA
+open AWM.gdt -q
+series y = GCR_YER * 100
 
-open "../tests/daily_data.gdt" -q
-series y = target
+#open "../tests/daily_data.gdt" -q
+#series y = target
 
 #=======================
 # Static naive forecasts
@@ -117,11 +121,13 @@ series y = target
 # Moving-window forecasts
 #=========================
 bundle opts = null					# setup additional options
-opts.horizon = 10
-opts.type_moving_window = "rolling" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+opts.horizon = 4
+opts.type_moving_window = "static" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
+scalar opts.endogenous_in_logs = TRUE
+dataset addobs 4
 # opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
-catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
+#catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
 #opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
@@ -133,7 +139,8 @@ strings methods = defarray("meanFC", "medianFC", "rwFC", "rwdriftFC", \
 
 bundle b = null
 bundle b = naiveFC(y, methods[1], opts)
-
+b
+#stop
 bundle forecast_results = b.forecast_results
 #eval forecast_results.smeanfc
 #eval forecast_results.smeanfc.forecasts_point

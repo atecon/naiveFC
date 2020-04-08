@@ -191,7 +191,6 @@ function matrix set_xlist_and_forecast (bundle *self)
             printWarning(sprintf("Training set of endogenous includes only zero-values.\n\
               Forecasts and associated standard-errors are assumed to be zero."))
         endif
-
         return forecast_results
     endif
 
@@ -352,7 +351,8 @@ function bundle naiveFC (const series y,
     endif
 
     smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
-    series self.y = endogenous_series_in_logs(y, self)		# TODO: add check that y has no values <= 0
+
+    series self.y = endogenous_series_in_logs(y, self)
 
     do_naive_forecasting(&self)
 
@@ -366,29 +366,6 @@ function bundle naiveFC (const series y,
     return self
 end function
 
-
-function scalar y_has_zero_negative_vals (const series y, const bundle self)
-    /* Check whether y includes zero or negative values.
-    return: 0 if not zero or negative values, otherwise 1. */
-
-    scalar ret = (sum(y <= 0) > 0) ? TRUE : FALSE
-    if self.verbose > 0 && ret == TRUE
-        printWarning("Endogenous series includes zero or negative values")
-    endif
-    
-    return ret
-end function
-
-
-function series endogenous_series_in_logs (const series y, const bundle self)
-    /* Return input series in natural logs if specified. */
-
-    if self.endogenous_in_logs == TRUE && y_has_zero_negative_vals(y, self) == FALSE
-        return log(y)
-    else
-        return y
-    endif
-end function
 
 function void cleanup_bundle (bundle *self)
     /* Delete some elements before returning to user. */
@@ -495,15 +472,22 @@ function bundle execute_forecasting (bundle *self)
       point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &self)
 
     # Retrieve moving-window point_forecasts from array,
-    # compute forecast intervals and put stuff to bundle
-    return compute_intval_forecasts(forecasts_and_factors)
+      # compute forecast intervals and put stuff to bundle
+    if self.endogenous_in_logs == FALSE
+        return compute_intval_forecasts(forecasts_and_factors)
+    else
+        bundle interval_forecasts = compute_intval_forecasts(forecasts_and_factors)
+        bundle intval_fc_in_levels = intval_forecasts_to_levels(interval_forecasts,\
+          collected_point_fc_and_sderr, self)
+        return intval_fc_in_levels
+    endif
 end function
 
 
 # TODO: untested
 function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
-/* Generate for each model based on respective point forecasts and
-    estimated standard derrors, arrays holding interval forecasts. */
+    /* Generate arrays holding interval forecasts for each model based
+    on respective point forecasts and estimated standard derrors. */
 
     bundle interval_forecasts
 
@@ -511,7 +495,7 @@ function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
       flatten(forecasts_and_factors.point_forecasts)	# rows: horizons, cols: sample period
 
     matrix factors_flattened = flatten(forecasts_and_factors.factors)
-
+    
     matrix interval_forecasts.forecasts_lower_bound = \
       interval_forecasts.forecasts_point .- factors_flattened
 
@@ -521,6 +505,61 @@ function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
     return interval_forecasts
 end function
 
+
+function bundle intval_forecasts_to_levels (const bundle interval_forecasts,
+                                            const matrices collected_point_fc_and_sderr,
+                                            const bundle self)
+    /* Once interval forecasts are computed but the endogenous was transformed to
+    logarithms, we need to compute the levels of the interval forecasts. */
+
+    bundle in_levels
+    scalar m = nelem(collected_point_fc_and_sderr)	# number of moving-windows
+    matrix in_levels.forecasts_point = NA * ones(self.horizon, m)
+    matrix in_levels.forecasts_lower_bound = NA * ones(self.horizon, m)
+    matrix in_levels.forecasts_upper_bound = NA * ones(self.horizon, m)
+
+    loop i=1..m -q
+        /*s
+        in_levels.forecasts_point[,i] = \
+          log_linear_to_levels(interval_forecasts.forecasts_point[,i],\
+          collected_point_fc_and_sderr[i][,2])
+
+        in_levels.forecasts_lower_bound[,i] = \
+          log_linear_to_levels(interval_forecasts.forecasts_lower_bound[,i],\
+          collected_point_fc_and_sderr[i][,2])
+        */
+        
+        in_levels.forecasts_upper_bound[,i] = \
+          log_linear_to_levels(interval_forecasts.forecasts_upper_bound[,i],\
+          collected_point_fc_and_sderr[i][,2])
+    endloop
+    
+#    printf "%.2f", in_levels.forecasts_point
+#    printf "%.2f", in_levels.forecasts_lower_bound
+#    printf "%.2f", in_levels.forecasts_upper_bound
+#    stop
+
+    return in_levels
+end function
+
+
+function matrix log_linear_to_levels (const matrix forecast "Point forecast",
+                                      const matrix forecast_stderr "Forecast standard error")
+    /* In case the endogenous was transformed to logarithms, retrieve the level.
+    Important assumptions made:
+    1) You want to forecast via conditional expectation (ie with quadratic loss)
+    2) Data are at least approximately normal
+    Read: https://davegiles.blogspot.com/2013/08/forecasting-from-log-linear-regressions.html
+    */
+
+#    printf "%.4f", forecast + 0.5 * forecast_stderr.^2
+#    stop
+eval forecast
+eval forecast_stderr
+eval 0.5 * forecast_stderr.^2
+stop
+    return exp( forecast + 0.5 * forecast_stderr.^2 )
+end function
 
 
 # TODO: untested
@@ -539,7 +578,7 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
         scalar obs_left = $tmax - maxc(date_idx[,1])
         scalar self.horizon_current = xmin(self.horizon, obs_left)
 
-        if self.horizon_current == 0		# FIXME: Why is n_folds=81 but only n_folds=80 would work!
+        if self.horizon_current == 0
             break
         endif
 
@@ -661,6 +700,7 @@ function list get_model_forecasts_from_list (const list plotlist,
 
     return new
 end function
+
 
 # untested
 function void call_plot (const list plotlist,
