@@ -95,11 +95,12 @@ function bundle default_values (const series y)
     /* Set default values */
 
     bundle self = null
-    scalar self.error = 0
+    scalar self.error = FALSE
     list self.xlist = null
+    scalar self.endogenous_in_logs = TRUE
     scalar self.horizon = 10				# maximum forecast horizon
     scalar self.level = 0.9					# probability level for forecast interval
-    scalar self.fan = 0						# plot fan chart  (not supported yet)
+    scalar self.fan = FALSE						# plot fan chart  (not supported yet)
     scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
     scalar self.blength = 4					# Block length bootstrap  (not supported yet)
     scalar self.is_seas = data_has_seasonality()
@@ -351,7 +352,7 @@ function bundle naiveFC (const series y,
     endif
 
     smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
-    series self.y = y
+    series self.y = endogenous_series_in_logs(y, self)		# TODO: add check that y has no values <= 0
 
     do_naive_forecasting(&self)
 
@@ -365,6 +366,29 @@ function bundle naiveFC (const series y,
     return self
 end function
 
+
+function scalar y_has_zero_negative_vals (const series y, const bundle self)
+    /* Check whether y includes zero or negative values.
+    return: 0 if not zero or negative values, otherwise 1. */
+
+    scalar ret = (sum(y <= 0) > 0) ? TRUE : FALSE
+    if self.verbose > 0 && ret == TRUE
+        printWarning("Endogenous series includes zero or negative values")
+    endif
+    
+    return ret
+end function
+
+
+function series endogenous_series_in_logs (const series y, const bundle self)
+    /* Return input series in natural logs if specified. */
+
+    if self.endogenous_in_logs == TRUE && y_has_zero_negative_vals(y, self) == FALSE
+        return log(y)
+    else
+        return y
+    endif
+end function
 
 function void cleanup_bundle (bundle *self)
     /* Delete some elements before returning to user. */
