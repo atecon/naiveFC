@@ -422,7 +422,7 @@ function void summarize_naive_fc_results (bundle *self)
     /* Print summarising information */
 
     if self.verbose
-        printf "-------------------------------------------------------------------\n"
+        printf "\n-------------------------------------------------------------------\n"
         printf "\t\tSummary of naive forecasting\n"
         printf "\nForecasting method: \t\t\t%s\n", self.which
         printf "Endogenous: \t\t\t\t%s\n", self.name_endo
