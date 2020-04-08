@@ -361,6 +361,11 @@ function bundle naiveFC (const series y,
     endif
 
     summarize_naive_fc_results(&self)
+    
+    if self.endogenous_in_logs
+        series self.y = exp(self.y)
+    endif
+
     cleanup_bundle(&self)
 
     return self
@@ -426,7 +431,10 @@ function void summarize_naive_fc_results (bundle *self)
         printf "\n-------------------------------------------------------------------\n"
         printf "\t\tSummary of naive forecasting\n"
         printf "\nForecasting method: \t\t\t%s\n", self.which
-        printf "Endogenous: \t\t\t\t%s\n", self.name_endo
+        printf "Endogenous: \t\t\t\t%s\n", self.name_endo        
+        if self.endogenous_in_logs
+            printf "Estimates based on logarithms of %s\n", self.name_endo
+        endif
         printf "Number of additional regressors: \t%d\n", nelem(self.xlist)
         printf "In-Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date_y, \
           self.t2_date_y, nobs(self.y) - self.horizon
@@ -519,7 +527,6 @@ function bundle intval_forecasts_to_levels (const bundle interval_forecasts,
     matrix in_levels.forecasts_upper_bound = NA * ones(self.horizon, m)
 
     loop i=1..m -q
-        /*s
         in_levels.forecasts_point[,i] = \
           log_linear_to_levels(interval_forecasts.forecasts_point[,i],\
           collected_point_fc_and_sderr[i][,2])
@@ -527,17 +534,11 @@ function bundle intval_forecasts_to_levels (const bundle interval_forecasts,
         in_levels.forecasts_lower_bound[,i] = \
           log_linear_to_levels(interval_forecasts.forecasts_lower_bound[,i],\
           collected_point_fc_and_sderr[i][,2])
-        */
         
         in_levels.forecasts_upper_bound[,i] = \
           log_linear_to_levels(interval_forecasts.forecasts_upper_bound[,i],\
           collected_point_fc_and_sderr[i][,2])
     endloop
-    
-#    printf "%.2f", in_levels.forecasts_point
-#    printf "%.2f", in_levels.forecasts_lower_bound
-#    printf "%.2f", in_levels.forecasts_upper_bound
-#    stop
 
     return in_levels
 end function
@@ -552,12 +553,6 @@ function matrix log_linear_to_levels (const matrix forecast "Point forecast",
     Read: https://davegiles.blogspot.com/2013/08/forecasting-from-log-linear-regressions.html
     */
 
-#    printf "%.4f", forecast + 0.5 * forecast_stderr.^2
-#    stop
-eval forecast
-eval forecast_stderr
-eval 0.5 * forecast_stderr.^2
-stop
     return exp( forecast + 0.5 * forecast_stderr.^2 )
 end function
 
@@ -608,11 +603,10 @@ end function
 # Public function
 function list get_naive_forecasts (const bundle self,
                                    matrix horizons[null] "Select specific horizons (moving-window only)",
-      const string suffix[null] "Suffix for series' names")
+                                   const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
-    series y = self.y
     if !exists(suffix)
         string suffix = ""
     endif

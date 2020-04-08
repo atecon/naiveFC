@@ -21,11 +21,11 @@ include "./src/naiveFC_helper.inp" --force
 
 
 # Load data
-open AWM.gdt -q
-series y = GCR_YER * 100
+#open AWM.gdt -q
+#series y = GCR_YER * 100
 
-#open "../tests/daily_data.gdt" -q
-#series y = target
+open "../tests/daily_data.gdt" -q
+series y = target
 
 #=======================
 # Static naive forecasts
@@ -121,13 +121,12 @@ series y = GCR_YER * 100
 # Moving-window forecasts
 #=========================
 bundle opts = null					# setup additional options
-opts.horizon = 4
+opts.horizon = 10
 opts.type_moving_window = "static" 		# "rolling" / "recursive" -> type of moving-window forecasting  (optional)
 scalar opts.endogenous_in_logs = TRUE
-dataset addobs 4
 # opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
-#catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
+catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
 #opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
@@ -149,5 +148,5 @@ list FC = get_naive_forecasts(b, {1,2})
 
 b.pre_fc_periods_to_plot = 60					# set no. of pre.-forecast periods obs. to plot
 plot_naive_forecasts(b, {1}, "meanfc")
-plot_naive_forecasts(b, {1}, "ar1FC")
-plot_naive_forecasts(b, {1}, "avgfc")
+#plot_naive_forecasts(b, {1}, "ar1FC")
+#plot_naive_forecasts(b, {1}, "avgfc")
