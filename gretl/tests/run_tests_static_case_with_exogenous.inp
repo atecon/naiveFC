@@ -75,11 +75,11 @@ function void test_naiveFC_meanfc_awm_stat (series y, list xlist)
     assert_almost_equal_num(point[1], 0.98407, 1e-5)
     assert_almost_equal_num(point[2], 0.98413, 1e-5)
 
-    assert_almost_equal_num(lower_bound[1], -0.63458, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63462, 1e-5)
+    assert_almost_equal_num(lower_bound[1], 0.96272, 1e-5)
+    assert_almost_equal_num(lower_bound[2], 0.96278, 1e-5)
 
-    assert_almost_equal_num(upper_bound[1], 2.6027, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6029, 1e-4)
+    assert_almost_equal_num(upper_bound[1], 1.0054, 1e-4)
+    assert_almost_equal_num(upper_bound[2], 1.0055, 1e-4)
 end function
 test_naiveFC_meanfc_awm_stat(y, xlist)
 
@@ -140,11 +140,11 @@ function void test_naiveFC_medianfc_awm_stat (series y, const list xlist)
     assert_almost_equal_num(point[1], 0.98430, 1e-5)
     assert_almost_equal_num(point[2], 0.98435, 1e-5)
 
-    assert_almost_equal_num(lower_bound[1], -0.63473, 1e-5)
-    assert_almost_equal_num(lower_bound[2], -0.63476, 1e-5)
+    assert_almost_equal_num(lower_bound[1], 0.96658, 1e-5)
+    assert_almost_equal_num(lower_bound[2], 0.96664, 1e-5)
 
-    assert_almost_equal_num(upper_bound[1], 2.6033, 1e-4)
-    assert_almost_equal_num(upper_bound[2], 2.6035, 1e-4)
+    assert_almost_equal_num(upper_bound[1], 1.0020, 1e-4)
+    assert_almost_equal_num(upper_bound[2], 1.0021, 1e-4)
 end function
 test_naiveFC_medianfc_awm_stat(y, xlist)
 
