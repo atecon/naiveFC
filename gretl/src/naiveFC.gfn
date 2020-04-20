@@ -50,12 +50,15 @@ if check
   return self
 endif
 smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
-series self.y = y
+series self.y = endogenous_series_in_logs(y, self)
 do_naive_forecasting(&amp;self)
 if self.which == &quot;avgfc&quot;
   self.forecast_results.avgfc = compute_avgerage_forecast(&amp;self)
 endif
 summarize_naive_fc_results(&amp;self)
+if self.endogenous_in_logs
+  series self.y = exp(self.y)
+endif
 cleanup_bundle(&amp;self)
 return self
 </code>
@@ -103,7 +106,6 @@ call_plot(plotlist, self)
  </params>
 <code>/* Transform interval forecasts into a list of series and return this. */
 list R = null
-series y = self.y
 if !exists(suffix)
   string suffix = &quot;&quot;
 endif
@@ -127,10 +129,10 @@ return list_of_forecasts(self, horizons, suffix)
   <param name="xlist" type="list" optional="true" const="true">
 <description>Additional exogenous (future values must be known)</description>
   </param>
-  <param name="which" type="int" min="1" max="11" default="1">
+  <param name="which" type="int" min="1" max="12" default="1">
 <description>Model type</description>
-<labels count="11">
-"meanFC" "medianFC" "rwFC" "rwdriftFC" "ar1FC" "ar1trendFC" "smeanFC" "smedianFC" "snaiveFC" "snaivedriftFC" "avgFC" </labels>
+<labels count="12">
+"meanFC" "medianFC" "rwFC" "rwdriftFC" "ar1FC" "ar1trendFC" "ar1ma1fc" "smeanFC" "smedianFC" "snaiveFC" "snaivedriftFC" "avgFC" </labels>
   </param>
   <param name="h" type="int" min="1" default="10">
 <description>Forecast horizon</description>
@@ -153,6 +155,35 @@ if Plot
   naivePlot(&amp;self)
 endif
 return self.fc
+</code>
+</gretl-function>
+<gretl-function name="y_has_zero_negative_vals" type="scalar" private="1">
+ <params count="2">
+  <param name="y" type="series" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Check whether y includes zero or negative values.
+return: 0 if not zero or negative values, otherwise 1. */
+smpl y != replace_nan_value_by() --restrict
+scalar ret = (sum(y &lt;= 0) &gt; 0) ? TRUE : FALSE
+if self.verbose &gt; 0 &amp;&amp; ret == TRUE
+  printWarning(&quot;Endogenous series includes zero or negative values&quot;)
+endif
+return ret
+</code>
+</gretl-function>
+<gretl-function name="endogenous_series_in_logs" type="series" private="1">
+ <params count="2">
+  <param name="y" type="series" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Return input series in natural logs if specified. */
+scalar code = y_has_zero_negative_vals(y, self)
+if self.endogenous_in_logs == TRUE &amp;&amp; code == FALSE
+  return log(y)
+else
+  return y
+endif
 </code>
 </gretl-function>
 <gretl-function name="print_dropped_series" type="void" private="1">
@@ -306,8 +337,9 @@ return sample_end
 </gretl-function>
 <gretl-function name="replace_nan_value_by" type="scalar" private="1">
 <code>/* Set value for replacing future unknown values
-of series to be forecasted by a specific value. */
-return -9876543210
+of series to be forecasted by a specific value. Number should be positive
+to avoid problems in case the endogenous is transformed to logarithms. */
+return abs(98765432107)
 </code>
 </gretl-function>
 <gretl-function name="repl_sampleend_missings_of_y" type="scalar" private="1">
@@ -540,7 +572,7 @@ return future_dates
   <param name="collected_point_fc_and_sderr" type="matrices" const="true"/>
   <param name="self" type="bundleref"/>
  </params>
-<code>/* Using each model's point forecast and standard error, compute
+<code>/* Using each model's point forecast and forecast standard errors, compute
 the forecast interval assuming standard normal. */
 bundle bout
 scalar m = nelem(collected_point_fc_and_sderr)
@@ -548,11 +580,24 @@ matrices point_forecasts = array(m)
 matrices factors = array(m)
 loop i=1..m -q
   point_forecasts[i] = collected_point_fc_and_sderr[i][,1]
-  factors[i] = fc_interval_width(collected_point_fc_and_sderr[i][,1], self.level)
+  factors[i] = fc_interval_width(collected_point_fc_and_sderr[i][,2], self.level)
 endloop
 bout.point_forecasts = point_forecasts
 bout.factors = factors
 return bout
+</code>
+</gretl-function>
+<gretl-function name="fc_interval_width" type="matrix" private="1">
+ <params count="2">
+  <param name="fc_sd" type="matrix" const="true">
+<description>Std. error of forecast</description>
+  </param>
+  <param name="level" type="scalar" min="0.001" max="0.999" const="true">
+<description>confidence level</description>
+  </param>
+ </params>
+<code>/* Compute width for a given condifdence level assuming standard normal. */
+return fc_sd * critical(z, (1 - level) / 2 )
 </code>
 </gretl-function>
 <gretl-function name="x_train_test_mats_static_case" type="void" private="1">
@@ -677,25 +722,12 @@ return defarray(&quot;smeanfc&quot;, &quot;smedianfc&quot;, &quot;snaivefc&quot;
 </gretl-function>
 <gretl-function name="get_supported_nonseas_methods" type="strings" private="1">
 <code>/* List all non-seasonal supported methods here. */
-return defarray(&quot;meanfc&quot;, &quot;medianfc&quot;, &quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;ar1fc&quot;, &quot;ar1trendfc&quot;, &quot;avgfc&quot;)
+return defarray(&quot;meanfc&quot;, &quot;medianfc&quot;, &quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;ar1fc&quot;, &quot;ar1trendfc&quot;, &quot;avgfc&quot;, &quot;ar1ma1fc&quot;)
 </code>
 </gretl-function>
 <gretl-function name="data_has_seasonality" type="scalar" private="1">
 <code>/* Flag seasonality of data set */
 return ($pd &gt; 1) ? 1 : 0
-</code>
-</gretl-function>
-<gretl-function name="fc_interval_width" type="matrix" private="1">
- <params count="2">
-  <param name="fc_sd" type="matrix" const="true">
-<description>Std. error of forecast</description>
-  </param>
-  <param name="level" type="scalar" min="0.001" max="0.999" const="true">
-<description>confidence level</description>
-  </param>
- </params>
-<code>/* Compute width for a given condifdence level assuming standard normal. */
-return fc_sd * critical(z, (1 - level) / 2 )
 </code>
 </gretl-function>
 <gretl-function name="gen_column_names" type="strings" private="1">
@@ -790,6 +822,7 @@ dict_models.rwfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &
 dict_models.rwdriftfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 0 1 0 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1trendfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 1, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+dict_models.ar1ma1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 1 0 1 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 return dict_models
 </code>
 </gretl-function>
@@ -799,11 +832,13 @@ return dict_models
  </params>
 <code>/* Set default values */
 bundle self = null
-scalar self.error = 0
+scalar self.error = FALSE
+scalar self.y_is_always_zero = FALSE
 list self.xlist = null
+scalar self.endogenous_in_logs = FALSE
 scalar self.horizon = 10				# maximum forecast horizon
 scalar self.level = 0.9					# probability level for forecast interval
-scalar self.fan = 0						# plot fan chart  (not supported yet)
+scalar self.fan = FALSE						# plot fan chart  (not supported yet)
 scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
 scalar self.blength = 4					# Block length bootstrap  (not supported yet)
 scalar self.is_seas = data_has_seasonality()
@@ -876,6 +911,7 @@ if $error
   return forecast_results
 endif
 if series_is_always_zero(y)
+  self.y_is_always_zero = TRUE
   matrix forecast_results = zeros(self.horizon, 2)
   if self.verbose
     printWarning(sprintf(&quot;Training set of endogenous includes only zero-values.\n               Forecasts and associated standard-errors are assumed to be zero.&quot;))
@@ -904,13 +940,10 @@ return forecast_results
  </params>
 <code>/* Helper function perfoming some initial checks */
 pkg query extra --quiet
-# FIXME: This fails
-/*
-if atof($result.version) &lt; 0.6
+if $result.version &lt; 0.6
   printError(&quot;You need at least version 0.6 of the 'extra' package.&quot;)
   printError(&quot;Update by executing 'pkg install extra'&quot;)
 endif
-*/
 strings methods = get_supported_nonseas_methods()
 strings seas_methods = get_supported_seas_methods()
 # Check whether called method exists
@@ -1032,10 +1065,13 @@ endloop
  </params>
 <code>/* Print summarising information */
 if self.verbose
-  printf &quot;-------------------------------------------------------------------\n&quot;
+  printf &quot;\n-------------------------------------------------------------------\n&quot;
   printf &quot;\t\tSummary of naive forecasting\n&quot;
   printf &quot;\nForecasting method: \t\t\t%s\n&quot;, self.which
   printf &quot;Endogenous: \t\t\t\t%s\n&quot;, self.name_endo
+  if self.endogenous_in_logs
+    printf &quot;Estimates based on logarithms of %s\n&quot;, self.name_endo
+  endif
   printf &quot;Number of additional regressors: \t%d\n&quot;, nelem(self.xlist)
   printf &quot;In-Sample: \t\t\t\t%s to %s (T = %d)\n&quot;, self.t1_date_y, self.t2_date_y, nobs(self.y) - self.horizon
   printf &quot;Max. forecast horizon: \t\t\t%d\n&quot;, self.horizon
@@ -1076,21 +1112,66 @@ matrices collected_point_fc_and_sderr = set_model_estimate_and_forecast(&amp;cv,
 bundle forecasts_and_factors = point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &amp;self)
 # Retrieve moving-window point_forecasts from array,
 # compute forecast intervals and put stuff to bundle
-return compute_intval_forecasts(forecasts_and_factors)
+if self.endogenous_in_logs == FALSE || self.y_is_always_zero == TRUE
+  return compute_intval_forecasts(forecasts_and_factors)
+elif self.endogenous_in_logs == TRUE &amp;&amp; self.y_is_always_zero == FALSE
+  bundle interval_forecasts = compute_intval_forecasts(forecasts_and_factors)
+  bundle intval_fc_in_levels = intval_forecasts_to_levels(interval_forecasts, collected_point_fc_and_sderr, self)
+  return intval_fc_in_levels
+endif
 </code>
 </gretl-function>
 <gretl-function name="compute_intval_forecasts" type="bundle" private="1">
  <params count="1">
   <param name="forecasts_and_factors" type="bundle" const="true"/>
  </params>
-<code>/* Generate for each model based on respective point forecasts and
-estimated standard derrors, arrays holding interval forecasts. */
+<code>/* Generate arrays holding interval forecasts for each model based
+on respective point forecasts and estimated standard derrors. */
 bundle interval_forecasts
 matrix interval_forecasts.forecasts_point = flatten(forecasts_and_factors.point_forecasts) # rows: horizons, cols: sample period
 matrix factors_flattened = flatten(forecasts_and_factors.factors)
 matrix interval_forecasts.forecasts_lower_bound = interval_forecasts.forecasts_point .- factors_flattened
 matrix interval_forecasts.forecasts_upper_bound = interval_forecasts.forecasts_point .+ factors_flattened
 return interval_forecasts
+</code>
+</gretl-function>
+<gretl-function name="intval_forecasts_to_levels" type="bundle" private="1">
+ <params count="3">
+  <param name="interval_forecasts" type="bundle" const="true"/>
+  <param name="collected_point_fc_and_sderr" type="matrices" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Once interval forecasts are computed but the endogenous was transformed to
+logarithms, we need to compute the levels of the interval forecasts. */
+bundle in_levels
+scalar m = nelem(collected_point_fc_and_sderr)	# number of moving-windows
+matrix in_levels.forecasts_point = NA * zeros(self.horizon, m)
+matrix in_levels.forecasts_lower_bound = NA * zeros(self.horizon, m)
+matrix in_levels.forecasts_upper_bound = NA * zeros(self.horizon, m)
+loop i=1..m -q
+  in_levels.forecasts_point[,i] = log_linear_to_levels(interval_forecasts.forecasts_point[,i], collected_point_fc_and_sderr[i][,2])
+  in_levels.forecasts_lower_bound[,i] = log_linear_to_levels(interval_forecasts.forecasts_lower_bound[,i], collected_point_fc_and_sderr[i][,2])
+  in_levels.forecasts_upper_bound[,i] = log_linear_to_levels(interval_forecasts.forecasts_upper_bound[,i], collected_point_fc_and_sderr[i][,2])
+endloop
+return in_levels
+</code>
+</gretl-function>
+<gretl-function name="log_linear_to_levels" type="matrix" private="1">
+ <params count="2">
+  <param name="forecast" type="matrix" const="true">
+<description>Point forecast</description>
+  </param>
+  <param name="forecast_stderr" type="matrix" const="true">
+<description>Forecast standard error</description>
+  </param>
+ </params>
+<code>/* In case the endogenous was transformed to logarithms, retrieve the level.
+Important assumptions made:
+1) You want to forecast via conditional expectation (ie with quadratic loss)
+2) Data are at least approximately normal
+Read: https://davegiles.blogspot.com/2013/08/forecasting-from-log-linear-regressions.html
+*/
+return exp( forecast + 0.5 * forecast_stderr.^2 )
 </code>
 </gretl-function>
 <gretl-function name="set_model_estimate_and_forecast" type="matrices" private="1">
@@ -1108,7 +1189,7 @@ loop lwin=1..cv.n_folds -q
   # observations, we still can compute forecasts for $Ttest &lt; self.horizon
   scalar obs_left = $tmax - maxc(date_idx[,1])
   scalar self.horizon_current = xmin(self.horizon, obs_left)
-  if self.horizon_current == 0		# FIXME: Why is n_folds=81 but only n_folds=80 would work!
+  if self.horizon_current == 0
     break
   endif
   smpl minc(date_idx[,1]) (maxc(date_idx[,1]) + self.horizon_current)
@@ -1202,7 +1283,13 @@ set verbose off
 
 #include naiveFC.gfn --force				# TODO:
 
-string WD = &quot;/home/at/git/naiveFC/gretl&quot;
+if $sysinfo.hostname == &quot;dsb&quot;
+    string WD = &quot;/home/ninja/repo/naiveFC/gretl&quot;
+elif $sysinfo.hostname == &quot;bipower6&quot;
+    string WD = &quot;/home/atarasso/git/naiveFC/gretl&quot;
+else
+    string WD = &quot;/home/at/git/naiveFC/gretl&quot;
+endif
 set workdir @WD
 
 # TODO: can be dropped once gfn compiled
@@ -1216,7 +1303,7 @@ include &quot;./src/naiveFC_helper.inp&quot; --force
 
 # Load data
 #open AWM.gdt -q
-#series y = YGA
+#series y = GCR_YER * 100
 
 open &quot;../tests/daily_data.gdt&quot; -q
 series y = target
@@ -1316,22 +1403,24 @@ series y = target
 #=========================
 bundle opts = null					# setup additional options
 opts.horizon = 10
-opts.type_moving_window = &quot;rolling&quot; 		# &quot;rolling&quot; / &quot;recursive&quot; -&gt; type of moving-window forecasting  (optional)
+opts.type_moving_window = &quot;rolling&quot; #/ &quot;recursive&quot; -&gt; type of moving-window forecasting  (optional)
+scalar opts.endogenous_in_logs = TRUE
 # opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
 catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
-#opts.verbose = 1						# print details (optional)
+# opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
 # TODO as we forecast only to the last valid obs of y in this case anyway!
 # FIXME: moving-window fc with &quot;avgfc&quot;
 
-strings methods = defarray(&quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, \
+strings methods = defarray(&quot;ar1ma1fc&quot;, &quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, \
   &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, &quot;snaivedriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgfc&quot;)
 
 bundle b = null
 bundle b = naiveFC(y, methods[1], opts)
-
+b
+#stop
 bundle forecast_results = b.forecast_results
 #eval forecast_results.smeanfc
 #eval forecast_results.smeanfc.forecasts_point
@@ -1340,8 +1429,8 @@ list FC = get_naive_forecasts(b, {1,2})
 
 b.pre_fc_periods_to_plot = 60					# set no. of pre.-forecast periods obs. to plot
 plot_naive_forecasts(b, {1}, &quot;meanfc&quot;)
-plot_naive_forecasts(b, {1}, &quot;ar1FC&quot;)
-plot_naive_forecasts(b, {1}, &quot;avgfc&quot;)
+#plot_naive_forecasts(b, {1}, &quot;ar1FC&quot;)
+#plot_naive_forecasts(b, {1}, &quot;avgfc&quot;)
 </sample-script>
 </gretl-function-package>
 </gretl-functions>
