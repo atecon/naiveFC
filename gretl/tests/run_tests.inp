@@ -197,7 +197,7 @@ function void test_prepare_forecast_bundles (void)
     b = prepare_forecast_bundles(&b)
     bundle fc = b.snaivefc
 
-    assert_equal_num(nelem(b), 10)
+    assert_equal_num(nelem(b), 11)
     assert_true(inbundle(b, snaivefc))
     assert_equal_num(nelem(fc), 0)
 end function
@@ -334,7 +334,7 @@ function void test_get_supported_ns_methods (void)
     print "Start with get_supported_nonseas_methods()"
 
     strings S = get_supported_nonseas_methods()
-    assert_equal_num(nelem(S), 7)
+    assert_equal_num(nelem(S), 8)
 
     assert_equal_str(S[1], "meanfc")
     assert_equal_str(S[2], "medianfc")
@@ -343,6 +343,7 @@ function void test_get_supported_ns_methods (void)
     assert_equal_str(S[5], "ar1fc")
     assert_equal_str(S[6], "ar1trendfc")
     assert_equal_str(S[7], "avgfc")
+    assert_equal_str(S[8], "ar1ma1fc")
 end function
 
 
@@ -363,11 +364,11 @@ function void test_get_estimator_names (void)
 
     scalar is_seas = 0
     strings S = get_estimator_names(is_seas)
-    assert_equal_num(nelem(S), 6)
+    assert_equal_num(nelem(S), 7)
 
     scalar is_seas = 1
     strings S = get_estimator_names(is_seas)
-    assert_equal_num(nelem(S), 10)
+    assert_equal_num(nelem(S), 11)
 end function
 
 

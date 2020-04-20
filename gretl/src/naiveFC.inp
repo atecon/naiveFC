@@ -86,6 +86,14 @@ function bundle dict_models (void)
       "add_intercept", 1, \
       "add_ohe_periods", 0 \
       )
+    dict_models.ar1ma1fc = defbundle( \
+      "forecast_arg", "--dynamic", \
+      "command", "arima 1 0 1 ; y xlist",
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
+      )
 
     return dict_models
 end function
@@ -733,8 +741,8 @@ end function
 # FIXME
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
-      int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
-      "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
+      int which[1:12:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
+      "ar1FC", "ar1trendFC", "ar1ma1fc", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
       int h[1::10] "Forecast horizon",
       bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */

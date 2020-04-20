@@ -805,7 +805,7 @@ function void test_naiveFC_avgfc_awm (series y)
     assert_equal_num(b.window_length, 107)
     assert_equal_num(b.horizon, 10)
 
-    assert_equal_num(nelem(forecast_results), 11)
+    assert_equal_num(nelem(forecast_results), 12)
     assert_equal_num(nelem(forecast_results.ar1trendfc), 3)
 end function
 test_naiveFC_avgfc_awm(y)
