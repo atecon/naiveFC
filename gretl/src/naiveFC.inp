@@ -86,6 +86,14 @@ function bundle dict_models (void)
       "add_intercept", 1, \
       "add_ohe_periods", 0 \
       )
+    dict_models.ar1ma1fc = defbundle( \
+      "forecast_arg", "--dynamic", \
+      "command", "arima 1 0 1 ; y xlist",
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
+      )
 
     return dict_models
 end function
@@ -95,11 +103,13 @@ function bundle default_values (const series y)
     /* Set default values */
 
     bundle self = null
-    scalar self.error = 0
+    scalar self.error = FALSE
+    scalar self.y_is_always_zero = FALSE
     list self.xlist = null
+    scalar self.endogenous_in_logs = FALSE
     scalar self.horizon = 10				# maximum forecast horizon
     scalar self.level = 0.9					# probability level for forecast interval
-    scalar self.fan = 0						# plot fan chart  (not supported yet)
+    scalar self.fan = FALSE						# plot fan chart  (not supported yet)
     scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
     scalar self.blength = 4					# Block length bootstrap  (not supported yet)
     scalar self.is_seas = data_has_seasonality()
@@ -185,12 +195,12 @@ function matrix set_xlist_and_forecast (bundle *self)
     endif
 
     if series_is_always_zero(y)
+        self.y_is_always_zero = TRUE
         matrix forecast_results = zeros(self.horizon, 2)
         if self.verbose
             printWarning(sprintf("Training set of endogenous includes only zero-values.\n\
               Forecasts and associated standard-errors are assumed to be zero."))
         endif
-
         return forecast_results
     endif
 
@@ -222,13 +232,11 @@ function void do_initial_checks (bundle *self)
     /* Helper function perfoming some initial checks */
 
     pkg query extra --quiet
-    # FIXME: This fails
-    /*
-       if atof($result.version) < 0.6
-       printError("You need at least version 0.6 of the 'extra' package.")
-       printError("Update by executing 'pkg install extra'")
-       endif
-    */
+
+    if $result.version < 0.6
+        printError("You need at least version 0.6 of the 'extra' package.")
+        printError("Update by executing 'pkg install extra'")
+    endif
 
     strings methods = get_supported_nonseas_methods()
     strings seas_methods = get_supported_seas_methods()
@@ -351,7 +359,8 @@ function bundle naiveFC (const series y,
     endif
 
     smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
-    series self.y = y
+
+    series self.y = endogenous_series_in_logs(y, self)
 
     do_naive_forecasting(&self)
 
@@ -360,6 +369,11 @@ function bundle naiveFC (const series y,
     endif
 
     summarize_naive_fc_results(&self)
+
+    if self.endogenous_in_logs
+        series self.y = exp(self.y)
+    endif
+
     cleanup_bundle(&self)
 
     return self
@@ -422,10 +436,13 @@ function void summarize_naive_fc_results (bundle *self)
     /* Print summarising information */
 
     if self.verbose
-        printf "-------------------------------------------------------------------\n"
+        printf "\n-------------------------------------------------------------------\n"
         printf "\t\tSummary of naive forecasting\n"
         printf "\nForecasting method: \t\t\t%s\n", self.which
         printf "Endogenous: \t\t\t\t%s\n", self.name_endo
+        if self.endogenous_in_logs
+            printf "Estimates based on logarithms of %s\n", self.name_endo
+        endif
         printf "Number of additional regressors: \t%d\n", nelem(self.xlist)
         printf "In-Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date_y, \
           self.t2_date_y, nobs(self.y) - self.horizon
@@ -472,14 +489,21 @@ function bundle execute_forecasting (bundle *self)
 
     # Retrieve moving-window point_forecasts from array,
     # compute forecast intervals and put stuff to bundle
-    return compute_intval_forecasts(forecasts_and_factors)
+    if self.endogenous_in_logs == FALSE || self.y_is_always_zero == TRUE
+        return compute_intval_forecasts(forecasts_and_factors)
+    elif self.endogenous_in_logs == TRUE && self.y_is_always_zero == FALSE
+        bundle interval_forecasts = compute_intval_forecasts(forecasts_and_factors)
+        bundle intval_fc_in_levels = intval_forecasts_to_levels(interval_forecasts,\
+          collected_point_fc_and_sderr, self)
+        return intval_fc_in_levels
+    endif
 end function
 
 
 # TODO: untested
 function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
-/* Generate for each model based on respective point forecasts and
-    estimated standard derrors, arrays holding interval forecasts. */
+/* Generate arrays holding interval forecasts for each model based
+    on respective point forecasts and estimated standard derrors. */
 
     bundle interval_forecasts
 
@@ -497,6 +521,49 @@ function bundle compute_intval_forecasts (const bundle forecasts_and_factors)
     return interval_forecasts
 end function
 
+# TODO: untested
+function bundle intval_forecasts_to_levels (const bundle interval_forecasts,
+                                            const matrices collected_point_fc_and_sderr,
+                                            const bundle self)
+    /* Once interval forecasts are computed but the endogenous was transformed to
+    logarithms, we need to compute the levels of the interval forecasts. */
+
+    bundle in_levels
+    scalar m = nelem(collected_point_fc_and_sderr)	# number of moving-windows
+    matrix in_levels.forecasts_point = NA * zeros(self.horizon, m)
+    matrix in_levels.forecasts_lower_bound = NA * zeros(self.horizon, m)
+    matrix in_levels.forecasts_upper_bound = NA * zeros(self.horizon, m)
+
+    loop i=1..m -q
+        in_levels.forecasts_point[,i] = \
+          log_linear_to_levels(interval_forecasts.forecasts_point[,i],\
+          collected_point_fc_and_sderr[i][,2])
+
+        in_levels.forecasts_lower_bound[,i] = \
+          log_linear_to_levels(interval_forecasts.forecasts_lower_bound[,i],\
+          collected_point_fc_and_sderr[i][,2])
+
+        in_levels.forecasts_upper_bound[,i] = \
+          log_linear_to_levels(interval_forecasts.forecasts_upper_bound[,i],\
+          collected_point_fc_and_sderr[i][,2])
+    endloop
+
+    return in_levels
+end function
+
+
+# TODO: untested
+function matrix log_linear_to_levels (const matrix forecast "Point forecast",
+                                      const matrix forecast_stderr "Forecast standard error")
+    /* In case the endogenous was transformed to logarithms, retrieve the level.
+       Important assumptions made:
+       1) You want to forecast via conditional expectation (ie with quadratic loss)
+       2) Data are at least approximately normal
+       Read: https://davegiles.blogspot.com/2013/08/forecasting-from-log-linear-regressions.html
+    */
+
+    return exp( forecast + 0.5 * forecast_stderr.^2 )
+end function
 
 
 # TODO: untested
@@ -515,7 +582,7 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
         scalar obs_left = $tmax - maxc(date_idx[,1])
         scalar self.horizon_current = xmin(self.horizon, obs_left)
 
-        if self.horizon_current == 0		# FIXME: Why is n_folds=81 but only n_folds=80 would work!
+        if self.horizon_current == 0
             break
         endif
 
@@ -549,7 +616,6 @@ function list get_naive_forecasts (const bundle self,
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
-    series y = self.y
     if !exists(suffix)
         string suffix = ""
     endif
@@ -564,7 +630,6 @@ function list get_naive_forecasts (const bundle self,
     endif
 
     smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
-
 
     return list_of_forecasts(self, horizons, suffix)
 end function
@@ -638,6 +703,7 @@ function list get_model_forecasts_from_list (const list plotlist,
     return new
 end function
 
+
 # untested
 function void call_plot (const list plotlist,
                          const bundle self)
@@ -675,8 +741,8 @@ end function
 # FIXME
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
-      int which[1:11:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
-      "ar1FC", "ar1trendFC", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
+      int which[1:12:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
+      "ar1FC", "ar1trendFC", "ar1ma1fc", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
       int h[1::10] "Forecast horizon",
       bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */
