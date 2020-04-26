@@ -1,0 +1,888 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"ex",
+				"exit"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "src/naiveFC.inp",
+			"settings":
+			{
+				"buffer_size": 23383,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "include naiveFC_helper.inp\n\nfunction bundle dict_models (void)\n/* Dictionary including stuff for calling estimation\n    command and fcast command. */\n\n    bundle dict_models\n\n    dict_models.meanfc = defbundle( \\\n      \"forecast_arg\", \"--static\", \\\n      \"command\", \"ols y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.medianfc = defbundle( \\\n      \"forecast_arg\", \"--static\", \\\n      \"command\", \"quantreg 0.5 y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.smeanfc = defbundle( \\\n      \"forecast_arg\", \"--static\", \\\n      \"command\", \"ols y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 1 \\\n      )\n    dict_models.smedianfc = defbundle( \\\n      \"forecast_arg\", \"--static\", \\\n      \"command\", \"quantreg 0.5 y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 1 \\\n      )\n    dict_models.snaivefc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"arima 0 0 0 ; 0 1 0 ; y xlist --nc\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.snaivedriftfc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"arima 0 0 0 ; 0 1 0 ; y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.rwfc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"arima 0 1 0 ; y xlist --nc\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 0, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.rwdriftfc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"arima 0 1 0 ; y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 0, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.ar1fc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"ols y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 1, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.ar1trendfc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"ols y xlist\", \\\n      \"add_linear_trend\", 1, \\\n      \"add_first_lag\", 1, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n\n    return dict_models\nend function\n\n\nfunction bundle default_values (const series y)\n    /* Set default values */\n\n    bundle self = null\n    scalar self.error = 0\n    list self.xlist = null\n    scalar self.horizon = 10\t\t\t\t# maximum forecast horizon\n    scalar self.level = 0.9\t\t\t\t\t# probability level for forecast interval\n    scalar self.fan = 0\t\t\t\t\t\t# plot fan chart  (not supported yet)\n    scalar self.nboot = 0\t\t\t\t\t# no. of bootstrap replications  (not supported yet)\n    scalar self.blength = 4\t\t\t\t\t# Block length bootstrap  (not supported yet)\n    scalar self.is_seas = data_has_seasonality()\n    strings self.supported_estimators = get_estimator_names(self.is_seas)\n    scalar self.verbose = 1\n\n    genr index\n    series self.index = index\n\n    string self.type_moving_window = \"static\" \t\t\t# \"static\", \"rolling\" or \"recursive\"\n    scalar self.window_length = ceil(0.25 * nobs(y))\t# default window length for moving-windows\n\n    # For naivePlot()\n    string self.title = \"\"\n    string self.ylab = \"\"\n    string self.xlab = \"\"\n    string self.filename = \"display\"\n    scalar self.pre_fc_periods_to_plot = int(0.25 * nobs(y))\n\n    return self\nend function\n\n\n\n# TODO: untested\nfunction list prepare_xlist (const bundle model_settings,\n                             const bundle self)\n    /* Prepare list of additional regressors. */\n\n    list xlist = null\n\n    if model_settings.add_ohe_periods\n        xlist += add_ohe_periods_to_list()\n    endif\n    if model_settings.add_intercept\n        xlist += add_intercept_to_list()\n    endif\n    if model_settings.add_linear_trend\n        xlist += add_linear_trend_to_list()\n    endif\n\n    if inbundle(self, \"xlist\")\n        xlist += self.xlist\n    endif\n\n    # TODO: check for duplicates in xlist\n\n    return xlist\nend function\n\n\n# TODO: untested\nfunction matrix set_xlist_and_forecast (bundle *self)\n/* Set list of regressors, estimate model and compute\n    point forecast and forecast standard errors. */\n\n    bundle model_settings = dict_models()[self.active_model]\n    string fcast_arg = model_settings.forecast_arg\n    string command = model_settings.command\n    # TODO: consider 3 verbose levels: silent, normal, detailed\n    if self.verbose < 2\n        command += \" --quiet\"\t# estimation details only for detailed verbosity level\n        fcast_arg += \" --quiet\"\n    endif\n    matrix forecast_results = zeros(self.horizon, 2) * NA\n    series y = self.y\t\t\t\t\t# length: window_length + horizon\n\n    # \"(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)\"\n    # is not the effective sample length but (window_length-max(lags))\n    bundle train_obsnums = get_train_start_end_obsnums(self)\n    bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)\n\n    list xlist = prepare_xlist(model_settings, self)\n    if model_settings.add_first_lag\n        xlist += y(-1)\n    endif\n\n    catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum\n    if $error\n        printError(\"Failed to set training sample. Check your sample and window size.\")\n        scalar self.error = 1\n        return forecast_results\n    endif\n\n    if series_is_always_zero(y)\n        matrix forecast_results = zeros(self.horizon, 2)\n        if self.verbose\n            printWarning(sprintf(\"Training set of endogenous includes only zero-values.\\n\\\n              Forecasts and associated standard-errors are assumed to be zero.\"))\n        endif\n\n        return forecast_results\n    endif\n\n    list xlist_new = drop_zero_series_from_list(xlist)\n    print_dropped_series(xlist, xlist_new, self)\n    list xlist = xlist_new\n\n    # TODO: Can this happen, and if so why -- otherwise drop\n    if self.type_moving_window != \"static\" && ($nobs > self.window_length)\n        printError(sprintf(\"You training sample (T=%d) is longer than the\\n\\\n          specified window length (T=%d).\", $nobs, self.window_length))\n\n        scalar self.error = 1\n        return forecast_results\n    endif\n\n    self.error = estimate_model_and_forecast(command, fcast_arg, y, \\\n      xlist, train_obsnums, test_obsnums, self)\n    if self.error == 0\n        forecast_results[1:self.horizon_current,] = $fcast ~ $fcse\n    endif\n\n    return forecast_results\nend function\n\n\n# TODO: put checks into separate functions\nfunction void do_initial_checks (bundle *self)\n    /* Helper function perfoming some initial checks */\n\n    pkg query extra --quiet\n    # FIXME: This fails\n    /*\n       if atof($result.version) < 0.6\n       printError(\"You need at least version 0.6 of the 'extra' package.\")\n       printError(\"Update by executing 'pkg install extra'\")\n       endif\n    */\n\n    strings methods = get_supported_nonseas_methods()\n    strings seas_methods = get_supported_seas_methods()\n\n    # Check whether called method exists\n    if !nelem(strpos(methods, self.which)) && !nelem(strpos(seas_methods, self.which))\n        printError(\"The forecasting method you selected does not exist.\")\n        self.error = 1\n    endif\n\n    if !self.is_seas && nelem(strpos(seas_methods, self.which))\n        printError(\"The method you requested is not available for non-seasonal data.\")\n        self.error = 1\n    endif\n\n    # TODO: Why is this necessary??\n    if self.window_length < $pd\n        printError(sprintf(\"Window size = %d\", self.window_length))\n        printError(sprintf(\"Periodicity = %d\\n\", $pd))\n        printError(\"The size of the moving window cannot be smaller than the underlying periodicity.\")\n        #        self.error = 1\t\t# TODO: don't return error as long as it is not clear why/ when this case matters\n    endif\n\n    if self.nboot\n        print_no_bootstrap_support()\n        self.error = 1\n    endif\n\n    if nelem(self.xlist) > 0 \\\n          && (self.which == \"rwfc\" || self.which == \"rwdriftfc\" || self.which == \"snaivefc\" || self.which == \"snaivedriftfc\")\n\n        printError(sprintf(\"No exogenous variables can be included for the selected model '%s'.\", self.which))\n        self.error = 1\n    endif\nend function\n\n\n# TODO: untested\nfunction void t1_and_t2_of_y_and_xlist (const series y,\n                                        bundle *self)\n    /* Check valid start and end dates of y and xlist. */\n\n    list xlist = self.xlist\n    scalar t1_curr = $t1\n    scalar t2_curr = $tmax\n    bundle obsdetails_y\n    bundle obsdetails_x\n\n    obslabels_and_nobs_to_bundle(y, &obsdetails_y)\n    string self.t1_date_y = obsdetails_y.t1_date\n    string self.t2_date_y = \\\n      obslabel(obsnum(obsdetails_y.t2_date) - self.n_sampleend_obs_replaced)\n    scalar self.t1_obsnum_y = obsnum(self.t1_date_y)\n    scalar self.t2_obsnum_y = obsnum(self.t2_date_y)\n\n    scalar t1_diff_y = self.t1_obsnum_y - t1_curr\n    scalar t2_diff_y = t2_curr - self.t2_obsnum_y\n\n    if t1_diff_y > 0\n        printWarning(sprintf(\"Found %d missing initial observations for %s.\", \\\n          t1_diff_y, self.name_endo))\n    endif\n\n    if nelem(xlist)\n        obslabels_and_nobs_to_bundle(xlist, &obsdetails_x)\n        scalar self.t1_obsnum_xlist = obsnum(obsdetails_x.t1_date)\n        scalar self.t2_obsnum_xlist = obsnum(obsdetails_x.t2_date)\n        string self.t1_date_xlist = obsdetails_x.t1_date\n        string self.t2_date_xlist = obsdetails_x.t2_date\n        scalar t1_diff_x = self.t1_obsnum_xlist - t1_curr\n        scalar t2_diff_x = t2_curr - self.t2_obsnum_xlist\n\n        if t1_diff_x > 0\n            printWarning(sprintf(\"Found %d missing initial observations for exogenous.\",\\\n              t1_diff_x))\n        endif\n        if t2_diff_x > 0\n            printWarning(sprintf(\"Found %d missing observations at sample end for exogenous.\",\\\n              t2_diff_x))\n        endif\n    endif\nend function\n\n\nfunction bundle naiveFC (const series y,\n                         string which \"Select forecasting method\",\n                         bundle opts[null] \"Bundle incl. optional parameters\")\n    /* Main package function */\n\n    if !exists(opts)\n        bundle opts = null\n    endif\n    bundle self = set_bundle(y, which, opts)\n\n    do_initial_checks(&self)\t# TODO: return scalar capturing error!\n    if self.error\n        return self\n    endif\n\n    # Replace of missing at the sample end\n    # must be done here before 't1_and_t2_of_y_and_xlist'\n    self.n_sampleend_obs_replaced = repl_sampleend_missings_of_y(&y, self.verbose)\n\n    t1_and_t2_of_y_and_xlist(y, &self)\n\n    if self.type_moving_window == \"static\"\n        # \"self.t2_date_y\" refers to in-sample end date of \"y\"\n        scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)\n    endif\n\n    scalar check = valid_dates_of_y_and_xlist(&self)\n    if check\n        printError(\"Problem with dating for y and/ or xlist.\")\n        return self\n    endif\n\n    scalar check = sufficient_future_obs(&self)\n    if check\n        return self\n    endif\n\n    smpl obsnum(self.t1_date_y) get_sample_end(self)\t\t# get_sample_end(self) = in-sample end plus max(horizon)\n    series self.y = y\n\n    do_naive_forecasting(&self)\n\n    if self.which == \"avgfc\"\n        self.forecast_results.avgfc = compute_avgerage_forecast(&self)\n    endif\n\n    summarize_naive_fc_results(&self)\n    cleanup_bundle(&self)\n\n    return self\nend function\n\n\nfunction void cleanup_bundle (bundle *self)\n    /* Delete some elements before returning to user. */\n\n    delete self.fan\n    delete self.blength\n    delete self.nboot\n    if inbundle(self,\"obs_season\")\n        delete self.obs_season\n    endif\n    delete self.supported_estimators\n    delete self.index\n    delete self.active_model\n    delete self.horizon_current\n    delete self.t1_date_y\n    delete self.t2_date_y\n    delete self.xlist\nend function\n\n\nfunction bundle prepare_forecast_bundles (bundle *self)\n/* Prepare for each estimator a dictionary for point\n    interval forecast results to be stored in matrices. */\n\n    bundle forecast_results\n\n    loop i=1..nelem(self.models) -q\n        string model = self.models[i]\n        bundle forecast_results[\"@model\"] = null\n    endloop\n\n    return forecast_results\nend function\n\n\nfunction void do_naive_forecasting (bundle *self)\n    /* Wrapper function actually calling procedures. */\n\n    strings models = getkeys(self.forecast_results)\n\n    loop i=1..nelem(self.forecast_results) -q\t# loop over models\n        self.active_model = models[i]\n\n        bundle interval_forecasts = execute_forecasting(&self)\n\n        attach_row_labels(&interval_forecasts, self)\n        attach_column_labels(&interval_forecasts, self)\n\n        self.forecast_results[self.active_model] = interval_forecasts\n    endloop\nend function\n\n\nfunction void summarize_naive_fc_results (bundle *self)\n    /* Print summarising information */\n\n    if self.verbose\n        printf \"-------------------------------------------------------------------\\n\"\n        printf \"\\t\\tSummary of naive forecasting\\n\"\n        printf \"\\nForecasting method: \\t\\t\\t%s\\n\", self.which\n        printf \"Endogenous: \\t\\t\\t\\t%s\\n\", self.name_endo\n        printf \"Number of additional regressors: \\t%d\\n\", nelem(self.xlist)\n        printf \"In-Sample: \\t\\t\\t\\t%s to %s (T = %d)\\n\", self.t1_date_y, \\\n          self.t2_date_y, nobs(self.y) - self.horizon\n        printf \"Max. forecast horizon: \\t\\t\\t%d\\n\", self.horizon\n        if self.type_moving_window == \"static\"\n            printf \"Last in-sample observation: \\t\\t%s\\n\", self.t2_train_date\n        elif self.type_moving_window == \"rolling\"\n            printf \"Moving window length: \\t\\t\\t%d\\n\", self.window_length\n        else\n            printf \"Initial window length: \\t\\t\\t%d\\n\", self.window_length\n        endif\n        if self.type_moving_window != \"static\"\n            printf \"Number of '%s' multi-step forecasts: %d\\n\", self.type_moving_window, \\\n              self.n_folds\n            printf \"First observation forecasted: \\t\\t%s\\n\", self.t1_forecast_date\n            printf \"Last observation forecasted: \\t\\t%s\\n\", self.t2_forecast_date\n        else\n            printf \"First observation forecasted (h=1): \\t%s\\n\", self.t1_forecast_date\n            printf \"Last observation forecasted (h=%d): \\t%s\\n\", self.horizon, \\\n              self.t2_forecast_date\n        endif\n        if self.type_moving_window == \"static\"\n            printf \"Width forecast interval: \\t\\t%d pct.\\n\", self.level * 100\n        else\n        endif\n        printf \"-------------------------------------------------------------------\\n\\n\"\n    endif\nend function\n\n\nfunction bundle execute_forecasting (bundle *self)\n/* This function estimates the point forecasts either in (i) a rolling or\n    (ii) a recursive manner and stores sequences of interval forecasts. */\n\n    bundle cv = prep_and_get_cv_folds(self)\n    self.n_folds = cv.n_folds\n\n    # Loop over training sets, run estimation and retrieve interval forecasts.\n    # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.\n    matrices collected_point_fc_and_sderr = set_model_estimate_and_forecast(&cv, &self)\n\n    bundle forecasts_and_factors = \\\n      point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &self)\n\n    # Retrieve moving-window point_forecasts from array,\n    # compute forecast intervals and put stuff to bundle\n    return compute_intval_forecasts(forecasts_and_factors)\nend function\n\n\n# TODO: untested\nfunction bundle compute_intval_forecasts (const bundle forecasts_and_factors)\n/* Generate for each model based on respective point forecasts and\n    estimated standard derrors, arrays holding interval forecasts. */\n\n    bundle interval_forecasts\n\n    matrix interval_forecasts.forecasts_point = \\\n      flatten(forecasts_and_factors.point_forecasts)\t# rows: horizons, cols: sample period\n\n    matrix factors_flattened = flatten(forecasts_and_factors.factors)\n\n    matrix interval_forecasts.forecasts_lower_bound = \\\n      interval_forecasts.forecasts_point .- factors_flattened\n\n    matrix interval_forecasts.forecasts_upper_bound = \\\n      interval_forecasts.forecasts_point .+ factors_flattened\n\n    return interval_forecasts\nend function\n\n\n\n# TODO: untested\nfunction matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)\n/* Loop over training sets, run estimation and retrieve\n    interval forecasts. */\n\n    matrices collected_point_fc_and_sderr = array(cv.n_folds)\n\n    loop lwin=1..cv.n_folds -q\n        matrix date_idx = cv.X_train[lwin]\n\n        # time index of the training set = self.window_length + self.horizon\n        # As the last rolling samples may inlude only a sample set less than self.horizon\n        # observations, we still can compute forecasts for $Ttest < self.horizon\n        scalar obs_left = $tmax - maxc(date_idx[,1])\n        scalar self.horizon_current = xmin(self.horizon, obs_left)\n\n        if self.horizon_current == 0\t\t# FIXME: Why is n_folds=81 but only n_folds=80 would work!\n            break\n        endif\n\n        smpl minc(date_idx[,1]) (maxc(date_idx[,1]) + self.horizon_current)\n\n        if lwin == 1\n            # CV series holds \"window_length+horizon\" observations: subtract \"horizon\"\n            self.t1_train_date = obslabel($t1)\n            string self.t2_train_date = obslabel($t2 - self.horizon_current)\n            string self.t1_forecast_date = obslabel($t2 - self.horizon_current + 1)\t# Date of 1st h=1 ahead forecast\n\n        elif lwin == (cv.n_folds - 1) && self.type_moving_window != \"static\"\n            self.t2_forecast_date = self.t2_date_y\t\t# Date of last h-step ahead forecast\n        endif\n        collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)\t# h by 2 matrix (point_fc ~ sderr)\n    endloop\n\n    if self.type_moving_window == \"static\"\n        string self.t2_forecast_date = obslabel(obsnum(self.t2_train_date) + self.horizon)\t# Date of last h-step ahead forecast\n    endif\n\n    return collected_point_fc_and_sderr\nend function\n\n\n# TODO: untested\n# Public function\nfunction list get_naive_forecasts (const bundle self,\n                                   matrix horizons[null] \"Select specific horizons (moving-window only)\",\n      const string suffix[null] \"Suffix for series' names\")\n    /* Transform interval forecasts into a list of series and return this. */\n\n    list R = null\n    series y = self.y\n    if !exists(suffix)\n        string suffix = \"\"\n    endif\n    if !exists(horizons)\n        matrix horizons = seq(1, self.horizon)\n    endif\n    matrix horizons = vec(horizons)\n\n    scalar err = horizons_isok(self, horizons)\n    if !err\n        return R\n    endif\n\n    smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)\t# don't drop\n\n\n    return list_of_forecasts(self, horizons, suffix)\nend function\n\n# TODO: add convenient function \"get_naive_forecast_errors()\"\n\n\n# untested\nfunction void plot_naive_forecasts (const bundle self \"Bundle returned from naiveFC()\",\n      const matrix horizons[null] \"Select only specific horizons\",\n      const string model[null] \"Select a model in case of avgfc\")\n    /* Function for plotting realizations and interval forecasts. */\n\n    if self.which == \"avgfc\" && !exists(model)\n        funcerr \"You must specify for which model to plot the forecasts.\"\n    endif\n    series y = self.y\n    setinfo y --graph-name=\"Actuals\"\n    /* re-set missing values back to NA */\n    series y = (y == replace_nan_value_by() && self.type_moving_window == \"static\") \\\n      ? NA : y\n\n    if !exists(horizons)\n        matrix horizons = seq(1, self.horizon)\n    endif\n\n    list plotlist = y get_naive_forecasts(self, horizons)\n    list plotlist = get_specific_model_for_avgfc(self, plotlist, model)\n\n    # incl. some pre-forecast periods obs. for plotting\n    scalar start = xmax(obsnum(self.t1_forecast_date) - self.pre_fc_periods_to_plot, \\\n      1)\n    smpl start obsnum(self.t2_forecast_date)\n\n    call_plot(plotlist, self)\nend function\n\n\n# untested\nfunction list get_specific_model_for_avgfc (const bundle self,\n                                            const list plotlist,\n                                            string model)\n    /* In case of \"avgfc\" we only plot the results for a specific model\n    but not for all in a single plot. */\n\n    if self.which == \"avgfc\"\n        string model = tolower(model)\n        list plotlist = get_model_forecasts_from_list(plotlist, model)\n        if nelem(plotlist) == 0\n            funcerr \"Model requested is not supported.\"\n        endif\n    endif\n\n    return plotlist\nend function\n\n\n# untested\nfunction list get_model_forecasts_from_list (const list plotlist,\n                                             const string model)\n    /* Retrieve from list only those series which include\n    model in its serie's name. */\n\n    list new = null\n    loop foreach i plotlist -q\n        if instring(varname(plotlist.$i), sprintf(\"_%s\", model))\n            list new += $i\n        endif\n    endloop\n\n    return new\nend function\n\n# untested\nfunction void call_plot (const list plotlist,\n                         const bundle self)\n    /* */\n\n    string filename = self.filename\n    scalar ylo\n    scalar yup\n    yaxis_ranges(plotlist, &ylo, &yup)\n\n    plot plotlist\n        options with-lp time-series single-yaxis\n        literal set linetype 1 lc rgb \"black\" lw 1 pt 0 ps 0\n        literal set linetype 3 lc rgb \"red\" lw 1.5 ps 0\n        literal set linetype 2 lc rgb \"grey\" lw 1.5 ps 0\n        literal set linetype 4 lc rgb \"grey\" lw 1.5 ps 0\n        literal set key left bottom below\n        #literal set key inside left bottom\n        #put the border more to the background by applying it\n        # only on the left and bottom part and put it and the tics in gray\n        literal set style line 11 lc rgb \"#808080\" lt 1\n        literal set border 3 back ls 11\t\t\t# get rid of upper + left border\n        literal set tics nomirror\n        #add a slight grid to make it easier to follow the exact position of the curves\n        literal set style line 12 lc rgb \"#808080\" lt 0 lw 1\t# light grey color\n        literal set grid back ls 12\n        printf \"set yrange[%g:%g]\", ylo, yup\n        printf \"set ylabel \\\"%s\\\"\", self.ylab\n        printf \"set xlabel \\\"%s\\\"\", self.xlab\n        printf \"set title \\\"%s\\\"\", self.title\n    end plot --output=\"@filename\"\nend function\n\n\n# FIXME\nfunction matrix GUI_naiveFC (const series y \"Dependent variable\",\n                             const list xlist[null] \"Additional exogenous (future values must be known)\",\n      int which[1:11:1] \"Model type\" {\"meanFC\", \"medianFC\", \"rwFC\", \"rwdriftFC\", \\\n      \"ar1FC\", \"ar1trendFC\", \"smeanFC\", \"smedianFC\", \"snaiveFC\", \"snaivedriftFC\", \"avgFC\"},\n      int h[1::10] \"Forecast horizon\",\n      bool Plot[1] \"Plot forecast\")\n    /* Helper function for GUI access. */\n\n    # map integer value to string\n    strings methods = get_supported_nonseas_methods()\n\n    bundle opts = null\n    bundle self = null\n    opts.h = h\n    opts.xlist = xlist\n    self = naiveFC(y, methods[which], opts)\n\n    # output\n    printf \"%12.4f\\n\", self.fc\n    if Plot\n        naivePlot(&self)\n    endif\n\n    return self.fc\nend function\n",
+			"settings":
+			{
+				"buffer_size": 23387,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "include naiveFC_helper.inp\n\nfunction bundle dict_models (void)\n/* Dictionary including stuff for calling estimation\n    command and fcast command. */\n\n    bundle dict_models\n\n    dict_models.meanfc = defbundle( \\\n      \"forecast_arg\", \"--static\", \\\n      \"command\", \"ols y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.medianfc = defbundle( \\\n      \"forecast_arg\", \"--static\", \\\n      \"command\", \"quantreg 0.5 y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.smeanfc = defbundle( \\\n      \"forecast_arg\", \"--static\", \\\n      \"command\", \"ols y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 1 \\\n      )\n    dict_models.smedianfc = defbundle( \\\n      \"forecast_arg\", \"--static\", \\\n      \"command\", \"quantreg 0.5 y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 1 \\\n      )\n    dict_models.snaivefc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"arima 0 0 0 ; 0 1 0 ; y xlist --nc\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.snaivedriftfc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"arima 0 0 0 ; 0 1 0 ; y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.rwfc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"arima 0 1 0 ; y xlist --nc\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 0, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.rwdriftfc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"arima 0 1 0 ; y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 0, \\\n      \"add_intercept\", 0, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.ar1fc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"ols y xlist\", \\\n      \"add_linear_trend\", 0, \\\n      \"add_first_lag\", 1, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n    dict_models.ar1trendfc = defbundle( \\\n      \"forecast_arg\", \"--dynamic\", \\\n      \"command\", \"ols y xlist\", \\\n      \"add_linear_trend\", 1, \\\n      \"add_first_lag\", 1, \\\n      \"add_intercept\", 1, \\\n      \"add_ohe_periods\", 0 \\\n      )\n\n    return dict_models\nend function\n\n\nfunction bundle default_values (const series y)\n    /* Set default values */\n\n    bundle self = null\n    scalar self.error = 0\n    list self.xlist = null\n    scalar self.horizon = 10\t\t\t\t# maximum forecast horizon\n    scalar self.level = 0.9\t\t\t\t\t# probability level for forecast interval\n    scalar self.fan = 0\t\t\t\t\t\t# plot fan chart  (not supported yet)\n    scalar self.nboot = 0\t\t\t\t\t# no. of bootstrap replications  (not supported yet)\n    scalar self.blength = 4\t\t\t\t\t# Block length bootstrap  (not supported yet)\n    scalar self.is_seas = data_has_seasonality()\n    strings self.supported_estimators = get_estimator_names(self.is_seas)\n    scalar self.verbose = 1\n\n    genr index\n    series self.index = index\n\n    string self.type_moving_window = \"static\" \t\t\t# \"static\", \"rolling\" or \"recursive\"\n    scalar self.window_length = ceil(0.25 * nobs(y))\t# default window length for moving-windows\n\n    # For naivePlot()\n    string self.title = \"\"\n    string self.ylab = \"\"\n    string self.xlab = \"\"\n    string self.filename = \"display\"\n    scalar self.pre_fc_periods_to_plot = int(0.25 * nobs(y))\n\n    return self\nend function\n\n\n\n# TODO: untested\nfunction list prepare_xlist (const bundle model_settings,\n                             const bundle self)\n    /* Prepare list of additional regressors. */\n\n    list xlist = null\n\n    if model_settings.add_ohe_periods\n        xlist += add_ohe_periods_to_list()\n    endif\n    if model_settings.add_intercept\n        xlist += add_intercept_to_list()\n    endif\n    if model_settings.add_linear_trend\n        xlist += add_linear_trend_to_list()\n    endif\n\n    if inbundle(self, \"xlist\")\n        xlist += self.xlist\n    endif\n\n    # TODO: check for duplicates in xlist\n\n    return xlist\nend function\n\n\n# TODO: untested\nfunction matrix set_xlist_and_forecast (bundle *self)\n/* Set list of regressors, estimate model and compute\n    point forecast and forecast standard errors. */\n\n    bundle model_settings = dict_models()[self.active_model]\n    string fcast_arg = model_settings.forecast_arg\n    string command = model_settings.command\n    # TODO: consider 3 verbose levels: silent, normal, detailed\n    if self.verbose < 2\n        command += \" --quiet\"\t# estimation details only for detailed verbosity level\n        fcast_arg += \" --quiet\"\n    endif\n    matrix forecast_results = zeros(self.horizon, 2) * NA\n    series y = self.y\t\t\t\t\t# length: window_length + horizon\n\n    # \"(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)\"\n    # is not the effective sample length but (window_length-max(lags))\n    bundle train_obsnums = get_train_start_end_obsnums(self)\n    bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)\n\n    list xlist = prepare_xlist(model_settings, self)\n    if model_settings.add_first_lag\n        xlist += y(-1)\n    endif\n\n    catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum\n    if $error\n        printError(\"Failed to set training sample. Check your sample and window size.\")\n        scalar self.error = 1\n        return forecast_results\n    endif\n\n    if series_is_always_zero(y)\n        matrix forecast_results = zeros(self.horizon, 2)\n        if self.verbose\n            printWarning(sprintf(\"Training set of endogenous includes only zero-values.\\n\\\n              Forecasts and associated standard-errors are assumed to be zero.\"))\n        endif\n\n        return forecast_results\n    endif\n\n    list xlist_new = drop_zero_series_from_list(xlist)\n    print_dropped_series(xlist, xlist_new, self)\n    list xlist = xlist_new\n\n    # TODO: Can this happen, and if so why -- otherwise drop\n    if self.type_moving_window != \"static\" && ($nobs > self.window_length)\n        printError(sprintf(\"You training sample (T=%d) is longer than the\\n\\\n          specified window length (T=%d).\", $nobs, self.window_length))\n\n        scalar self.error = 1\n        return forecast_results\n    endif\n\n    self.error = estimate_model_and_forecast(command, fcast_arg, y, \\\n      xlist, train_obsnums, test_obsnums, self)\n    if self.error == 0\n        forecast_results[1:self.horizon_current,] = $fcast ~ $fcse\n    endif\n\n    return forecast_results\nend function\n\n\n# TODO: put checks into separate functions\nfunction void do_initial_checks (bundle *self)\n    /* Helper function perfoming some initial checks */\n\n    pkg query extra --quiet\n    # FIXME: This fails\n    /*\n       if atof($result.version) < 0.6\n       printError(\"You need at least version 0.6 of the 'extra' package.\")\n       printError(\"Update by executing 'pkg install extra'\")\n       endif\n    */\n\n    strings methods = get_supported_nonseas_methods()\n    strings seas_methods = get_supported_seas_methods()\n\n    # Check whether called method exists\n    if !nelem(strpos(methods, self.which)) && !nelem(strpos(seas_methods, self.which))\n        printError(\"The forecasting method you selected does not exist.\")\n        self.error = 1\n    endif\n\n    if !self.is_seas && nelem(strpos(seas_methods, self.which))\n        printError(\"The method you requested is not available for non-seasonal data.\")\n        self.error = 1\n    endif\n\n    # TODO: Why is this necessary??\n    if self.window_length < $pd\n        printError(sprintf(\"Window size = %d\", self.window_length))\n        printError(sprintf(\"Periodicity = %d\\n\", $pd))\n        printError(\"The size of the moving window cannot be smaller than the underlying periodicity.\")\n        #        self.error = 1\t\t# TODO: don't return error as long as it is not clear why/ when this case matters\n    endif\n\n    if self.nboot\n        print_no_bootstrap_support()\n        self.error = 1\n    endif\n\n    if nelem(self.xlist) > 0 \\\n          && (self.which == \"rwfc\" || self.which == \"rwdriftfc\" || self.which == \"snaivefc\" || self.which == \"snaivedriftfc\")\n\n        printError(sprintf(\"No exogenous variables can be included for the selected model '%s'.\", self.which))\n        self.error = 1\n    endif\nend function\n\n\n# TODO: untested\nfunction void t1_and_t2_of_y_and_xlist (const series y,\n                                        bundle *self)\n    /* Check valid start and end dates of y and xlist. */\n\n    list xlist = self.xlist\n    scalar t1_curr = $t1\n    scalar t2_curr = $tmax\n    bundle obsdetails_y\n    bundle obsdetails_x\n\n    obslabels_and_nobs_to_bundle(y, &obsdetails_y)\n    string self.t1_date_y = obsdetails_y.t1_date\n    string self.t2_date_y = \\\n      obslabel(obsnum(obsdetails_y.t2_date) - self.n_sampleend_obs_replaced)\n    scalar self.t1_obsnum_y = obsnum(self.t1_date_y)\n    scalar self.t2_obsnum_y = obsnum(self.t2_date_y)\n\n    scalar t1_diff_y = self.t1_obsnum_y - t1_curr\n    scalar t2_diff_y = t2_curr - self.t2_obsnum_y\n\n    if t1_diff_y > 0\n        printWarning(sprintf(\"Found %d missing initial observations for %s.\", \\\n          t1_diff_y, self.name_endo))\n    endif\n\n    if nelem(xlist)\n        obslabels_and_nobs_to_bundle(xlist, &obsdetails_x)\n        scalar self.t1_obsnum_xlist = obsnum(obsdetails_x.t1_date)\n        scalar self.t2_obsnum_xlist = obsnum(obsdetails_x.t2_date)\n        string self.t1_date_xlist = obsdetails_x.t1_date\n        string self.t2_date_xlist = obsdetails_x.t2_date\n        scalar t1_diff_x = self.t1_obsnum_xlist - t1_curr\n        scalar t2_diff_x = t2_curr - self.t2_obsnum_xlist\n\n        if t1_diff_x > 0\n            printWarning(sprintf(\"Found %d missing initial observations for exogenous.\",\\\n              t1_diff_x))\n        endif\n        if t2_diff_x > 0\n            printWarning(sprintf(\"Found %d missing observations at sample end for exogenous.\",\\\n              t2_diff_x))\n        endif\n    endif\nend function\n\n\nfunction bundle naiveFC (const series y,\n                         string which \"Select forecasting method\",\n                         bundle opts[null] \"Bundle incl. optional parameters\")\n    /* Main package function */\n\n    if !exists(opts)\n        bundle opts = null\n    endif\n    bundle self = set_bundle(y, which, opts)\n\n    do_initial_checks(&self)\t# TODO: return scalar capturing error!\n    if self.error\n        return self\n    endif\n\n    # Replace of missing at the sample end\n    # must be done here before 't1_and_t2_of_y_and_xlist'\n    self.n_sampleend_obs_replaced = repl_sampleend_missings_of_y(&y, self.verbose)\n\n    t1_and_t2_of_y_and_xlist(y, &self)\n\n    if self.type_moving_window == \"static\"\n        # \"self.t2_date_y\" refers to in-sample end date of \"y\"\n        scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)\n    endif\n\n    scalar check = valid_dates_of_y_and_xlist(&self)\n    if check\n        printError(\"Problem with dating for y and/ or xlist.\")\n        return self\n    endif\n\n    scalar check = sufficient_future_obs(&self)\n    if check\n        return self\n    endif\n\n    smpl obsnum(self.t1_date_y) get_sample_end(self)\t\t# get_sample_end(self) = in-sample end plus max(horizon)\n    series self.y = y\n\n    do_naive_forecasting(&self)\n\n    if self.which == \"avgfc\"\n        self.forecast_results.avgfc = compute_avgerage_forecast(&self)\n    endif\n\n    summarize_naive_fc_results(&self)\n    cleanup_bundle(&self)\n\n    return self\nend function\n\n\nfunction void cleanup_bundle (bundle *self)\n    /* Delete some elements before returning to user. */\n\n    delete self.fan\n    delete self.blength\n    delete self.nboot\n    if inbundle(self,\"obs_season\")\n        delete self.obs_season\n    endif\n    delete self.supported_estimators\n    delete self.index\n    delete self.active_model\n    delete self.horizon_current\n    delete self.t1_date_y\n    delete self.t2_date_y\n    delete self.xlist\nend function\n\n\nfunction bundle prepare_forecast_bundles (bundle *self)\n/* Prepare for each estimator a dictionary for point\n    interval forecast results to be stored in matrices. */\n\n    bundle forecast_results\n\n    loop i=1..nelem(self.models) -q\n        string model = self.models[i]\n        bundle forecast_results[\"@model\"] = null\n    endloop\n\n    return forecast_results\nend function\n\n\nfunction void do_naive_forecasting (bundle *self)\n    /* Wrapper function actually calling procedures. */\n\n    strings models = getkeys(self.forecast_results)\n\n    loop i=1..nelem(self.forecast_results) -q\t# loop over models\n        self.active_model = models[i]\n\n        bundle interval_forecasts = execute_forecasting(&self)\n\n        attach_row_labels(&interval_forecasts, self)\n        attach_column_labels(&interval_forecasts, self)\n\n        self.forecast_results[self.active_model] = interval_forecasts\n    endloop\nend function\n\n\nfunction void summarize_naive_fc_results (bundle *self)\n    /* Print summarising information */\n\n    if self.verbose\n        printf \"-------------------------------------------------------------------\\n\"\n        printf \"\\t\\tSummary of naive forecasting\\n\"\n        printf \"\\nForecasting method: \\t\\t\\t%s\\n\", self.which\n        printf \"Endogenous: \\t\\t\\t\\t%s\\n\", self.name_endo\n        printf \"Number of additional regressors: \\t%d\\n\", nelem(self.xlist)\n        printf \"In-Sample: \\t\\t\\t\\t%s to %s (T = %d)\\n\", self.t1_date_y, \\\n          self.t2_date_y, nobs(self.y) - self.horizon\n        printf \"Max. forecast horizon: \\t\\t\\t%d\\n\", self.horizon\n        if self.type_moving_window == \"static\"\n            printf \"Last in-sample observation: \\t\\t%s\\n\", self.t2_train_date\n        elif self.type_moving_window == \"rolling\"\n            printf \"Moving window length: \\t\\t\\t%d\\n\", self.window_length\n        else\n            printf \"Initial window length: \\t\\t\\t%d\\n\", self.window_length\n        endif\n        if self.type_moving_window != \"static\"\n            printf \"Number of '%s' multi-step forecasts: %d\\n\", self.type_moving_window, \\\n              self.n_folds\n            printf \"First observation forecasted: \\t\\t%s\\n\", self.t1_forecast_date\n            printf \"Last observation forecasted: \\t\\t%s\\n\", self.t2_forecast_date\n        else\n            printf \"First observation forecasted (h=1): \\t%s\\n\", self.t1_forecast_date\n            printf \"Last observation forecasted (h=%d): \\t%s\\n\", self.horizon, \\\n              self.t2_forecast_date\n        endif\n        if self.type_moving_window == \"static\"\n            printf \"Width forecast interval: \\t\\t%d pct.\\n\", self.level * 100\n        else\n        endif\n        printf \"-------------------------------------------------------------------\\n\\n\"\n    endif\nend function\n\n\nfunction bundle execute_forecasting (bundle *self)\n/* This function estimates the point forecasts either in (i) a rolling or\n    (ii) a recursive manner and stores sequences of interval forecasts. */\n\n    bundle cv = prep_and_get_cv_folds(self)\n    self.n_folds = cv.n_folds\n\n    # Loop over training sets, run estimation and retrieve interval forecasts.\n    # returns an n_folds-dimensional array comprising h by 2 (point~sderr) matrices.\n    matrices collected_point_fc_and_sderr = set_model_estimate_and_forecast(&cv, &self)\n\n    bundle forecasts_and_factors = \\\n      point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &self)\n\n    # Retrieve moving-window point_forecasts from array,\n    # compute forecast intervals and put stuff to bundle\n    return compute_intval_forecasts(forecasts_and_factors)\nend function\n\n\n# TODO: untested\nfunction bundle compute_intval_forecasts (const bundle forecasts_and_factors)\n/* Generate for each model based on respective point forecasts and\n    estimated standard derrors, arrays holding interval forecasts. */\n\n    bundle interval_forecasts\n\n    matrix interval_forecasts.forecasts_point = \\\n      flatten(forecasts_and_factors.point_forecasts)\t# rows: horizons, cols: sample period\n\n    matrix factors_flattened = flatten(forecasts_and_factors.factors)\n\n    matrix interval_forecasts.forecasts_lower_bound = \\\n      interval_forecasts.forecasts_point .- factors_flattened\n\n    matrix interval_forecasts.forecasts_upper_bound = \\\n      interval_forecasts.forecasts_point .+ factors_flattened\n\n    return interval_forecasts\nend function\n\n\n\n# TODO: untested\nfunction matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)\n/* Loop over training sets, run estimation and retrieve\n    interval forecasts. */\n\n    matrices collected_point_fc_and_sderr = array(cv.n_folds)\n\n    loop lwin=1..cv.n_folds -q\n        matrix date_idx = cv.X_train[lwin]\n\n        # time index of the training set = self.window_length + self.horizon\n        # As the last rolling samples may inlude only a sample set less than self.horizon\n        # observations, we still can compute forecasts for $Ttest < self.horizon\n        scalar obs_left = $tmax - maxc(date_idx[,1])\n        scalar self.horizon_current = xmin(self.horizon, obs_left)\n\n        if self.horizon_current == 0\t\t# FIXME: Why is n_folds=81 but only n_folds=80 would work!\n            break\n        endif\n\n        smpl minc(date_idx[,1]) (maxc(date_idx[,1]) + self.horizon_current)\n\n        if lwin == 1\n            # CV series holds \"window_length+horizon\" observations: subtract \"horizon\"\n            self.t1_train_date = obslabel($t1)\n            string self.t2_train_date = obslabel($t2 - self.horizon_current)\n            string self.t1_forecast_date = obslabel($t2 - self.horizon_current + 1)\t# Date of 1st h=1 ahead forecast\n\n        elif lwin == (cv.n_folds - 1) && self.type_moving_window != \"static\"\n            self.t2_forecast_date = self.t2_date_y\t\t# Date of last h-step ahead forecast\n        endif\n        collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)\t# h by 2 matrix (point_fc ~ sderr)\n    endloop\n\n    if self.type_moving_window == \"static\"\n        string self.t2_forecast_date = obslabel(obsnum(self.t2_train_date) + self.horizon)\t# Date of last h-step ahead forecast\n    endif\n\n    return collected_point_fc_and_sderr\nend function\n\n\n# TODO: untested\n# Public function\nfunction list get_naive_forecasts (const bundle self,\n                                   matrix horizons[null] \"Select specific horizons (moving-window only)\",\n      const string suffix[null] \"Suffix for series' names\")\n    /* Transform interval forecasts into a list of series and return this. */\n\n    list R = null\n    series y = self.y\n    if !exists(suffix)\n        string suffix = \"\"\n    endif\n    if !exists(horizons)\n        matrix horizons = seq(1, self.horizon)\n    endif\n    matrix horizons = vec(horizons)\n\n    scalar err = horizons_isok(self, horizons)\n    if !err\n        return R\n    endif\n\n    smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)\t# don't drop\n\n\n    return list_of_forecasts(self, horizons, suffix)\nend function\n\n# TODO: add convenient function \"get_naive_forecast_errors()\"\n\n\n# untested\nfunction void plot_naive_forecasts (const bundle self \"Bundle returned from naiveFC()\",\n      const matrix horizons[null] \"Select only specific horizons\",\n      const string model[null] \"Select a model in case of avgfc\")\n    /* Function for plotting realizations and interval forecasts. */\n\n    if self.which == \"avgfc\" && !exists(model)\n        funcerr \"You must specify for which model to plot the forecasts.\"\n    endif\n    series y = self.y\n    setinfo y --graph-name=\"Actuals\"\n    # re-set missing values back to NA\n    series y = (y == replace_nan_value_by() && self.type_moving_window == \"static\") \\\n      ? NA : y\n\n    if !exists(horizons)\n        matrix horizons = seq(1, self.horizon)\n    endif\n\n    list plotlist = y get_naive_forecasts(self, horizons)\n    list plotlist = get_specific_model_for_avgfc(self, plotlist, model)\n\n    # incl. some pre-forecast periods obs. for plotting\n    scalar start = xmax(obsnum(self.t1_forecast_date) - self.pre_fc_periods_to_plot, \\\n      1)\n    smpl start obsnum(self.t2_forecast_date)\n\n    call_plot(plotlist, self)\nend function\n\n\n# untested\nfunction list get_specific_model_for_avgfc (const bundle self,\n                                            const list plotlist,\n                                            string model)\n    /* In case of \"avgfc\" we only plot the results for a specific model\n    but not for all in a single plot. */\n\n    if self.which == \"avgfc\"\n        string model = tolower(model)\n        list plotlist = get_model_forecasts_from_list(plotlist, model)\n        if nelem(plotlist) == 0\n            funcerr \"Model requested is not supported.\"\n        endif\n    endif\n\n    return plotlist\nend function\n\n\n# untested\nfunction list get_model_forecasts_from_list (const list plotlist,\n                                             const string model)\n    /* Retrieve from list only those series which include\n    model in its serie's name. */\n\n    list new = null\n    loop foreach i plotlist -q\n        if instring(varname(plotlist.$i), sprintf(\"_%s\", model))\n            list new += $i\n        endif\n    endloop\n\n    return new\nend function\n\n# untested\nfunction void call_plot (const list plotlist,\n                         const bundle self)\n    /* */\n\n    string filename = self.filename\n    scalar ylo\n    scalar yup\n    yaxis_ranges(plotlist, &ylo, &yup)\n\n    plot plotlist\n        options with-lp time-series single-yaxis\n        literal set linetype 1 lc rgb \"black\" lw 1 pt 0 ps 0\n        literal set linetype 3 lc rgb \"red\" lw 1.5 ps 0\n        literal set linetype 2 lc rgb \"grey\" lw 1.5 ps 0\n        literal set linetype 4 lc rgb \"grey\" lw 1.5 ps 0\n        literal set key left bottom below\n        #literal set key inside left bottom\n        #put the border more to the background by applying it\n        # only on the left and bottom part and put it and the tics in gray\n        literal set style line 11 lc rgb \"#808080\" lt 1\n        literal set border 3 back ls 11\t\t\t# get rid of upper + left border\n        literal set tics nomirror\n        #add a slight grid to make it easier to follow the exact position of the curves\n        literal set style line 12 lc rgb \"#808080\" lt 0 lw 1\t# light grey color\n        literal set grid back ls 12\n        printf \"set yrange[%g:%g]\", ylo, yup\n        printf \"set ylabel \\\"%s\\\"\", self.ylab\n        printf \"set xlabel \\\"%s\\\"\", self.xlab\n        printf \"set title \\\"%s\\\"\", self.title\n    end plot --output=\"@filename\"\nend function\n\n\n# FIXME\nfunction matrix GUI_naiveFC (const series y \"Dependent variable\",\n                             const list xlist[null] \"Additional exogenous (future values must be known)\",\n      int which[1:11:1] \"Model type\" {\"meanFC\", \"medianFC\", \"rwFC\", \"rwdriftFC\", \\\n      \"ar1FC\", \"ar1trendFC\", \"smeanFC\", \"smedianFC\", \"snaiveFC\", \"snaivedriftFC\", \"avgFC\"},\n      int h[1::10] \"Forecast horizon\",\n      bool Plot[1] \"Plot forecast\")\n    /* Helper function for GUI access. */\n\n    # map integer value to string\n    strings methods = get_supported_nonseas_methods()\n\n    bundle opts = null\n    bundle self = null\n    opts.h = h\n    opts.xlist = xlist\n    self = naiveFC(y, methods[which], opts)\n\n    # output\n    printf \"%12.4f\\n\", self.fc\n    if Plot\n        naivePlot(&self)\n    endif\n\n    return self.fc\nend function\n",
+			"settings":
+			{
+				"buffer_size": 23383,
+				"line_ending": "Unix",
+				"name": "include naiveFC_helper.inp"
+			}
+		},
+		{
+			"file": "src/naiveFC_helper.inp",
+			"settings":
+			{
+				"buffer_size": 20722,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "gretl.sublime-project",
+			"settings":
+			{
+				"buffer_size": 461,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"install",
+				"Package Control: Install Package"
+			],
+			[
+				"bra",
+				"BracketHighlighter: Toggle High Visibility Mode"
+			],
+			[
+				"pref",
+				"Preferences: Settings"
+			],
+			[
+				"insta",
+				"Package Control: Install Package"
+			],
+			[
+				"inst",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 249.0,
+		"history":
+		[
+			"dir",
+			"di",
+			"cd ",
+			"ls",
+			"ll",
+			"git status"
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"file_history":
+	[
+		"/home/at/git/naiveFC/gretl/src/naiveFC_helper.inp",
+		"/home/at/git/naiveFC/gretl/untitled.sublime-project",
+		"/home/at/git/gretl-git/lib/src/geneval.c",
+		"/home/at/git/gretl-git/lib/src/forecast.c",
+		"/home/at/git/gretl-git/config.h",
+		"/home/at/git/gretl-git/gretl.sublime-project",
+		"/home/at/git/multiplot/src/multiplot.inp",
+		"/home/at/tmp/test.txt",
+		"/home/at/git/multiplot/src/test.txt",
+		"/home/at/git/multiplot/test.sublime-project",
+		"/home/at/git/covid_19_forecast/markdown_cmd.txt",
+		"/home/at/git/covid_19_forecast/README.md",
+		"/home/at/git/stack/src/stack_data_sample.inp",
+		"/home/at/git/stack/src/stack_data_help.txt",
+		"/home/at/git/mat2data/src/mat2data_help.txt",
+		"/home/at/git/docker_gretl/Dockerfile",
+		"/home/at/git/docker_gretl/Docker",
+		"/home/at/git/scriptcollection/compile-gretl_git.sh",
+		"/home/at/git/docker_gretl/run_docker_gretl.sh",
+		"/home/at/git/docker_gretl/docker_basics.txt",
+		"/home/at/run_docker_gretl.sh",
+		"/home/at/git/stack/.travis.yml",
+		"/home/at/git/stack/src/Makefile",
+		"/home/at/git/stack/src/stack.spec",
+		"/home/at/git/stack/src/stack_help.txt",
+		"/home/at/git/string_utils/.travis.yml",
+		"/home/at/git/covid_19_forecast/run_travis_automated_updating.sh",
+		"/home/at/git/string_utils/src/string_utils_help.txt",
+		"/home/at/git/naiveFC/gretl/run_tests.sh",
+		"/home/at/git/naiveFC/gretl/src/naiveFC.spec",
+		"/home/at/git/glmnet_wrapper/tests/run_tests.inp",
+		"/home/at/git/glmnet_wrapper/Dockerfile",
+		"/home/at/git/glmnet_wrapper/.travis.yml",
+		"/home/at/git/assertion/.travis.yml",
+		"/home/at/git/assertion/Dockerfile",
+		"/home/at/git/CategoryEncoders/src/CategoryEncoders_help.txt",
+		"/home/at/git/gretl-git/addons/extra/doc/extra.tex",
+		"/home/at/git/assertion/src/assertion_help.txt",
+		"/home/at/git/mat2data/src/mat2data.spec",
+		"/home/at/git/string_utils/src/string_utils.txt",
+		"/home/at/git/MwriteCsv/src/Makefile",
+		"/home/at/git/MwriteCsv/src/MwriteCsv.spec",
+		"/home/at/git/MwriteCsv/src/MwriteCsv_help.txt",
+		"/home/at/.config/autostart/GIT update.desktop",
+		"/home/at/test.sh",
+		"/home/at/git/psf_forecasting/load_raw_data_and_compile_panel_foreach_business_direct.sh",
+		"/home/at/git/psf_forecasting/data/psf_mart_since_20180101_direct=3 (Kopie).csv",
+		"/home/at/git/psf_forecasting/data/psf_mart_since_20180101_direct=3.csv",
+		"/home/at/git/nardl_simulation/run_nardl_simulation.sh",
+		"/home/at/git/psf_forecasting/data/psf_mart_since_20180101_5_days.csv",
+		"/home/at/git/psf_forecasting/data/psf_mart_since_20180101_5_days.csv=foo",
+		"/home/at/git/psf_forecasting/data/marketing.csv",
+		"/home/at/git/ridge/src/ridge_help.txt",
+		"/home/at/git/psf_forecasting/data/ifo.csv",
+		"/home/at/git/ridge/src/ridge.spec",
+		"/tmp/ark-wBjfRm/Table4.prg",
+		"/home/at/git/opaf/run_time_series_forecasts_per_assortment.sh",
+		"/home/at/Backup-Code Scalable",
+		"/home/at/git/opaf/script/run_time_series_forecasts_per_assortment.sh",
+		"/home/at/git/opaf/run_crawler_wettercom.sh",
+		"/home/at/tmp/extra/extra.spec",
+		"/home/at/tmp/extra/extra.inp",
+		"/home/at/tmp/extra/extra_sample.inp",
+		"/home/at/git/PairPlot/src/PairPlot_help.txt",
+		"/home/at/git/PairPlot/src/naiveFC.spec",
+		"/home/at/git/wooldridge_test_serial/src/wooldridge_test_serial_help.txt",
+		"/home/at/git/tardl_correlation_based_threshold/correlation_based_threshold_determination",
+		"/home/at/git/ForecastMetrics/src/ForecastMetrics_help.txt",
+		"/home/at/git/FEP/src/FEP.spec",
+		"/home/at/git/FEP/src/Makefile",
+		"/home/at/.config/openbox/lubuntu-rc.xml"
+	],
+	"find":
+	{
+		"height": 33.0
+	},
+	"find_in_files":
+	{
+		"height": 120.0,
+		"where_history":
+		[
+			"*.inp"
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"end",
+			"get_train_start_end_obsnums",
+			"panel",
+			"open",
+			"get_movwin_low_up_matrices",
+			"do_avgfcs_and_get_fc_sd_array",
+			"valid_sample_and_obs_details",
+			"do_avgfcs_and_get_fc_sd_array",
+			"valid_sample_and_obs_details",
+			"set_xlist_and_forecast",
+			"call_me",
+			"call_method",
+			"run_movwin_forecasts",
+			"add_last_xtrain_fold",
+			"prep_and_get_cv_folds",
+			"get_moving_window_forecasts",
+			"prep_and_get_cv_folds",
+			"run_movwin_forecasts",
+			"get_moving_window_forecasts",
+			"do_naiv",
+			"-",
+			"==========",
+			"============",
+			"--------",
+			"Returns:",
+			"-----------",
+			"Parameters:",
+			"\"",
+			"half",
+			"screen",
+			"Super_L-",
+			"C-Lef",
+			"Super_L",
+			"key=\"W"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			"",
+			"### Returns:",
+			"",
+			"## Parameters:",
+			"*",
+			"C-"
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 0,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "src/naiveFC.inp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 23383,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								23383,
+								23383
+							]
+						],
+						"settings":
+						{
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+								},
+								"icon":
+								{
+								},
+								"open":
+								{
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content"
+							],
+							"syntax": "Packages/C++/C.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 23387,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								19082,
+								19082
+							]
+						],
+						"settings":
+						{
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+								},
+								"icon":
+								{
+								},
+								"open":
+								{
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content"
+							],
+							"default_dir": "/home/at/git/naiveFC/gretl/src",
+							"syntax": "Packages/C++/C.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 12373.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 23383,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								2628,
+								2628
+							]
+						],
+						"settings":
+						{
+							"auto_name": "include naiveFC_helper.inp",
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+								},
+								"icon":
+								{
+								},
+								"open":
+								{
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content"
+							],
+							"default_dir": "/home/at/git/naiveFC/gretl/src",
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 1063.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "src/naiveFC_helper.inp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 20722,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								866,
+								866
+							]
+						],
+						"settings":
+						{
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+									"1":
+									[
+										967,
+										968
+									]
+								},
+								"icon":
+								{
+									"1":
+									[
+										"Packages/BracketHighlighter/icons/round_bracket.png",
+										"region.yellowish"
+									]
+								},
+								"open":
+								{
+									"1":
+									[
+										865,
+										866
+									]
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content"
+							],
+							"syntax": "Packages/C++/C.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				},
+				{
+					"buffer": 4,
+					"file": "gretl.sublime-project",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 461,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								461,
+								461
+							]
+						],
+						"settings":
+						{
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+								},
+								"icon":
+								{
+								},
+								"open":
+								{
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content"
+							],
+							"syntax": "Packages/PackageDev/Package/Sublime Text Project/Sublime Text Project.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 33.0
+	},
+	"input":
+	{
+		"height": 46.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"output.unsaved_changes":
+	{
+		"height": 218.0
+	},
+	"pinned_build_system": "Packages/User/build-systems/gretlcli.sublime-build",
+	"project": "untitled.sublime-project",
+	"replace":
+	{
+		"height": 62.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 500.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 380.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 366.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
