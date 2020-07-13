@@ -10,6 +10,18 @@ include assertion.gfn
 include extra.gfn
 
 
+function void test_get_supported_structism (void)
+    print "Start with get_supported_structism_methods()"
+
+    strings S = get_supported_structism_methods()
+
+    assert_equal_num(nelem(S), 2)
+    assert_true(instrings(S, "bsmfc"))
+    assert_true(instrings(S, "lltfc"))
+end function
+test_get_supported_structism()
+
+
 function void test_horizons_isok (void)
     print "Start with horizons_isok()"
 
@@ -50,7 +62,7 @@ series x = normal()
 list L = y x
 function void test_drop_zero_series_from_list (const list L)
     print "Start with drop_zero_series_from_list()"
-    
+
     list R = drop_zero_series_from_list(L)
     assert_equal_num(nelem(R), 1)
     assert_equal_str(varname(R), "x")
@@ -66,12 +78,12 @@ series x = normal()
 list L = y x
 function void test_valid_dates_of_y_and_xlist (const list L )
     print "Start with valid_dates_of_y_and_xlist()"
-    
+
     list xlist = null
     bundle self = defbundle("horizon", 10, "xlist", \
       xlist, "name_endo", "y", "t2_obsnum_y", 5)
     assert_false(valid_dates_of_y_and_xlist(&self))
-    
+
     # Series y and xlist members have equal number of observations
     list xlist = x
     bundle self = defbundle("horizon", 10, "xlist", xlist, "name_endo", "y", \
@@ -85,7 +97,7 @@ function void test_valid_dates_of_y_and_xlist (const list L )
       "t2_obsnum_y", 5, "t2_obsnum_xlist", 3, \
       "t2_date_y", "5", "t2_date_xlist", "3")
     assert_true(valid_dates_of_y_and_xlist(&self))
-    
+
     # xlist members have t more future obs than y, but
     # requested horizon is bigger than 't'
     list xlist = x
@@ -93,7 +105,7 @@ function void test_valid_dates_of_y_and_xlist (const list L )
       "t2_obsnum_y", 5, "t2_obsnum_xlist", 8, \
       "t2_date_y", "5", "t2_date_xlist", "8")
     assert_true(valid_dates_of_y_and_xlist(&self))
-    
+
 
     # xlist members have t more future obs than y, and
     # t > horizon

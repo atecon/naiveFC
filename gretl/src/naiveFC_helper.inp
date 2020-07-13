@@ -273,17 +273,19 @@ function scalar estimate_model_and_forecast (const string est_command,
                                              const bundle train_obsnums,
                                              const bundle test_obsnums,
                                              const bundle self)
-    /* Estimate model and return oos-forecast. */
+    /* Estimate model and execute forecasting command. Return zero on success, otherwise zero. */
+
+    scalar error = FALSE
 
     smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
-    
+
     catch @est_command
     if $error
         if self.verbose
             printError("Model estimation failed. Forecast values are set to \
               NA for the current sample.")
         endif
-        return 1
+        return TRUE
     endif
 
     catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
@@ -291,10 +293,10 @@ function scalar estimate_model_and_forecast (const string est_command,
         if self.verbose
             printError("Failed executing forecast command.")
         endif
-        return 1
+        return TRUE
     endif
 
-    return 0
+    return error
 end function
 
 
@@ -618,10 +620,16 @@ function bundle set_bundle (const series y,
     return self
 end function
 
+function strings get_supported_structism_methods (void)
+  /* List all methods supported by the StrucTiSM package. */
+
+  return defarray("bsmfc", "lltfc")
+end function
+
 function strings get_supported_seas_methods (void)
     /* List all seasonal supported methods here. */
 
-    return defarray("smeanfc", "smedianfc", "snaivefc", "snaivedriftfc")
+    return defarray("smeanfc", "smedianfc", "snaivefc", "snaivedriftfc") + get_supported_structism_methods()
 end function
 
 function strings get_supported_nonseas_methods (void)

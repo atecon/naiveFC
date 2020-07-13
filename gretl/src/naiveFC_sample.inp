@@ -2,6 +2,7 @@ clear
 set verbose off
 #set debug 0
 
+include StrucTiSM.gfn
 #include naiveFC.gfn --force				# TODO:
 
 if $sysinfo.hostname == "dsb"
@@ -129,24 +130,24 @@ scalar opts.endogenous_in_logs = TRUE
 # opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
 catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
-# opts.verbose = 1						# print details (optional)
+opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
 # TODO as we forecast only to the last valid obs of y in this case anyway!
 # FIXME: moving-window fc with "avgfc"
 
-strings methods = defarray("ar1ma1fc", "meanFC", "medianFC", "rwFC", "rwdriftFC", \
+strings methods = defarray("bsmfc", "ar1ma1fc", "meanFC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
 bundle b = naiveFC(y, methods[1], opts)
 b
-#stop
 bundle forecast_results = b.forecast_results
 #eval forecast_results.smeanfc
 #eval forecast_results.smeanfc.forecasts_point
 
 list FC = get_naive_forecasts(b, {1,2})
+stop
 
 b.pre_fc_periods_to_plot = 60					# set no. of pre.-forecast periods obs. to plot
 plot_naive_forecasts(b, {1}, "meanfc")

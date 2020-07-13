@@ -95,6 +95,16 @@ function bundle dict_models (void)
       "add_ohe_periods", 0 \
       )
 
+
+    dict_models.bsmfc = defbundle( \
+      "forecast_arg", "", \
+      "command", "BSM(y, 0, &mod)", \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 0, \
+      "add_ohe_periods", 0 \
+      )
+
     return dict_models
 end function
 
@@ -160,27 +170,58 @@ function list prepare_xlist (const bundle model_settings,
     return xlist
 end function
 
+function scalar active_model_is_ucm (const bundle self)
+  /* Check whether the selected/ active model is an unobserved component model (UCM) from the StrucTiSM package. */
+
+  scalar r = FALSE
+  strings ucm = get_supported_structism_methods()
+
+  loop foreach i ucm
+    if instrings(ucm, self.active_model)
+      r = TRUE
+    endif
+  endloop
+
+  return r
+end function
+
+function string add_quiet_str_to_command (const bundle self,
+                                        const bundle model_settings)
+  /* Retrieve command string for estimation and optionally attache "quiet" string. */
+
+  string command = model_settings.command
+  command += (self.verbose < 2 && active_model_is_ucm(self) == FALSE) ? " --quiet" : ""  # estimation details only for detailed verbosity
+
+  return command
+end function
+
+function string add_quiet_str_to_fcast_arg (const bundle self,
+                                          const bundle model_settings)
+  /* Retrieve command string for getting forecast values and optionally attache "quiet" string. */
+
+  string fcast_arg = model_settings.forecast_arg
+  fcast_arg += (self.verbose < 2 && active_model_is_ucm(self) == FALSE) ? " --quiet" : ""
+
+  return fcast_arg
+end function
+
 
 # TODO: untested
 function matrix set_xlist_and_forecast (bundle *self)
-/* Set list of regressors, estimate model and compute
-    point forecast and forecast standard errors. */
+  /* Set list of regressors, estimate model and compute point forecast and forecast standard errors. */
 
-    bundle model_settings = dict_models()[self.active_model]
-    string fcast_arg = model_settings.forecast_arg
-    string command = model_settings.command
-    # TODO: consider 3 verbose levels: silent, normal, detailed
-    if self.verbose < 2
-        command += " --quiet"	# estimation details only for detailed verbosity level
-        fcast_arg += " --quiet"
-    endif
-    matrix forecast_results = zeros(self.horizon, 2) * NA
-    series y = self.y					# length: window_length + horizon
+  matrix forecast_results = zeros(self.horizon, 2) * NA
+  series y = self.y         # length: window_length + horizon
+  bundle model_settings = dict_models()[self.active_model]
+  string command = add_quiet_str_to_command(self, model_settings)
+  string fcast_arg = add_quiet_str_to_fcast_arg(self, model_settings)
+
 
     # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
     # is not the effective sample length but (window_length-max(lags))
     bundle train_obsnums = get_train_start_end_obsnums(self)
     bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
+
 
     list xlist = prepare_xlist(model_settings, self)
     if model_settings.add_first_lag
@@ -217,9 +258,14 @@ function matrix set_xlist_and_forecast (bundle *self)
         return forecast_results
     endif
 
+    *** HIER WEITERMACHEN ***
+    1) UNterscheide zw. StrucTiSM Modell und native AR-Types
+    2) Entweder rufe separate Funktionen auf, oder passe estimate_model_and_forecast() dementsprechend an
+    3) Schreibe get_forecast_results() jeweils für StrucTiSM bzw. native Modelle
+
     self.error = estimate_model_and_forecast(command, fcast_arg, y, \
       xlist, train_obsnums, test_obsnums, self)
-    if self.error == 0
+    if self.error == FALSE
         forecast_results[1:self.horizon_current,] = $fcast ~ $fcse
     endif
 
