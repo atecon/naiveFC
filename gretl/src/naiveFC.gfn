@@ -199,6 +199,18 @@ if nelem(dropped) &amp;&amp; self.verbose
 endif
 </code>
 </gretl-function>
+<gretl-function name="series_isconst" type="scalar" private="1">
+ <params count="1">
+  <param name="y" type="series" const="true"/>
+ </params>
+<code>/* Check whether series is constant. If so, return TRUE, else FALSE. */
+if isconst(y) == TRUE
+  printWarning(sprintf(&quot;Series '%s' is a constant for the selected sample. Forecasts and associated standard-errors are set to NA.&quot;, argname(y)))
+  return TRUE
+endif
+return FALSE
+</code>
+</gretl-function>
 <gretl-function name="series_is_always_zero" type="scalar" private="1">
  <params count="1">
   <param name="y" type="series" const="true"/>
@@ -388,7 +400,47 @@ endif
 return 0
 </code>
 </gretl-function>
-<gretl-function name="estimate_model_and_forecast" type="scalar" private="1">
+<gretl-function name="print_estimation_error_msg" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>if self.verbose
+  printError(&quot;Model estimation failed. Forecast values are set to            NA for the current test set.&quot;)
+endif
+</code>
+</gretl-function>
+<gretl-function name="print_forecast_error_msg" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>if self.verbose
+  printError(&quot;Failed executing forecast command.&quot;)
+endif
+</code>
+</gretl-function>
+<gretl-function name="estimate_and_forecast_structism" type="matrix" private="1">
+ <params count="4">
+  <param name="est_command" type="string" const="true"/>
+  <param name="y" type="series" const="true"/>
+  <param name="train_obsnums" type="bundle" const="true"/>
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Estimate StrucTiSM type of model and execute forecasting command. Return zero on success, otherwise zero. */
+matrix fc = mshape(NA, self.horizon, 2)
+bundle model = null
+smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+@est_command
+scalar error = STSM_fcast(&amp;model, self.horizon_current, self.verbose)
+if error == TRUE
+  print_forecast_error_msg(self)
+  scalar self.error = TRUE
+  return fc
+endif
+fc = model.fcast ~ sqrt(model.fcastvar)
+return fc
+</code>
+</gretl-function>
+<gretl-function name="estimate_and_forecast_gretl" type="matrix" private="1">
  <params count="7">
   <param name="est_command" type="string" const="true"/>
   <param name="fcast_command" type="string" const="true"/>
@@ -396,25 +448,30 @@ return 0
   <param name="xlist" type="list" const="true"/>
   <param name="train_obsnums" type="bundle" const="true"/>
   <param name="test_obsnums" type="bundle" const="true"/>
-  <param name="self" type="bundle" const="true"/>
+  <param name="self" type="bundleref"/>
  </params>
-<code>/* Estimate model and return oos-forecast. */
+<code>/* Estimate built-in gretl models and execute forecasting command. Return zero on success, otherwise zero. */
+matrix fc = mshape(NA, self.horizon, 2)
 smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 catch @est_command
 if $error
-  if self.verbose
-    printError(&quot;Model estimation failed. Forecast values are set to                NA for the current sample.&quot;)
-  endif
-  return 1
+  print_estimation_error_msg(self)
+  scalar self.error = TRUE
+  return fc
+endif
+smpl full
+if sample_is_valid(test_obsnums.t1_test_obsnum, test_obsnums.t2_test_obsnum) == FALSE
+  scalar self.error = TRUE
+  return fc
 endif
 catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
 if $error
-  if self.verbose
-    printError(&quot;Failed executing forecast command.&quot;)
-  endif
-  return 1
+  print_forecast_error_msg(self)
+  scalar self.error = TRUE
+  return fc
 endif
-return 0
+fc = $fcast ~ $fcse
+return fc
 </code>
 </gretl-function>
 <gretl-function name="compute_avgerage_forecast" type="bundle" private="1">
@@ -715,9 +772,28 @@ self.name_endo = argname(y)
 return self
 </code>
 </gretl-function>
+<gretl-function name="model_is_ucm" type="scalar" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Check whether the selected/ active model is an unobserved component model (UCM) from the StrucTiSM package. */
+scalar r = FALSE
+strings ucm = get_supported_structism_methods()
+matrix pos = instrings(ucm, self.active_model)
+if nelem(pos) &gt; 0
+  return TRUE
+endif
+return r
+</code>
+</gretl-function>
+<gretl-function name="get_supported_structism_methods" type="strings" private="1">
+<code>/* List all methods supported by the StrucTiSM package. */
+return defarray(&quot;bsmfc&quot;, &quot;lltfc&quot;)
+</code>
+</gretl-function>
 <gretl-function name="get_supported_seas_methods" type="strings" private="1">
 <code>/* List all seasonal supported methods here. */
-return defarray(&quot;smeanfc&quot;, &quot;smedianfc&quot;, &quot;snaivefc&quot;, &quot;snaivedriftfc&quot;)
+return defarray(&quot;smeanfc&quot;, &quot;smedianfc&quot;, &quot;snaivefc&quot;, &quot;snaivedriftfc&quot;) + get_supported_structism_methods()
 </code>
 </gretl-function>
 <gretl-function name="get_supported_nonseas_methods" type="strings" private="1">
@@ -808,6 +884,32 @@ list xlist = time
 return xlist
 </code>
 </gretl-function>
+<gretl-function name="window_length_is_ok" type="scalar" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Check that sample length fits window length. Return TRUE if so, otherwise FALSE. */
+if self.type_moving_window != &quot;static&quot; &amp;&amp; ($nobs &gt; self.window_length)
+  printError(sprintf(&quot;The training sample (T=%d) is longer than the\n           specified window length (T=%d).&quot;, $nobs, self.window_length))
+  return FALSE
+endif
+return TRUE
+</code>
+</gretl-function>
+<gretl-function name="sample_is_valid" type="scalar" private="1">
+ <params count="2">
+  <param name="start" type="scalar" const="true"/>
+  <param name="ende" type="scalar" const="true"/>
+ </params>
+<code>/* Check that sample is valid. If so return TRUE, else FALSE.*/
+catch smpl start ende
+if $error
+  printError(&quot;Sample cannot be set.&quot;)
+  return FALSE
+endif
+return TRUE
+</code>
+</gretl-function>
 <gretl-function name="dict_models" type="bundle" private="1">
 <code>/* Dictionary including stuff for calling estimation
 command and fcast command. */
@@ -823,6 +925,8 @@ dict_models.rwdriftfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quo
 dict_models.ar1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1trendfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 1, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1ma1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 1 0 1 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+dict_models.bsmfc = defbundle( &quot;forecast_arg&quot;, &quot;&quot;, &quot;command&quot;, &quot;BSM(y, 0, &amp;model)&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
+dict_models.lltfc = defbundle( &quot;forecast_arg&quot;, &quot;&quot;, &quot;command&quot;, &quot;LLT(y, 0, &amp;model)&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
 return dict_models
 </code>
 </gretl-function>
@@ -833,7 +937,7 @@ return dict_models
 <code>/* Set default values */
 bundle self = null
 scalar self.error = FALSE
-scalar self.y_is_always_zero = FALSE
+scalar self.y_is_constant = FALSE
 list self.xlist = null
 scalar self.endogenous_in_logs = FALSE
 scalar self.horizon = 10				# maximum forecast horizon
@@ -876,7 +980,42 @@ endif
 if inbundle(self, &quot;xlist&quot;)
   xlist += self.xlist
 endif
+xlist = add_lagged_y_to_xlist(xlist, model_settings)
 # TODO: check for duplicates in xlist
+return xlist
+</code>
+</gretl-function>
+<gretl-function name="add_quiet_str_to_command" type="string" private="1">
+ <params count="2">
+  <param name="self" type="bundle" const="true"/>
+  <param name="model_settings" type="bundle" const="true"/>
+ </params>
+<code>/* Retrieve command string for estimation and optionally attache &quot;quiet&quot; string. */
+string command = model_settings.command
+command += (self.verbose &lt; 2 &amp;&amp; model_is_ucm(self) == FALSE) ? &quot; --quiet&quot; : &quot;&quot;  # estimation details only for detailed verbosity
+return command
+</code>
+</gretl-function>
+<gretl-function name="add_quiet_str_to_fcast_arg" type="string" private="1">
+ <params count="2">
+  <param name="self" type="bundle" const="true"/>
+  <param name="model_settings" type="bundle" const="true"/>
+ </params>
+<code>/* Retrieve command string for getting forecast values and optionally attache &quot;quiet&quot; string. */
+string fcast_arg = model_settings.forecast_arg
+fcast_arg += (self.verbose &lt; 2 &amp;&amp; model_is_ucm(self) == FALSE) ? &quot; --quiet&quot; : &quot;&quot;
+return fcast_arg
+</code>
+</gretl-function>
+<gretl-function name="add_lagged_y_to_xlist" type="list" private="1">
+ <params count="2">
+  <param name="xlist" type="list"/>
+  <param name="model_settings" type="bundle" const="true"/>
+ </params>
+<code>/* Conditionally add 1st lag of endogenous to xlist. */
+if model_settings.add_first_lag == TRUE
+  xlist += y(-1)
+endif
 return xlist
 </code>
 </gretl-function>
@@ -884,52 +1023,41 @@ return xlist
  <params count="1">
   <param name="self" type="bundleref"/>
  </params>
-<code>/* Set list of regressors, estimate model and compute
-point forecast and forecast standard errors. */
+<code>/* Set list of regressors, estimate model and compute point forecast and forecast standard errors. */
+matrix forecast_results = mshape(NA, self.horizon, 2)
+series y = self.y         # length: window_length + horizon
 bundle model_settings = dict_models()[self.active_model]
-string fcast_arg = model_settings.forecast_arg
-string command = model_settings.command
-# TODO: consider 3 verbose levels: silent, normal, detailed
-if self.verbose &lt; 2
-  command += &quot; --quiet&quot;	# estimation details only for detailed verbosity level
-  fcast_arg += &quot; --quiet&quot;
-endif
-matrix forecast_results = zeros(self.horizon, 2) * NA
-series y = self.y					# length: window_length + horizon
+string command = add_quiet_str_to_command(self, model_settings)
+string fcast_arg = add_quiet_str_to_fcast_arg(self, model_settings)
+list xlist = prepare_xlist(model_settings, self)
 # &quot;(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)&quot;
 # is not the effective sample length but (window_length-max(lags))
 bundle train_obsnums = get_train_start_end_obsnums(self)
 bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
-list xlist = prepare_xlist(model_settings, self)
-if model_settings.add_first_lag
-  xlist += y(-1)
-endif
-catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
-if $error
-  printError(&quot;Failed to set training sample. Check your sample and window size.&quot;)
-  scalar self.error = 1
+# Check training and test samples
+if sample_is_valid(train_obsnums.t1_obsnum, train_obsnums.t2_obsnum) == FALSE
+  scalar self.error = TRUE
   return forecast_results
 endif
-if series_is_always_zero(y)
-  self.y_is_always_zero = TRUE
-  matrix forecast_results = zeros(self.horizon, 2)
-  if self.verbose
-    printWarning(sprintf(&quot;Training set of endogenous includes only zero-values.\n               Forecasts and associated standard-errors are assumed to be zero.&quot;))
-  endif
+smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+# TODO: Can this happen, and if so why -- otherwise drop
+if window_length_is_ok(self) == FALSE
+  scalar self.error = TRUE
+  return forecast_results
+endif
+# Check series
+scalar self.y_is_constant = series_isconst(y)
+if self.y_is_constant == TRUE
   return forecast_results
 endif
 list xlist_new = drop_zero_series_from_list(xlist)
 print_dropped_series(xlist, xlist_new, self)
 list xlist = xlist_new
-# TODO: Can this happen, and if so why -- otherwise drop
-if self.type_moving_window != &quot;static&quot; &amp;&amp; ($nobs &gt; self.window_length)
-  printError(sprintf(&quot;You training sample (T=%d) is longer than the\n           specified window length (T=%d).&quot;, $nobs, self.window_length))
-  scalar self.error = 1
-  return forecast_results
-endif
-self.error = estimate_model_and_forecast(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, self)
-if self.error == 0
-  forecast_results[1:self.horizon_current,] = $fcast ~ $fcse
+if model_is_ucm(self) == TRUE
+  forecast_results[1:self.horizon_current,] = estimate_and_forecast_structism(command, y, train_obsnums, &amp;self)
+else
+  smpl full     # samples are set within function
+  forecast_results[1:self.horizon_current,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &amp;self)
 endif
 return forecast_results
 </code>
@@ -947,11 +1075,11 @@ endif
 strings methods = get_supported_nonseas_methods()
 strings seas_methods = get_supported_seas_methods()
 # Check whether called method exists
-if !nelem(strpos(methods, self.which)) &amp;&amp; !nelem(strpos(seas_methods, self.which))
+if !nelem(instrings(methods, self.which)) &amp;&amp; !nelem(instrings(seas_methods, self.which))
   printError(&quot;The forecasting method you selected does not exist.&quot;)
   self.error = 1
 endif
-if !self.is_seas &amp;&amp; nelem(strpos(seas_methods, self.which))
+if !self.is_seas &amp;&amp; nelem(instrings(seas_methods, self.which))
   printError(&quot;The method you requested is not available for non-seasonal data.&quot;)
   self.error = 1
 endif
@@ -1112,9 +1240,9 @@ matrices collected_point_fc_and_sderr = set_model_estimate_and_forecast(&amp;cv,
 bundle forecasts_and_factors = point_fc_and_factor_as_arrays(collected_point_fc_and_sderr, &amp;self)
 # Retrieve moving-window point_forecasts from array,
 # compute forecast intervals and put stuff to bundle
-if self.endogenous_in_logs == FALSE || self.y_is_always_zero == TRUE
+if self.endogenous_in_logs == FALSE || self.y_is_constant == TRUE
   return compute_intval_forecasts(forecasts_and_factors)
-elif self.endogenous_in_logs == TRUE &amp;&amp; self.y_is_always_zero == FALSE
+elif self.endogenous_in_logs == TRUE &amp;&amp; self.y_is_constant == FALSE
   bundle interval_forecasts = compute_intval_forecasts(forecasts_and_factors)
   bundle intval_fc_in_levels = intval_forecasts_to_levels(interval_forecasts, collected_point_fc_and_sderr, self)
   return intval_fc_in_levels
@@ -1281,6 +1409,7 @@ clear
 set verbose off
 #set debug 0
 
+include StrucTiSM.gfn
 #include naiveFC.gfn --force				# TODO:
 
 if $sysinfo.hostname == &quot;dsb&quot;
@@ -1405,32 +1534,30 @@ bundle opts = null					# setup additional options
 opts.horizon = 10
 opts.type_moving_window = &quot;rolling&quot; #/ &quot;recursive&quot; -&gt; type of moving-window forecasting  (optional)
 scalar opts.endogenous_in_logs = TRUE
-# opts.window_length = 400 #xmax($pd, 90) 	# moving window length (optional)
+opts.window_length = 700 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
-catch list opts.xlist = kracher budget #D743 FDD		# optional additional regressors
-# opts.verbose = 1						# print details (optional)
+catch list opts.xlist = budget #D743 FDD		# optional additional regressors
+opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
 # TODO as we forecast only to the last valid obs of y in this case anyway!
 # FIXME: moving-window fc with &quot;avgfc&quot;
 
-strings methods = defarray(&quot;ar1ma1fc&quot;, &quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, \
+strings methods = defarray(&quot;lltfc&quot;, &quot;bsmfc&quot;, &quot;ar1ma1fc&quot;, &quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, \
   &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, &quot;snaivedriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgfc&quot;)
 
 bundle b = null
 bundle b = naiveFC(y, methods[1], opts)
 b
-#stop
 bundle forecast_results = b.forecast_results
+
 #eval forecast_results.smeanfc
 #eval forecast_results.smeanfc.forecasts_point
 
 list FC = get_naive_forecasts(b, {1,2})
 
 b.pre_fc_periods_to_plot = 60					# set no. of pre.-forecast periods obs. to plot
-plot_naive_forecasts(b, {1}, &quot;meanfc&quot;)
-#plot_naive_forecasts(b, {1}, &quot;ar1FC&quot;)
-#plot_naive_forecasts(b, {1}, &quot;avgfc&quot;)
+plot_naive_forecasts(b, {1}, b.which)
 </sample-script>
 </gretl-function-package>
 </gretl-functions>
