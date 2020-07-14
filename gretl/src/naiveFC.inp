@@ -173,7 +173,7 @@ function list prepare_xlist (const bundle model_settings,
         xlist += self.xlist
     endif
 
-    xlist = add_lagged_y_to_xlist(xlist, model_settings)
+    xlist = add_lagged_y_to_xlist(self.y, xlist, model_settings)
 
     # TODO: check for duplicates in xlist
 
@@ -201,7 +201,8 @@ function string add_quiet_str_to_fcast_arg (const bundle self,
   return fcast_arg
 end function
 
-function list add_lagged_y_to_xlist (list xlist,
+function list add_lagged_y_to_xlist (const series y,
+                                    list xlist,
                                     const bundle model_settings)
   /* Conditionally add 1st lag of endogenous to xlist. */
 

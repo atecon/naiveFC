@@ -980,7 +980,7 @@ endif
 if inbundle(self, &quot;xlist&quot;)
   xlist += self.xlist
 endif
-xlist = add_lagged_y_to_xlist(xlist, model_settings)
+xlist = add_lagged_y_to_xlist(self.y, xlist, model_settings)
 # TODO: check for duplicates in xlist
 return xlist
 </code>
@@ -1008,7 +1008,8 @@ return fcast_arg
 </code>
 </gretl-function>
 <gretl-function name="add_lagged_y_to_xlist" type="list" private="1">
- <params count="2">
+ <params count="3">
+  <param name="y" type="series" const="true"/>
   <param name="xlist" type="list"/>
   <param name="model_settings" type="bundle" const="true"/>
  </params>
