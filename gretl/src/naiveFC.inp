@@ -95,10 +95,18 @@ function bundle dict_models (void)
       "add_ohe_periods", 0 \
       )
 
-
     dict_models.bsmfc = defbundle( \
       "forecast_arg", "", \
-      "command", "BSM(y, 0, &mod)", \
+      "command", "BSM(y, 0, &model)", \
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 0, \
+      "add_ohe_periods", 0 \
+      )
+
+    dict_models.lltfc = defbundle( \
+      "forecast_arg", "", \
+      "command", "LLT(y, 0, &model)", \
       "add_linear_trend", 0, \
       "add_first_lag", 0, \
       "add_intercept", 0, \
@@ -114,7 +122,7 @@ function bundle default_values (const series y)
 
     bundle self = null
     scalar self.error = FALSE
-    scalar self.y_is_always_zero = FALSE
+    scalar self.y_is_constant = FALSE
     list self.xlist = null
     scalar self.endogenous_in_logs = FALSE
     scalar self.horizon = 10				# maximum forecast horizon
@@ -165,32 +173,20 @@ function list prepare_xlist (const bundle model_settings,
         xlist += self.xlist
     endif
 
+    xlist = add_lagged_y_to_xlist(xlist, model_settings)
+
     # TODO: check for duplicates in xlist
 
     return xlist
 end function
 
-function scalar active_model_is_ucm (const bundle self)
-  /* Check whether the selected/ active model is an unobserved component model (UCM) from the StrucTiSM package. */
-
-  scalar r = FALSE
-  strings ucm = get_supported_structism_methods()
-
-  loop foreach i ucm
-    if instrings(ucm, self.active_model)
-      r = TRUE
-    endif
-  endloop
-
-  return r
-end function
 
 function string add_quiet_str_to_command (const bundle self,
                                         const bundle model_settings)
   /* Retrieve command string for estimation and optionally attache "quiet" string. */
 
   string command = model_settings.command
-  command += (self.verbose < 2 && active_model_is_ucm(self) == FALSE) ? " --quiet" : ""  # estimation details only for detailed verbosity
+  command += (self.verbose < 2 && model_is_ucm(self) == FALSE) ? " --quiet" : ""  # estimation details only for detailed verbosity
 
   return command
 end function
@@ -200,76 +196,68 @@ function string add_quiet_str_to_fcast_arg (const bundle self,
   /* Retrieve command string for getting forecast values and optionally attache "quiet" string. */
 
   string fcast_arg = model_settings.forecast_arg
-  fcast_arg += (self.verbose < 2 && active_model_is_ucm(self) == FALSE) ? " --quiet" : ""
+  fcast_arg += (self.verbose < 2 && model_is_ucm(self) == FALSE) ? " --quiet" : ""
 
   return fcast_arg
 end function
 
+function list add_lagged_y_to_xlist (list xlist,
+                                    const bundle model_settings)
+  /* Conditionally add 1st lag of endogenous to xlist. */
+
+  if model_settings.add_first_lag == TRUE
+    xlist += y(-1)
+  endif
+
+  return xlist
+end function
 
 # TODO: untested
 function matrix set_xlist_and_forecast (bundle *self)
   /* Set list of regressors, estimate model and compute point forecast and forecast standard errors. */
 
-  matrix forecast_results = zeros(self.horizon, 2) * NA
+  matrix forecast_results = mshape(NA, self.horizon, 2)
   series y = self.y         # length: window_length + horizon
   bundle model_settings = dict_models()[self.active_model]
   string command = add_quiet_str_to_command(self, model_settings)
   string fcast_arg = add_quiet_str_to_fcast_arg(self, model_settings)
+  list xlist = prepare_xlist(model_settings, self)
 
+  # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
+  # is not the effective sample length but (window_length-max(lags))
+  bundle train_obsnums = get_train_start_end_obsnums(self)
+  bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
 
-    # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
-    # is not the effective sample length but (window_length-max(lags))
-    bundle train_obsnums = get_train_start_end_obsnums(self)
-    bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
-
-
-    list xlist = prepare_xlist(model_settings, self)
-    if model_settings.add_first_lag
-        xlist += y(-1)
-    endif
-
-    catch smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
-    if $error
-        printError("Failed to set training sample. Check your sample and window size.")
-        scalar self.error = 1
-        return forecast_results
-    endif
-
-    if series_is_always_zero(y)
-        self.y_is_always_zero = TRUE
-        matrix forecast_results = zeros(self.horizon, 2)
-        if self.verbose
-            printWarning(sprintf("Training set of endogenous includes only zero-values.\n\
-              Forecasts and associated standard-errors are assumed to be zero."))
-        endif
-        return forecast_results
-    endif
-
-    list xlist_new = drop_zero_series_from_list(xlist)
-    print_dropped_series(xlist, xlist_new, self)
-    list xlist = xlist_new
-
-    # TODO: Can this happen, and if so why -- otherwise drop
-    if self.type_moving_window != "static" && ($nobs > self.window_length)
-        printError(sprintf("You training sample (T=%d) is longer than the\n\
-          specified window length (T=%d).", $nobs, self.window_length))
-
-        scalar self.error = 1
-        return forecast_results
-    endif
-
-    *** HIER WEITERMACHEN ***
-    1) UNterscheide zw. StrucTiSM Modell und native AR-Types
-    2) Entweder rufe separate Funktionen auf, oder passe estimate_model_and_forecast() dementsprechend an
-    3) Schreibe get_forecast_results() jeweils für StrucTiSM bzw. native Modelle
-
-    self.error = estimate_model_and_forecast(command, fcast_arg, y, \
-      xlist, train_obsnums, test_obsnums, self)
-    if self.error == FALSE
-        forecast_results[1:self.horizon_current,] = $fcast ~ $fcse
-    endif
-
+  # Check training and test samples
+  if sample_is_valid(train_obsnums.t1_obsnum, train_obsnums.t2_obsnum) == FALSE
+    scalar self.error = TRUE
     return forecast_results
+  endif
+  smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+
+  # TODO: Can this happen, and if so why -- otherwise drop
+  if window_length_is_ok(self) == FALSE
+    scalar self.error = TRUE
+    return forecast_results
+  endif
+
+  # Check series
+  scalar self.y_is_constant = series_isconst(y)
+  if self.y_is_constant == TRUE
+      return forecast_results
+  endif
+  list xlist_new = drop_zero_series_from_list(xlist)
+  print_dropped_series(xlist, xlist_new, self)
+  list xlist = xlist_new
+
+  if model_is_ucm(self) == TRUE
+    forecast_results[1:self.horizon_current,] = estimate_and_forecast_structism(command, y, train_obsnums, &self)
+  else
+    smpl full     # samples are set within function
+    forecast_results[1:self.horizon_current,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &self)
+  endif
+
+  return forecast_results
 end function
 
 
@@ -288,12 +276,12 @@ function void do_initial_checks (bundle *self)
     strings seas_methods = get_supported_seas_methods()
 
     # Check whether called method exists
-    if !nelem(strpos(methods, self.which)) && !nelem(strpos(seas_methods, self.which))
+    if !nelem(instrings(methods, self.which)) && !nelem(instrings(seas_methods, self.which))
         printError("The forecasting method you selected does not exist.")
         self.error = 1
     endif
 
-    if !self.is_seas && nelem(strpos(seas_methods, self.which))
+    if !self.is_seas && nelem(instrings(seas_methods, self.which))
         printError("The method you requested is not available for non-seasonal data.")
         self.error = 1
     endif
@@ -535,9 +523,9 @@ function bundle execute_forecasting (bundle *self)
 
     # Retrieve moving-window point_forecasts from array,
     # compute forecast intervals and put stuff to bundle
-    if self.endogenous_in_logs == FALSE || self.y_is_always_zero == TRUE
+    if self.endogenous_in_logs == FALSE || self.y_is_constant == TRUE
         return compute_intval_forecasts(forecasts_and_factors)
-    elif self.endogenous_in_logs == TRUE && self.y_is_always_zero == FALSE
+    elif self.endogenous_in_logs == TRUE && self.y_is_constant == FALSE
         bundle interval_forecasts = compute_intval_forecasts(forecasts_and_factors)
         bundle intval_fc_in_levels = intval_forecasts_to_levels(interval_forecasts,\
           collected_point_fc_and_sderr, self)

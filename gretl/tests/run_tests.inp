@@ -573,4 +573,31 @@ end function
 test_naiveFC_meanfc_awm_stat(y)
 
 
+#=====================
+function void test_add_lagged_y_to_xlist (void)
+    print "Start add_lagged_y_to_xlist()"
+    print "pass"
+end function
+test_add_lagged_y_to_xlist()
+
+function void test_window_length_is_ok (void)
+    print "Start window_length_is_ok()"
+    print "pass"
+end function
+test_window_length_is_ok()
+
+function void test_sample_is_valid (void)
+    print "Start sample_is_valid()"
+    print "pass"
+end function
+test_sample_is_valid()
+
+function void test_model_is_ucm (void)
+    print "Start model_is_ucm()"
+    print "pass"
+end function
+test_model_is_ucm()
+
+
+
 printf "\nInfo: All tests passed.\n"

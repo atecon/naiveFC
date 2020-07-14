@@ -35,6 +35,16 @@ function void print_dropped_series (const list old, const list new, const bundle
     endif
 end function
 
+function scalar series_isconst (const series y)
+    /* Check whether series is constant. If so, return TRUE, else FALSE. */
+
+    if isconst(y) == TRUE
+        printWarning(sprintf("Series '%s' is a constant for the selected sample. Forecasts and associated standard-errors are set to NA.", argname(y)))
+        return TRUE
+    endif
+
+    return FALSE
+end function
 
 function scalar series_is_always_zero (const series y)
 /* Check whether values on comprise zeros.
@@ -265,38 +275,80 @@ function scalar valid_dates_of_y_and_xlist (bundle *self)
     return 0
 end function
 
+function void print_estimation_error_msg (const bundle self)
+    if self.verbose
+        printError("Model estimation failed. Forecast values are set to \
+          NA for the current test set.")
+    endif
+end function
 
-function scalar estimate_model_and_forecast (const string est_command,
+function void print_forecast_error_msg (const bundle self)
+    if self.verbose
+        printError("Failed executing forecast command.")
+    endif
+end function
+
+
+function matrix estimate_and_forecast_structism (const string est_command,
+                                               const series y,
+                                               const bundle train_obsnums,
+                                               bundle *self)
+    /* Estimate StrucTiSM type of model and execute forecasting command. Return zero on success, otherwise zero. */
+
+    matrix fc = mshape(NA, self.horizon, 2)
+    bundle model = null
+
+    smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+
+    @est_command
+    scalar error = STSM_fcast(&model, self.horizon_current, self.verbose)
+
+    if error == TRUE
+      print_forecast_error_msg(self)
+      scalar self.error = TRUE
+      return fc
+    endif
+
+    fc = model.fcast ~ sqrt(model.fcastvar)
+
+    return fc
+end function
+
+function matrix estimate_and_forecast_gretl (const string est_command,
                                              const string fcast_command,
                                              const series y,
                                              const list xlist,
                                              const bundle train_obsnums,
                                              const bundle test_obsnums,
-                                             const bundle self)
-    /* Estimate model and execute forecasting command. Return zero on success, otherwise zero. */
+                                             bundle *self)
+    /* Estimate built-in gretl models and execute forecasting command. Return zero on success, otherwise zero. */
 
-    scalar error = FALSE
+    matrix fc = mshape(NA, self.horizon, 2)
 
     smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
 
     catch @est_command
     if $error
-        if self.verbose
-            printError("Model estimation failed. Forecast values are set to \
-              NA for the current sample.")
-        endif
-        return TRUE
+      print_estimation_error_msg(self)
+      scalar self.error = TRUE
+      return fc
+    endif
+
+    smpl full
+    if sample_is_valid(test_obsnums.t1_test_obsnum, test_obsnums.t2_test_obsnum) == FALSE
+      scalar self.error = TRUE
+      return fc
     endif
 
     catch fcast test_obsnums.t1_test_obsnum test_obsnums.t2_test_obsnum @fcast_command
     if $error
-        if self.verbose
-            printError("Failed executing forecast command.")
-        endif
-        return TRUE
+      print_forecast_error_msg(self)
+      scalar self.error = TRUE
+      return fc
     endif
+    fc = $fcast ~ $fcse
 
-    return error
+    return fc
 end function
 
 
@@ -620,6 +672,22 @@ function bundle set_bundle (const series y,
     return self
 end function
 
+
+function scalar model_is_ucm (const bundle self)
+  /* Check whether the selected/ active model is an unobserved component model (UCM) from the StrucTiSM package. */
+
+  scalar r = FALSE
+  strings ucm = get_supported_structism_methods()
+
+  matrix pos = instrings(ucm, self.active_model)
+  if nelem(pos) > 0
+    return TRUE
+  endif
+
+  return r
+end function
+
+
 function strings get_supported_structism_methods (void)
   /* List all methods supported by the StrucTiSM package. */
 
@@ -736,5 +804,32 @@ function list add_linear_trend_to_list (void)
     list xlist = time
 
     return xlist
+end function
+
+
+function scalar window_length_is_ok (const bundle self)
+    /* Check that sample length fits window length. Return TRUE if so, otherwise FALSE. */
+
+    if self.type_moving_window != "static" && ($nobs > self.window_length)
+        printError(sprintf("The training sample (T=%d) is longer than the\n\
+          specified window length (T=%d).", $nobs, self.window_length))
+
+        return FALSE
+    endif
+
+    return TRUE
+end function
+
+function scalar sample_is_valid (const scalar start,
+                                const scalar ende)
+    /* Check that sample is valid. If so return TRUE, else FALSE.*/
+
+    catch smpl start ende
+    if $error
+        printError("Sample cannot be set.")
+        return FALSE
+    endif
+
+    return TRUE
 end function
 
