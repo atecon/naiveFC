@@ -12,7 +12,7 @@
 pdfdoc:naiveFC.pdf
 </help>
 <depends count="4">
-CvDataSplitter string_utils extra StructTiSM </depends>
+CvDataSplitter string_utils extra StrucTiSM </depends>
 <gretl-function name="naiveFC" type="bundle">
  <params count="3">
   <param name="y" type="series" const="true"/>
