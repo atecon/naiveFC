@@ -11,8 +11,8 @@
 <help>
 pdfdoc:naiveFC.pdf
 </help>
-<depends count="3">
-CvDataSplitter string_utils extra </depends>
+<depends count="4">
+CvDataSplitter string_utils extra StructTiSM </depends>
 <gretl-function name="naiveFC" type="bundle">
  <params count="3">
   <param name="y" type="series" const="true"/>

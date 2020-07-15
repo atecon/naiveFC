@@ -14,4 +14,4 @@ public = naiveFC plot_naive_forecasts get_naive_forecasts \
 menu-only = GUI_naiveFC
 help = naiveFC.pdf
 sample-script = naiveFC_sample.inp
-depends = CvDataSplitter string_utils extra
+depends = CvDataSplitter string_utils extra StructTiSM
