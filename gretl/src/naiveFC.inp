@@ -306,7 +306,6 @@ function void xlist_is_valid (bundle *self)
     /* Flag whether the requested method supports exogenous variables. */
 
     strings not_valid_for = defarray("rwfc", "rwdriftfc", "snaivefc", "snaivedriftfc", "bsmfc", "lltfc")
-    eval instrings(not_valid_for, self.which)
     matrix not_supported = instrings(not_valid_for, self.which)
 
     if nelem(self.xlist) > 0 && nelem(not_supported) > 0
