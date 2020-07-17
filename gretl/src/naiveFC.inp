@@ -299,12 +299,18 @@ function void do_initial_checks (bundle *self)
         print_no_bootstrap_support()
         self.error = 1
     endif
+end function
 
-    if nelem(self.xlist) > 0 \
-          && (self.which == "rwfc" || self.which == "rwdriftfc" || self.which == "snaivefc" || self.which == "snaivedriftfc")
 
+function void xlist_is_valid (bundle *self)
+    /* Flag whether the requested method supports exogenous variables. */
+
+    strings not_valid_for = defarray("rwfc", "rwdriftfc", "snaivefc", "snaivedriftfc", "bsmfc", "lltfc")
+
+    if nelem(self.xlist) > 0 && ok(instrings(not_valid_for, self.which))
         printError(sprintf("No exogenous variables can be included for the selected model '%s'.", self.which))
-        self.error = 1
+        printInfo("List of exogenous will be cleared. Proceed.")
+        list self.xlist = null
     endif
 end function
 
@@ -366,10 +372,12 @@ function bundle naiveFC (const series y,
     endif
     bundle self = set_bundle(y, which, opts)
 
-    do_initial_checks(&self)	# TODO: return scalar capturing error!
+    do_initial_checks(&self)	# TODO: return scalar capturing error instead of using pointer!
     if self.error
         return self
     endif
+    
+    xlist_is_valid(&self)
 
     # Replace of missing at the sample end
     # must be done here before 't1_and_t2_of_y_and_xlist'

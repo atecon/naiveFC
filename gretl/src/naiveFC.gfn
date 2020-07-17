@@ -28,10 +28,11 @@ if !exists(opts)
   bundle opts = null
 endif
 bundle self = set_bundle(y, which, opts)
-do_initial_checks(&amp;self)	# TODO: return scalar capturing error!
+do_initial_checks(&amp;self)	# TODO: return scalar capturing error instead of using pointer!
 if self.error
   return self
 endif
+xlist_is_valid(&amp;self)
 # Replace of missing at the sample end
 # must be done here before 't1_and_t2_of_y_and_xlist'
 self.n_sampleend_obs_replaced = repl_sampleend_missings_of_y(&amp;y, self.verbose)
@@ -1095,9 +1096,18 @@ if self.nboot
   print_no_bootstrap_support()
   self.error = 1
 endif
-if nelem(self.xlist) &gt; 0 &amp;&amp; (self.which == &quot;rwfc&quot; || self.which == &quot;rwdriftfc&quot; || self.which == &quot;snaivefc&quot; || self.which == &quot;snaivedriftfc&quot;)
+</code>
+</gretl-function>
+<gretl-function name="xlist_is_valid" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Flag whether the requested method supports exogenous variables. */
+strings not_valid_for = defarray(&quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;snaivefc&quot;, &quot;snaivedriftfc&quot;, &quot;bsmfc&quot;, &quot;lltfc&quot;)
+if nelem(self.xlist) &gt; 0 &amp;&amp; ok(instrings(not_valid_for, self.which))
   printError(sprintf(&quot;No exogenous variables can be included for the selected model '%s'.&quot;, self.which))
-  self.error = 1
+  printInfo(&quot;List of exogenous will be cleared. Proceed.&quot;)
+  list self.xlist = null
 endif
 </code>
 </gretl-function>
