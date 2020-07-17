@@ -1104,9 +1104,9 @@ endif
  </params>
 <code>/* Flag whether the requested method supports exogenous variables. */
 strings not_valid_for = defarray(&quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;snaivefc&quot;, &quot;snaivedriftfc&quot;, &quot;bsmfc&quot;, &quot;lltfc&quot;)
-not_supported = ok(instrings(not_valid_for, self.which)) ? TRUE : FALSE
-eval not_supported
-if nelem(self.xlist) &gt; 0 &amp;&amp; not_supported == TRUE
+eval instrings(not_valid_for, self.which)
+matrix not_supported = instrings(not_valid_for, self.which)
+if nelem(self.xlist) &gt; 0 &amp;&amp; nelem(not_supported) &gt; 0
   printWarning(sprintf(&quot;No exogenous variables can be included for the selected model '%s'.&quot;, self.which))
   printInfo(&quot;List of exogenous will be cleared. Proceed.&quot;)
   list self.xlist = null
