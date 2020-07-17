@@ -308,7 +308,7 @@ function void xlist_is_valid (bundle *self)
     strings not_valid_for = defarray("rwfc", "rwdriftfc", "snaivefc", "snaivedriftfc", "bsmfc", "lltfc")
 
     if nelem(self.xlist) > 0 && ok(instrings(not_valid_for, self.which))
-        printError(sprintf("No exogenous variables can be included for the selected model '%s'.", self.which))
+        printWarning(sprintf("No exogenous variables can be included for the selected model '%s'.", self.which))
         printInfo("List of exogenous will be cleared. Proceed.")
         list self.xlist = null
     endif
