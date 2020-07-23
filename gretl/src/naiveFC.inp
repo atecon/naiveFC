@@ -404,8 +404,11 @@ function bundle naiveFC (const series y,
 
     smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
 
-    series self.y = endogenous_series_in_logs(y, self)
-
+    series self.y = endogenous_series_in_logs(y, &self)
+    if self.error == TRUE
+        return self
+    endif
+    
     do_naive_forecasting(&self)
 
     if self.which == "avgfc"

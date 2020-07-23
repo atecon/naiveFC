@@ -1,27 +1,31 @@
 #TODO: untested
-function scalar y_has_zero_negative_vals (const series y, const bundle self)
+function scalar y_has_zero_negative_vals (const series y, bundle *self)
     /* Check whether y includes zero or negative values.
     return: 0 if not zero or negative values, otherwise 1. */
 
     smpl y != replace_nan_value_by() --restrict
     scalar ret = (sum(y <= 0) > 0) ? TRUE : FALSE
-    if self.verbose > 0 && ret == TRUE
-        printWarning("Endogenous series includes zero or negative values")
-    endif
 
     return ret
 end function
 
 
 #TODO: untested
-function series endogenous_series_in_logs (const series y, const bundle self)
+function series endogenous_series_in_logs (const series y, bundle *self)
     /* Return input series in natural logs if specified. */
 
-    scalar code = y_has_zero_negative_vals(y, self)
-    if self.endogenous_in_logs == TRUE && code == FALSE
-        return log(y)
-    else
+    if self.endogenous_in_logs == FALSE
         return y
+    endif
+
+    scalar code = y_has_zero_negative_vals(y, &self)
+    
+    if self.endogenous_in_logs == TRUE && code == TRUE
+        printError("Endogenous series includes zero or negative values. You cannot compute logs.")
+        self.error = TRUE
+        return y
+    elif self.endogenous_in_logs == TRUE && code == FALSE
+        return log(y)
     endif
 end function
 

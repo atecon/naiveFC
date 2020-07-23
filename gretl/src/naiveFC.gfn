@@ -51,7 +51,10 @@ if check
   return self
 endif
 smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
-series self.y = endogenous_series_in_logs(y, self)
+series self.y = endogenous_series_in_logs(y, &amp;self)
+if self.error == TRUE
+  return self
+endif
 do_naive_forecasting(&amp;self)
 if self.which == &quot;avgfc&quot;
   self.forecast_results.avgfc = compute_avgerage_forecast(&amp;self)
@@ -161,29 +164,31 @@ return self.fc
 <gretl-function name="y_has_zero_negative_vals" type="scalar" private="1">
  <params count="2">
   <param name="y" type="series" const="true"/>
-  <param name="self" type="bundle" const="true"/>
+  <param name="self" type="bundleref"/>
  </params>
 <code>/* Check whether y includes zero or negative values.
 return: 0 if not zero or negative values, otherwise 1. */
 smpl y != replace_nan_value_by() --restrict
 scalar ret = (sum(y &lt;= 0) &gt; 0) ? TRUE : FALSE
-if self.verbose &gt; 0 &amp;&amp; ret == TRUE
-  printWarning(&quot;Endogenous series includes zero or negative values&quot;)
-endif
 return ret
 </code>
 </gretl-function>
 <gretl-function name="endogenous_series_in_logs" type="series" private="1">
  <params count="2">
   <param name="y" type="series" const="true"/>
-  <param name="self" type="bundle" const="true"/>
+  <param name="self" type="bundleref"/>
  </params>
 <code>/* Return input series in natural logs if specified. */
-scalar code = y_has_zero_negative_vals(y, self)
-if self.endogenous_in_logs == TRUE &amp;&amp; code == FALSE
-  return log(y)
-else
+if self.endogenous_in_logs == FALSE
   return y
+endif
+scalar code = y_has_zero_negative_vals(y, &amp;self)
+if self.endogenous_in_logs == TRUE &amp;&amp; code == TRUE
+  printError(&quot;Endogenous series includes zero or negative values. You cannot compute logs.&quot;)
+  self.error = TRUE
+  return y
+elif self.endogenous_in_logs == TRUE &amp;&amp; code == FALSE
+  return log(y)
 endif
 </code>
 </gretl-function>
