@@ -377,7 +377,7 @@ function bundle naiveFC (const series y,
     if self.error
         return self
     endif
-    
+
     xlist_is_valid(&self)
 
     # Replace of missing at the sample end
@@ -408,7 +408,7 @@ function bundle naiveFC (const series y,
     if self.error == TRUE
         return self
     endif
-    
+
     do_naive_forecasting(&self)
 
     if self.which == "avgfc"

@@ -19,7 +19,7 @@ function series endogenous_series_in_logs (const series y, bundle *self)
     endif
 
     scalar code = y_has_zero_negative_vals(y, &self)
-    
+
     if self.endogenous_in_logs == TRUE && code == TRUE
         printError("Endogenous series includes zero or negative values. You cannot compute logs.")
         self.error = TRUE
