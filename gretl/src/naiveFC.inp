@@ -95,6 +95,16 @@ function bundle dict_models (void)
       "add_ohe_periods", 0 \
       )
 
+    # Harvey (1989, sect. 2.5.5) has shown that the autocorrelation structure of the airline model is similar to that of an UCM composed by LLT and stochastic seasonals.
+    dict_models.airlinefc = defbundle( \
+      "forecast_arg", "--dynamic", \
+      "command", "arima 0 1 1 ; 0 1 1 ; y xlist",
+      "add_linear_trend", 0, \
+      "add_first_lag", 0, \
+      "add_intercept", 1, \
+      "add_ohe_periods", 0 \
+      )
+
     dict_models.bsmfc = defbundle( \
       "forecast_arg", "", \
       "command", "BSM(y, 0, &model)", \
@@ -788,8 +798,8 @@ end function
 # FIXME
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
-      int which[1:12:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
-      "ar1FC", "ar1trendFC", "ar1ma1fc", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC"},
+      int which[1:13:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
+      "ar1FC", "ar1trendFC", "ar1ma1fc", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC", "airlinefc"},
       int h[1::10] "Forecast horizon",
       bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */

@@ -701,7 +701,7 @@ end function
 function strings get_supported_seas_methods (void)
     /* List all seasonal supported methods here. */
 
-    return defarray("smeanfc", "smedianfc", "snaivefc", "snaivedriftfc") + get_supported_structism_methods()
+    return defarray("smeanfc", "smedianfc", "snaivefc", "snaivedriftfc", "airlinefc") + get_supported_structism_methods()
 end function
 
 function strings get_supported_nonseas_methods (void)

@@ -136,11 +136,11 @@ opts.verbose = 1						# print details (optional)
 # TODO as we forecast only to the last valid obs of y in this case anyway!
 # FIXME: moving-window fc with "avgfc"
 
-strings methods = defarray("lltfc", "bsmfc", "ar1ma1fc", "meanFC", "medianFC", "rwFC", "rwdriftFC", \
+strings methods = defarray("lltfc", "bsmfc", "airlinefc", "ar1ma1fc", "meanFC", "medianFC", "rwFC", "rwdriftFC", \
   "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
-bundle b = naiveFC(y, methods[1], opts)
+bundle b = naiveFC(y, methods[3], opts)
 b
 bundle forecast_results = b.forecast_results
 
