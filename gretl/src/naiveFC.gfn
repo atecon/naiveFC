@@ -133,10 +133,10 @@ return list_of_forecasts(self, horizons, suffix)
   <param name="xlist" type="list" optional="true" const="true">
 <description>Additional exogenous (future values must be known)</description>
   </param>
-  <param name="which" type="int" min="1" max="12" default="1">
+  <param name="which" type="int" min="1" max="13" default="1">
 <description>Model type</description>
-<labels count="12">
-"meanFC" "medianFC" "rwFC" "rwdriftFC" "ar1FC" "ar1trendFC" "ar1ma1fc" "smeanFC" "smedianFC" "snaiveFC" "snaivedriftFC" "avgFC" </labels>
+<labels count="13">
+"meanFC" "medianFC" "rwFC" "rwdriftFC" "ar1FC" "ar1trendFC" "ar1ma1fc" "smeanFC" "smedianFC" "snaiveFC" "snaivedriftFC" "avgFC" "airlinefc" </labels>
   </param>
   <param name="h" type="int" min="1" default="10">
 <description>Forecast horizon</description>
@@ -799,7 +799,7 @@ return defarray(&quot;bsmfc&quot;, &quot;lltfc&quot;)
 </gretl-function>
 <gretl-function name="get_supported_seas_methods" type="strings" private="1">
 <code>/* List all seasonal supported methods here. */
-return defarray(&quot;smeanfc&quot;, &quot;smedianfc&quot;, &quot;snaivefc&quot;, &quot;snaivedriftfc&quot;) + get_supported_structism_methods()
+return defarray(&quot;smeanfc&quot;, &quot;smedianfc&quot;, &quot;snaivefc&quot;, &quot;snaivedriftfc&quot;, &quot;airlinefc&quot;) + get_supported_structism_methods()
 </code>
 </gretl-function>
 <gretl-function name="get_supported_nonseas_methods" type="strings" private="1">
@@ -931,6 +931,8 @@ dict_models.rwdriftfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quo
 dict_models.ar1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1trendfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 1, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1ma1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 1 0 1 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+# Harvey (1989, sect. 2.5.5) has shown that the autocorrelation structure of the airline model is similar to that of an UCM composed by LLT and stochastic seasonals.
+dict_models.airlinefc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 0 1 1 ; 0 1 1 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.bsmfc = defbundle( &quot;forecast_arg&quot;, &quot;&quot;, &quot;command&quot;, &quot;BSM(y, 0, &amp;model)&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
 dict_models.lltfc = defbundle( &quot;forecast_arg&quot;, &quot;&quot;, &quot;command&quot;, &quot;LLT(y, 0, &amp;model)&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
 return dict_models
@@ -1560,11 +1562,11 @@ opts.verbose = 1						# print details (optional)
 # TODO as we forecast only to the last valid obs of y in this case anyway!
 # FIXME: moving-window fc with &quot;avgfc&quot;
 
-strings methods = defarray(&quot;lltfc&quot;, &quot;bsmfc&quot;, &quot;ar1ma1fc&quot;, &quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, \
+strings methods = defarray(&quot;lltfc&quot;, &quot;bsmfc&quot;, &quot;airlinefc&quot;, &quot;ar1ma1fc&quot;, &quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, \
   &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, &quot;snaivedriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgfc&quot;)
 
 bundle b = null
-bundle b = naiveFC(y, methods[1], opts)
+bundle b = naiveFC(y, methods[3], opts)
 b
 bundle forecast_results = b.forecast_results
 
