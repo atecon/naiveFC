@@ -116,16 +116,13 @@ function list get_movwindow_forecast_list (const matrix horizons,
     loop i=1..rows(horizons) -q
         scalar shift_periods = $i - 1
 
-        R += genseries(sprintf("low_h%d_%s%s", horizons[i], \
-          model, suffix), \
+        R += genseries(sprintf("low_h%d_%s", horizons[i], suffix), \
           mlag(self.forecast_results[model].forecasts_lower_bound[i,]', shift_periods, NA) )
 
-        R += genseries(sprintf("point_h%d_%s%s", horizons[i], \
-          model, suffix), \
+        R += genseries(sprintf("point_h%d_%s", horizons[i], suffix), \
           mlag(self.forecast_results[model].forecasts_point[i,]', shift_periods, NA) )
 
-        R += genseries(sprintf("up_h%d_%s%s", horizons[i], \
-          model, suffix), \
+        R += genseries(sprintf("up_h%d_%s", horizons[i], suffix), \
           mlag(self.forecast_results[model].forecasts_upper_bound[i,]', shift_periods, NA) )
     endloop
 
@@ -142,16 +139,13 @@ function list get_static_forecast_list (const bundle self,
 
     list R = null
 
-    R += genseries(sprintf("low_h1to%d_%s%s", self.horizon, \
-      model, suffix), \
+    R += genseries(sprintf("low_h1to%d_%s", self.horizon, suffix), \
       self.forecast_results[model].forecasts_lower_bound)
 
-    R += genseries(sprintf("point_h1to%d_%s%s", self.horizon, \
-      model, suffix), \
+    R += genseries(sprintf("point_h1to%d_%s", self.horizon, suffix), \
       self.forecast_results[model].forecasts_point)
 
-    R += genseries(sprintf("up_h1to%d_%s%s", self.horizon, \
-      model, suffix), \
+    R += genseries(sprintf("up_h1to%d_%s", self.horizon, suffix), \
       self.forecast_results[model].forecasts_upper_bound)
 
     return R
