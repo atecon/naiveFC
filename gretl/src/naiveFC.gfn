@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gretl-functions>
-<gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2019b" lives-in-subdir="true">
+<gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2021b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.9</version>
-<date>2020-03-04</date>
+<version>0.91</version>
+<date>2021-06-15</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
 <label>naive forecast(s)</label>
@@ -15,7 +15,7 @@ pdfdoc:naiveFC.pdf
 CvDataSplitter string_utils extra StrucTiSM </depends>
 <gretl-function name="naiveFC" type="bundle">
  <params count="3">
-  <param name="y" type="series" const="true"/>
+  <param name="y" type="series"/>
   <param name="which" type="string">
 <description>Select forecasting method</description>
   </param>
@@ -35,7 +35,9 @@ endif
 xlist_is_valid(&amp;self)
 # Replace of missing at the sample end
 # must be done here before 't1_and_t2_of_y_and_xlist'
-self.n_sampleend_obs_replaced = repl_sampleend_missings_of_y(&amp;y, self.verbose)
+scalar n_sampleend_obs_replaced = NA
+series y = repl_sampleend_missings_of_y(y, self.verbose, &amp;n_sampleend_obs_replaced)
+self.n_sampleend_obs_replaced = n_sampleend_obs_replaced
 t1_and_t2_of_y_and_xlist(y, &amp;self)
 if self.type_moving_window == &quot;static&quot;
   # &quot;self.t2_date_y&quot; refers to in-sample end date of &quot;y&quot;
@@ -50,7 +52,8 @@ scalar check = sufficient_future_obs(&amp;self)
 if check
   return self
 endif
-smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
+# get_sample_end(self) = in-sample end plus max(horizon)
+smpl obsnum(self.t1_date_y) get_sample_end(self)
 series self.y = endogenous_series_in_logs(y, &amp;self)
 if self.error == TRUE
   return self
@@ -102,7 +105,7 @@ call_plot(plotlist, self)
  <params count="3">
   <param name="self" type="bundle" const="true"/>
   <param name="horizons" type="matrix" optional="true">
-<description>Select specific horizons (moving-window only)</description>
+<description>Select specific horizons, moving-window only</description>
   </param>
   <param name="suffix" type="string" optional="true" const="true">
 <description>Suffix for series' names</description>
@@ -116,13 +119,13 @@ endif
 if !exists(horizons)
   matrix horizons = seq(1, self.horizon)
 endif
-matrix horizons = vec(horizons)
-scalar err = horizons_isok(self, horizons)
+matrix hors = vec(horizons)
+scalar err = horizons_isok(self, hors)
 if !err
   return R
 endif
 smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
-return list_of_forecasts(self, horizons, suffix)
+return list_of_forecasts(self, hors, suffix)
 </code>
 </gretl-function>
 <gretl-function name="GUI_naiveFC" type="matrix" menu-only="1" pkg-role="gui-main">
@@ -360,10 +363,11 @@ to avoid problems in case the endogenous is transformed to logarithms. */
 return abs(98765432107)
 </code>
 </gretl-function>
-<gretl-function name="repl_sampleend_missings_of_y" type="scalar" private="1">
- <params count="2">
-  <param name="y" type="seriesref"/>
+<gretl-function name="repl_sampleend_missings_of_y" type="series" private="1">
+ <params count="3">
+  <param name="y" type="series"/>
   <param name="verbose" type="bool" const="true"/>
+  <param name="n_sampleend_obs_replaced" type="scalarref"/>
  </params>
 <code>/* Replace missing values of y at the sample end. */
 smpl y --no-missing
@@ -374,9 +378,9 @@ if n_sampleend_obs_replaced &gt; 0
   smpl full
 endif
 if verbose
-  printInfo(sprintf(&quot;Replaced %d missing values at the sample end of 'y'.&quot;, n_sampleend_obs_replaced))
+  Info(sprintf(&quot;Replaced %d missing values at the sample end of 'y'.&quot;, n_sampleend_obs_replaced))
 endif
-return n_sampleend_obs_replaced
+return y
 </code>
 </gretl-function>
 <gretl-function name="valid_dates_of_y_and_xlist" type="scalar" private="1">
@@ -732,7 +736,7 @@ string self.t2_date = obslabel($t2)
 scalar self.T = $nobs
 </code>
 </gretl-function>
-<gretl-function name="printInfo" type="void" private="1">
+<gretl-function name="Info" type="void" private="1">
  <params count="1">
   <param name="s" type="string" const="true"/>
  </params>
@@ -931,7 +935,9 @@ dict_models.rwdriftfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quo
 dict_models.ar1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1trendfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 1, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1ma1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 1 0 1 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
-# Harvey (1989, sect. 2.5.5) has shown that the autocorrelation structure of the airline model is similar to that of an UCM composed by LLT and stochastic seasonals.
+# Harvey (1989, sect. 2.5.5) has shown that the autocorrelation structure
+# of the airline model is similar to that of an UCM composed by LLT and
+# stochastic seasonals.
 dict_models.airlinefc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 0 1 1 ; 0 1 1 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.bsmfc = defbundle( &quot;forecast_arg&quot;, &quot;&quot;, &quot;command&quot;, &quot;BSM(y, 0, &amp;model)&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
 dict_models.lltfc = defbundle( &quot;forecast_arg&quot;, &quot;&quot;, &quot;command&quot;, &quot;LLT(y, 0, &amp;model)&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 0, &quot;add_ohe_periods&quot;, 0 )
@@ -1017,7 +1023,7 @@ return fcast_arg
 </gretl-function>
 <gretl-function name="add_lagged_y_to_xlist" type="list" private="1">
  <params count="3">
-  <param name="y" type="series" const="true"/>
+  <param name="y" type="series"/>
   <param name="xlist" type="list"/>
   <param name="model_settings" type="bundle" const="true"/>
  </params>
@@ -1063,10 +1069,10 @@ list xlist_new = drop_zero_series_from_list(xlist)
 print_dropped_series(xlist, xlist_new, self)
 list xlist = xlist_new
 if model_is_ucm(self) == TRUE
-  forecast_results[1:self.horizon_current,] = estimate_and_forecast_structism(command, y, train_obsnums, &amp;self)
+  forecast_results[1:,] = estimate_and_forecast_structism(command, y, train_obsnums, &amp;self)
 else
   smpl full     # samples are set within function
-  forecast_results[1:self.horizon_current,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &amp;self)
+  forecast_results[1:,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &amp;self)
 endif
 return forecast_results
 </code>
@@ -1114,7 +1120,7 @@ strings not_valid_for = defarray(&quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;
 matrix not_supported = instrings(not_valid_for, self.which)
 if nelem(self.xlist) &gt; 0 &amp;&amp; nelem(not_supported) &gt; 0
   Warn(sprintf(&quot;No exogenous variables can be included for the selected model '%s'.&quot;, self.which))
-  printInfo(&quot;List of exogenous will be cleared. Proceed.&quot;)
+  Info(&quot;List of exogenous will be cleared. Proceed.&quot;)
   list self.xlist = null
 endif
 </code>
@@ -1348,7 +1354,8 @@ loop lwin=1..cv.n_folds -q
   elif lwin == (cv.n_folds - 1) &amp;&amp; self.type_moving_window != &quot;static&quot;
     self.t2_forecast_date = self.t2_date_y		# Date of last h-step ahead forecast
   endif
-  collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&amp;self)	# h by 2 matrix (point_fc ~ sderr)
+  # h by 2 matrix (point_fc ~ sderr)
+  collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&amp;self)
 endloop
 if self.type_moving_window == &quot;static&quot;
   string self.t2_forecast_date = obslabel(obsnum(self.t2_train_date) + self.horizon)	# Date of last h-step ahead forecast
@@ -1433,8 +1440,6 @@ include StrucTiSM.gfn
 
 if $sysinfo.hostname == &quot;dsb&quot;
     string WD = &quot;/home/ninja/repo/naiveFC/gretl&quot;
-elif $sysinfo.hostname == &quot;bipower6&quot;
-    string WD = &quot;/home/atarasso/git/naiveFC/gretl&quot;
 else
     string WD = &quot;/home/at/git/naiveFC/gretl&quot;
 endif

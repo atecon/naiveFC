@@ -1,10 +1,10 @@
 author = Artur Tarassow
 email = atecon@posteo.de
-version = 0.9
-date = 2020-03-04
+version = 0.91
+date = 2021-06-15
 description = Simple forecasting methods
 tags = C53
-min-version = 2019b
+min-version = 2021b
 data-requirement = needs-time-series-data
 gui-main = GUI_naiveFC
 label = naive forecast(s)
