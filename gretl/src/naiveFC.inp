@@ -95,7 +95,9 @@ function bundle dict_models (void)
       "add_ohe_periods", 0 \
       )
 
-    # Harvey (1989, sect. 2.5.5) has shown that the autocorrelation structure of the airline model is similar to that of an UCM composed by LLT and stochastic seasonals.
+    # Harvey (1989, sect. 2.5.5) has shown that the autocorrelation structure
+    # of the airline model is similar to that of an UCM composed by LLT and
+    # stochastic seasonals.
     dict_models.airlinefc = defbundle( \
       "forecast_arg", "--dynamic", \
       "command", "arima 0 1 1 ; 0 1 1 ; y xlist",
@@ -211,7 +213,7 @@ function string add_quiet_str_to_fcast_arg (const bundle self,
   return fcast_arg
 end function
 
-function list add_lagged_y_to_xlist (const series y,
+function list add_lagged_y_to_xlist (series y,
                                     list xlist,
                                     const bundle model_settings)
   /* Conditionally add 1st lag of endogenous to xlist. */
@@ -262,10 +264,10 @@ function matrix set_xlist_and_forecast (bundle *self)
   list xlist = xlist_new
 
   if model_is_ucm(self) == TRUE
-    forecast_results[1:self.horizon_current,] = estimate_and_forecast_structism(command, y, train_obsnums, &self)
+    forecast_results[1:,] = estimate_and_forecast_structism(command, y, train_obsnums, &self)
   else
     smpl full     # samples are set within function
-    forecast_results[1:self.horizon_current,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &self)
+    forecast_results[1:,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &self)
   endif
 
   return forecast_results
@@ -279,8 +281,8 @@ function void do_initial_checks (bundle *self)
     pkg query extra --quiet
 
     if $result.version < 0.6
-        printError("You need at least version 0.6 of the 'extra' package.")
-        printError("Update by executing 'pkg install extra'")
+        Error("You need at least version 0.6 of the 'extra' package.")
+        Error("Update by executing 'pkg install extra'")
     endif
 
     strings methods = get_supported_nonseas_methods()
@@ -288,20 +290,20 @@ function void do_initial_checks (bundle *self)
 
     # Check whether called method exists
     if !nelem(instrings(methods, self.which)) && !nelem(instrings(seas_methods, self.which))
-        printError("The forecasting method you selected does not exist.")
+        Error("The forecasting method you selected does not exist.")
         self.error = 1
     endif
 
     if !self.is_seas && nelem(instrings(seas_methods, self.which))
-        printError("The method you requested is not available for non-seasonal data.")
+        Error("The method you requested is not available for non-seasonal data.")
         self.error = 1
     endif
 
     # TODO: Why is this necessary??
     if self.window_length < $pd
-        printError(sprintf("Window size = %d", self.window_length))
-        printError(sprintf("Periodicity = %d\n", $pd))
-        printError("The size of the moving window cannot be smaller than the underlying periodicity.")
+        Error(sprintf("Window size = %d", self.window_length))
+        Error(sprintf("Periodicity = %d\n", $pd))
+        Error("The size of the moving window cannot be smaller than the underlying periodicity.")
         #        self.error = 1		# TODO: don't return error as long as it is not clear why/ when this case matters
     endif
 
@@ -319,8 +321,8 @@ function void xlist_is_valid (bundle *self)
     matrix not_supported = instrings(not_valid_for, self.which)
 
     if nelem(self.xlist) > 0 && nelem(not_supported) > 0
-        printWarning(sprintf("No exogenous variables can be included for the selected model '%s'.", self.which))
-        printInfo("List of exogenous will be cleared. Proceed.")
+        Warn(sprintf("No exogenous variables can be included for the selected model '%s'.", self.which))
+        Info("List of exogenous will be cleared. Proceed.")
         list self.xlist = null
     endif
 end function
@@ -348,7 +350,7 @@ function void t1_and_t2_of_y_and_xlist (const series y,
     scalar t2_diff_y = t2_curr - self.t2_obsnum_y
 
     if t1_diff_y > 0
-        printWarning(sprintf("Found %d missing initial observations for %s.", \
+        Warn(sprintf("Found %d missing initial observations for %s.", \
           t1_diff_y, self.name_endo))
     endif
 
@@ -362,18 +364,18 @@ function void t1_and_t2_of_y_and_xlist (const series y,
         scalar t2_diff_x = t2_curr - self.t2_obsnum_xlist
 
         if t1_diff_x > 0
-            printWarning(sprintf("Found %d missing initial observations for exogenous.",\
+            Warn(sprintf("Found %d missing initial observations for exogenous.",\
               t1_diff_x))
         endif
         if t2_diff_x > 0
-            printWarning(sprintf("Found %d missing observations at sample end for exogenous.",\
+            Warn(sprintf("Found %d missing observations at sample end for exogenous.",\
               t2_diff_x))
         endif
     endif
 end function
 
 
-function bundle naiveFC (const series y,
+function bundle naiveFC (series y,
                          string which "Select forecasting method",
                          bundle opts[null] "Bundle incl. optional parameters")
     /* Main package function */
@@ -392,7 +394,10 @@ function bundle naiveFC (const series y,
 
     # Replace of missing at the sample end
     # must be done here before 't1_and_t2_of_y_and_xlist'
-    self.n_sampleend_obs_replaced = repl_sampleend_missings_of_y(&y, self.verbose)
+    scalar n_sampleend_obs_replaced = NA
+    series y = repl_sampleend_missings_of_y(y, self.verbose,\
+                                            &n_sampleend_obs_replaced)
+    self.n_sampleend_obs_replaced = n_sampleend_obs_replaced
 
     t1_and_t2_of_y_and_xlist(y, &self)
 
@@ -403,7 +408,7 @@ function bundle naiveFC (const series y,
 
     scalar check = valid_dates_of_y_and_xlist(&self)
     if check
-        printError("Problem with dating for y and/ or xlist.")
+        Error("Problem with dating for y and/ or xlist.")
         return self
     endif
 
@@ -412,7 +417,8 @@ function bundle naiveFC (const series y,
         return self
     endif
 
-    smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
+    # get_sample_end(self) = in-sample end plus max(horizon)
+    smpl obsnum(self.t1_date_y) get_sample_end(self)
 
     series self.y = endogenous_series_in_logs(y, &self)
     if self.error == TRUE
@@ -654,7 +660,9 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
         elif lwin == (cv.n_folds - 1) && self.type_moving_window != "static"
             self.t2_forecast_date = self.t2_date_y		# Date of last h-step ahead forecast
         endif
-        collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)	# h by 2 matrix (point_fc ~ sderr)
+
+        # h by 2 matrix (point_fc ~ sderr)
+        collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)
     endloop
 
     if self.type_moving_window == "static"
@@ -668,8 +676,8 @@ end function
 # TODO: untested
 # Public function
 function list get_naive_forecasts (const bundle self,
-                                   matrix horizons[null] "Select specific horizons (moving-window only)",
-      const string suffix[null] "Suffix for series' names")
+                                   matrix horizons[null] "Select specific horizons, moving-window only",
+                                   const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
@@ -679,16 +687,16 @@ function list get_naive_forecasts (const bundle self,
     if !exists(horizons)
         matrix horizons = seq(1, self.horizon)
     endif
-    matrix horizons = vec(horizons)
+    matrix hors = vec(horizons)
 
-    scalar err = horizons_isok(self, horizons)
+    scalar err = horizons_isok(self, hors)
     if !err
         return R
     endif
 
     smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
 
-    return list_of_forecasts(self, horizons, suffix)
+    return list_of_forecasts(self, hors, suffix)
 end function
 
 # TODO: add convenient function "get_naive_forecast_errors()"

@@ -21,7 +21,7 @@ function series endogenous_series_in_logs (const series y, bundle *self)
     scalar code = y_has_zero_negative_vals(y, &self)
 
     if self.endogenous_in_logs == TRUE && code == TRUE
-        printError("Endogenous series includes zero or negative values. You cannot compute logs.")
+        Error("Endogenous series includes zero or negative values. You cannot compute logs.")
         self.error = TRUE
         return y
     elif self.endogenous_in_logs == TRUE && code == FALSE
@@ -43,7 +43,7 @@ function scalar series_isconst (const series y)
     /* Check whether series is constant. If so, return TRUE, else FALSE. */
 
     if isconst(y) == TRUE
-        printWarning(sprintf("Series '%s' is a constant for the selected sample. Forecasts and associated standard-errors are set to NA.", argname(y)))
+        Warn(sprintf("Series '%s' is a constant for the selected sample. Forecasts and associated standard-errors are set to NA.", argname(y)))
         return TRUE
     endif
 
@@ -166,11 +166,11 @@ function scalar horizons_isok (const bundle self,
 
     if self.type_moving_window != "static"
         if minc(horizons) <= 0
-            printError("You cannot select a negative forecast horizon.")
+            Error("You cannot select a negative forecast horizon.")
             return 0
         endif
         if maxc(horizons) > self.horizon
-            printError(sprintf("The maximum forecast horizon you \n\
+            Error(sprintf("The maximum forecast horizon you \n\
               selected (=%d) does exceed the horizon set before (=%d).", \
               maxc(horizons), self.horizon))
             return 0
@@ -187,7 +187,7 @@ function scalar sufficient_future_obs (bundle *self)
     scalar tdiff = $tmax + self.n_sampleend_obs_replaced - self.t2_obsnum_y
 
     if tdiff < self.horizon
-        printError(sprintf("Requested maximum forecast horizon exceeds\n\
+        Error(sprintf("Requested maximum forecast horizon exceeds\n\
           the number of available future periods. Either add observations\n\
           or decrease the maximum forecast horizon to %d",
           self.horizon - (self.horizon - tdiff)))
@@ -219,7 +219,9 @@ end function
 
 
 # TODO: untested
-function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
+function series repl_sampleend_missings_of_y (series y,
+                                              const bool verbose,
+                                              scalar *n_sampleend_obs_replaced)
     /* Replace missing values of y at the sample end. */
 
     smpl y --no-missing
@@ -231,11 +233,11 @@ function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
     endif
 
     if verbose
-        printInfo(sprintf("Replaced %d missing values at the sample end of 'y'.", \
+        Info(sprintf("Replaced %d missing values at the sample end of 'y'.", \
           n_sampleend_obs_replaced))
     endif
 
-    return n_sampleend_obs_replaced
+    return y
 end function
 
 function scalar valid_dates_of_y_and_xlist (bundle *self)
@@ -249,22 +251,22 @@ function scalar valid_dates_of_y_and_xlist (bundle *self)
 
     if tdiff_y_xlist >= 0
         if tdiff_y_xlist > 0
-            printError(sprintf("Sample ends earlier for exogenous regressors ('%s')\n\
+            Error(sprintf("Sample ends earlier for exogenous regressors ('%s')\n\
               than for the endogenous %s ('%s').", self.t2_date_xlist,
               self.name_endo, self.t2_date_y))
         else
-            printError(sprintf("Sample ends for both the exogenous regressors\n\
+            Error(sprintf("Sample ends for both the exogenous regressors\n\
               and for the endogenous %s at observation '%s'.",
               self.name_endo, self.t2_date_y))
         endif
-        printError("List of exogenous has insufficient future values.")
+        Error("List of exogenous has insufficient future values.")
 
         self.error = 1
         return 1
     endif
 
     if tdiff_y_xlist < 0 && (abs(tdiff_y_xlist) <  self.horizon)
-        printError(sprintf("You set the maximum forecast horizon to %d periods but\n\
+        Error(sprintf("You set the maximum forecast horizon to %d periods but\n\
           the sample of the exogenous regressors has only %d future\n\
           values left after period %s.\n\
           Either restrict the maximum forecast horizon to 'horizon = %d'\n\
@@ -281,14 +283,14 @@ end function
 
 function void print_estimation_error_msg (const bundle self)
     if self.verbose
-        printError("Model estimation failed. Forecast values are set to \
+        Error("Model estimation failed. Forecast values are set to \
           NA for the current test set.")
     endif
 end function
 
 function void print_forecast_error_msg (const bundle self)
     if self.verbose
-        printError("Failed executing forecast command.")
+        Error("Failed executing forecast command.")
     endif
 end function
 
@@ -317,6 +319,7 @@ function matrix estimate_and_forecast_structism (const string est_command,
 
     return fc
 end function
+
 
 function matrix estimate_and_forecast_gretl (const string est_command,
                                              const string fcast_command,
@@ -366,11 +369,11 @@ function bundle compute_avgerage_forecast (bundle *self)
     bundle avgfc = null
 
     if !inbundle(self, "forecast_results")
-        printError("Bundle 'forecast_results' does not exist.")
+        Error("Bundle 'forecast_results' does not exist.")
         scalar self.error = 1
     endif
     if nelem(self.forecast_results) < 2
-        printError("Average forecast combination requires at least two forecasting models.")
+        Error("Average forecast combination requires at least two forecasting models.")
         scalar self.error = 1
     endif
 
@@ -607,7 +610,7 @@ function scalar valid_window_length (bundle *self)
     /* Returns zero of window_length is valid. */
 
     if smplspan(self.t1_date_y, self.t2_date_y, $pd) < self.window_length
-        printError(sprintf("The window size you selected (wsize=%d) exceeds the\n\
+        Error(sprintf("The window size you selected (wsize=%d) exceeds the\n\
           number of valid observations in '%s'.", self.window_length, self.name_endo))
 
         return 1
@@ -637,15 +640,15 @@ function void obslabels_and_nobs_to_bundle (const list y,
 end function
 
 
-function void printInfo (const string s)
+function void Info (const string s)
     printf "\nInfo: %s\n", s
 end function
 
-function void printWarning (const string s)
+function void Warn (const string s)
     printf "\nWarning: %s\n", s
 end function
 
-function void printError (const string s)
+function void Error (const string s)
     printf "\nError: %s\n", s
 end function
 
@@ -733,7 +736,7 @@ end function
 
 # TODO: Drop funcerr, instead return error but don't stop
 function void print_no_bootstrap_support (void)
-    printError("Bootstrap confidence intervals are not supported, yet")
+    Error("Bootstrap confidence intervals are not supported, yet")
 end function
 
 
@@ -815,7 +818,7 @@ function scalar window_length_is_ok (const bundle self)
     /* Check that sample length fits window length. Return TRUE if so, otherwise FALSE. */
 
     if self.type_moving_window != "static" && ($nobs > self.window_length)
-        printError(sprintf("The training sample (T=%d) is longer than the\n\
+        Error(sprintf("The training sample (T=%d) is longer than the\n\
           specified window length (T=%d).", $nobs, self.window_length))
 
         return FALSE
@@ -830,7 +833,7 @@ function scalar sample_is_valid (const scalar start,
 
     catch smpl start ende
     if $error
-        printError("Sample cannot be set.")
+        Error("Sample cannot be set.")
         return FALSE
     endif
 
