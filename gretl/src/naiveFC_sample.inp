@@ -7,8 +7,6 @@ include StrucTiSM.gfn
 
 if $sysinfo.hostname == "dsb"
     string WD = "/home/ninja/repo/naiveFC/gretl"
-elif $sysinfo.hostname == "bipower6"
-    string WD = "/home/atarasso/git/naiveFC/gretl"
 else
     string WD = "/home/at/git/naiveFC/gretl"
 endif

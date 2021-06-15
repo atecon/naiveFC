@@ -209,7 +209,7 @@ function void test_prepare_forecast_bundles (void)
     b = prepare_forecast_bundles(&b)
     bundle fc = b.snaivefc
 
-    assert_equal_num(nelem(b), 11)
+    assert_equal_num(nelem(b), 14)
     assert_true(inbundle(b, snaivefc))
     assert_equal_num(nelem(fc), 0)
 end function
@@ -380,7 +380,7 @@ function void test_get_estimator_names (void)
 
     scalar is_seas = 1
     strings S = get_estimator_names(is_seas)
-    assert_equal_num(nelem(S), 11)
+    assert_equal_num(nelem(S), 14)
 end function
 
 

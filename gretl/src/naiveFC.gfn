@@ -43,7 +43,7 @@ if self.type_moving_window == &quot;static&quot;
 endif
 scalar check = valid_dates_of_y_and_xlist(&amp;self)
 if check
-  printError(&quot;Problem with dating for y and/ or xlist.&quot;)
+  Error(&quot;Problem with dating for y and/ or xlist.&quot;)
   return self
 endif
 scalar check = sufficient_future_obs(&amp;self)
@@ -184,7 +184,7 @@ if self.endogenous_in_logs == FALSE
 endif
 scalar code = y_has_zero_negative_vals(y, &amp;self)
 if self.endogenous_in_logs == TRUE &amp;&amp; code == TRUE
-  printError(&quot;Endogenous series includes zero or negative values. You cannot compute logs.&quot;)
+  Error(&quot;Endogenous series includes zero or negative values. You cannot compute logs.&quot;)
   self.error = TRUE
   return y
 elif self.endogenous_in_logs == TRUE &amp;&amp; code == FALSE
@@ -211,7 +211,7 @@ endif
  </params>
 <code>/* Check whether series is constant. If so, return TRUE, else FALSE. */
 if isconst(y) == TRUE
-  printWarning(sprintf(&quot;Series '%s' is a constant for the selected sample. Forecasts and associated standard-errors are set to NA.&quot;, argname(y)))
+  Warn(sprintf(&quot;Series '%s' is a constant for the selected sample. Forecasts and associated standard-errors are set to NA.&quot;, argname(y)))
   return TRUE
 endif
 return FALSE
@@ -317,11 +317,11 @@ get_naive_forecasts().
 : return: 1 if ok, 0 otherwise */
 if self.type_moving_window != &quot;static&quot;
   if minc(horizons) &lt;= 0
-    printError(&quot;You cannot select a negative forecast horizon.&quot;)
+    Error(&quot;You cannot select a negative forecast horizon.&quot;)
     return 0
   endif
   if maxc(horizons) &gt; self.horizon
-    printError(sprintf(&quot;The maximum forecast horizon you \n               selected (=%d) does exceed the horizon set before (=%d).&quot;, maxc(horizons), self.horizon))
+    Error(sprintf(&quot;The maximum forecast horizon you \n               selected (=%d) does exceed the horizon set before (=%d).&quot;, maxc(horizons), self.horizon))
     return 0
   endif
 endif
@@ -335,7 +335,7 @@ return 1
 <code>/* */
 scalar tdiff = $tmax + self.n_sampleend_obs_replaced - self.t2_obsnum_y
 if tdiff &lt; self.horizon
-  printError(sprintf(&quot;Requested maximum forecast horizon exceeds\n           the number of available future periods. Either add observations\n           or decrease the maximum forecast horizon to %d&quot;, self.horizon - (self.horizon - tdiff)))
+  Error(sprintf(&quot;Requested maximum forecast horizon exceeds\n           the number of available future periods. Either add observations\n           or decrease the maximum forecast horizon to %d&quot;, self.horizon - (self.horizon - tdiff)))
   self.error = 1
   return 1
 endif
@@ -390,16 +390,16 @@ endif
 scalar tdiff_y_xlist = self.t2_obsnum_y - self.t2_obsnum_xlist
 if tdiff_y_xlist &gt;= 0
   if tdiff_y_xlist &gt; 0
-    printError(sprintf(&quot;Sample ends earlier for exogenous regressors ('%s')\n               than for the endogenous %s ('%s').&quot;, self.t2_date_xlist, self.name_endo, self.t2_date_y))
+    Error(sprintf(&quot;Sample ends earlier for exogenous regressors ('%s')\n               than for the endogenous %s ('%s').&quot;, self.t2_date_xlist, self.name_endo, self.t2_date_y))
   else
-    printError(sprintf(&quot;Sample ends for both the exogenous regressors\n               and for the endogenous %s at observation '%s'.&quot;, self.name_endo, self.t2_date_y))
+    Error(sprintf(&quot;Sample ends for both the exogenous regressors\n               and for the endogenous %s at observation '%s'.&quot;, self.name_endo, self.t2_date_y))
   endif
-  printError(&quot;List of exogenous has insufficient future values.&quot;)
+  Error(&quot;List of exogenous has insufficient future values.&quot;)
   self.error = 1
   return 1
 endif
 if tdiff_y_xlist &lt; 0 &amp;&amp; (abs(tdiff_y_xlist) &lt;  self.horizon)
-  printError(sprintf(&quot;You set the maximum forecast horizon to %d periods but\n           the sample of the exogenous regressors has only %d future\n           values left after period %s.\n           Either restrict the maximum forecast horizon to 'horizon = %d'\n           or add %d additional future values to the exogenous variables.&quot;, self.horizon, abs(tdiff_y_xlist), self.t2_date_xlist, abs(tdiff_y_xlist), self.horizon-abs(tdiff_y_xlist)))
+  Error(sprintf(&quot;You set the maximum forecast horizon to %d periods but\n           the sample of the exogenous regressors has only %d future\n           values left after period %s.\n           Either restrict the maximum forecast horizon to 'horizon = %d'\n           or add %d additional future values to the exogenous variables.&quot;, self.horizon, abs(tdiff_y_xlist), self.t2_date_xlist, abs(tdiff_y_xlist), self.horizon-abs(tdiff_y_xlist)))
   self.error = 1
   return 1
 endif
@@ -411,7 +411,7 @@ return 0
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>if self.verbose
-  printError(&quot;Model estimation failed. Forecast values are set to            NA for the current test set.&quot;)
+  Error(&quot;Model estimation failed. Forecast values are set to            NA for the current test set.&quot;)
 endif
 </code>
 </gretl-function>
@@ -420,7 +420,7 @@ endif
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>if self.verbose
-  printError(&quot;Failed executing forecast command.&quot;)
+  Error(&quot;Failed executing forecast command.&quot;)
 endif
 </code>
 </gretl-function>
@@ -490,11 +490,11 @@ window, respectively. We also compute averages of forecast
 intervals. */
 bundle avgfc = null
 if !inbundle(self, &quot;forecast_results&quot;)
-  printError(&quot;Bundle 'forecast_results' does not exist.&quot;)
+  Error(&quot;Bundle 'forecast_results' does not exist.&quot;)
   scalar self.error = 1
 endif
 if nelem(self.forecast_results) &lt; 2
-  printError(&quot;Average forecast combination requires at least two forecasting models.&quot;)
+  Error(&quot;Average forecast combination requires at least two forecasting models.&quot;)
   scalar self.error = 1
 endif
 strings keys = get_name_of_intval_matrices(self)
@@ -701,7 +701,7 @@ return cv
  </params>
 <code>/* Returns zero of window_length is valid. */
 if smplspan(self.t1_date_y, self.t2_date_y, $pd) &lt; self.window_length
-  printError(sprintf(&quot;The window size you selected (wsize=%d) exceeds the\n           number of valid observations in '%s'.&quot;, self.window_length, self.name_endo))
+  Error(sprintf(&quot;The window size you selected (wsize=%d) exceeds the\n           number of valid observations in '%s'.&quot;, self.window_length, self.name_endo))
   return 1
 endif
 return 0
@@ -739,14 +739,14 @@ scalar self.T = $nobs
 <code>printf &quot;\nInfo: %s\n&quot;, s
 </code>
 </gretl-function>
-<gretl-function name="printWarning" type="void" private="1">
+<gretl-function name="Warn" type="void" private="1">
  <params count="1">
   <param name="s" type="string" const="true"/>
  </params>
 <code>printf &quot;\nWarning: %s\n&quot;, s
 </code>
 </gretl-function>
-<gretl-function name="printError" type="void" private="1">
+<gretl-function name="Error" type="void" private="1">
  <params count="1">
   <param name="s" type="string" const="true"/>
  </params>
@@ -826,7 +826,7 @@ return s
 </code>
 </gretl-function>
 <gretl-function name="print_no_bootstrap_support" type="void" private="1">
-<code>printError(&quot;Bootstrap confidence intervals are not supported, yet&quot;)
+<code>Error(&quot;Bootstrap confidence intervals are not supported, yet&quot;)
 </code>
 </gretl-function>
 <gretl-function name="get_test_start_end_obsnums" type="bundle" private="1">
@@ -896,7 +896,7 @@ return xlist
  </params>
 <code>/* Check that sample length fits window length. Return TRUE if so, otherwise FALSE. */
 if self.type_moving_window != &quot;static&quot; &amp;&amp; ($nobs &gt; self.window_length)
-  printError(sprintf(&quot;The training sample (T=%d) is longer than the\n           specified window length (T=%d).&quot;, $nobs, self.window_length))
+  Error(sprintf(&quot;The training sample (T=%d) is longer than the\n           specified window length (T=%d).&quot;, $nobs, self.window_length))
   return FALSE
 endif
 return TRUE
@@ -910,7 +910,7 @@ return TRUE
 <code>/* Check that sample is valid. If so return TRUE, else FALSE.*/
 catch smpl start ende
 if $error
-  printError(&quot;Sample cannot be set.&quot;)
+  Error(&quot;Sample cannot be set.&quot;)
   return FALSE
 endif
 return TRUE
@@ -1078,25 +1078,25 @@ return forecast_results
 <code>/* Helper function perfoming some initial checks */
 pkg query extra --quiet
 if $result.version &lt; 0.6
-  printError(&quot;You need at least version 0.6 of the 'extra' package.&quot;)
-  printError(&quot;Update by executing 'pkg install extra'&quot;)
+  Error(&quot;You need at least version 0.6 of the 'extra' package.&quot;)
+  Error(&quot;Update by executing 'pkg install extra'&quot;)
 endif
 strings methods = get_supported_nonseas_methods()
 strings seas_methods = get_supported_seas_methods()
 # Check whether called method exists
 if !nelem(instrings(methods, self.which)) &amp;&amp; !nelem(instrings(seas_methods, self.which))
-  printError(&quot;The forecasting method you selected does not exist.&quot;)
+  Error(&quot;The forecasting method you selected does not exist.&quot;)
   self.error = 1
 endif
 if !self.is_seas &amp;&amp; nelem(instrings(seas_methods, self.which))
-  printError(&quot;The method you requested is not available for non-seasonal data.&quot;)
+  Error(&quot;The method you requested is not available for non-seasonal data.&quot;)
   self.error = 1
 endif
 # TODO: Why is this necessary??
 if self.window_length &lt; $pd
-  printError(sprintf(&quot;Window size = %d&quot;, self.window_length))
-  printError(sprintf(&quot;Periodicity = %d\n&quot;, $pd))
-  printError(&quot;The size of the moving window cannot be smaller than the underlying periodicity.&quot;)
+  Error(sprintf(&quot;Window size = %d&quot;, self.window_length))
+  Error(sprintf(&quot;Periodicity = %d\n&quot;, $pd))
+  Error(&quot;The size of the moving window cannot be smaller than the underlying periodicity.&quot;)
   #        self.error = 1		# TODO: don't return error as long as it is not clear why/ when this case matters
 endif
 if self.nboot
@@ -1113,7 +1113,7 @@ endif
 strings not_valid_for = defarray(&quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;snaivefc&quot;, &quot;snaivedriftfc&quot;, &quot;bsmfc&quot;, &quot;lltfc&quot;)
 matrix not_supported = instrings(not_valid_for, self.which)
 if nelem(self.xlist) &gt; 0 &amp;&amp; nelem(not_supported) &gt; 0
-  printWarning(sprintf(&quot;No exogenous variables can be included for the selected model '%s'.&quot;, self.which))
+  Warn(sprintf(&quot;No exogenous variables can be included for the selected model '%s'.&quot;, self.which))
   printInfo(&quot;List of exogenous will be cleared. Proceed.&quot;)
   list self.xlist = null
 endif
@@ -1138,7 +1138,7 @@ scalar self.t2_obsnum_y = obsnum(self.t2_date_y)
 scalar t1_diff_y = self.t1_obsnum_y - t1_curr
 scalar t2_diff_y = t2_curr - self.t2_obsnum_y
 if t1_diff_y &gt; 0
-  printWarning(sprintf(&quot;Found %d missing initial observations for %s.&quot;, t1_diff_y, self.name_endo))
+  Warn(sprintf(&quot;Found %d missing initial observations for %s.&quot;, t1_diff_y, self.name_endo))
 endif
 if nelem(xlist)
   obslabels_and_nobs_to_bundle(xlist, &amp;obsdetails_x)
@@ -1149,10 +1149,10 @@ if nelem(xlist)
   scalar t1_diff_x = self.t1_obsnum_xlist - t1_curr
   scalar t2_diff_x = t2_curr - self.t2_obsnum_xlist
   if t1_diff_x &gt; 0
-    printWarning(sprintf(&quot;Found %d missing initial observations for exogenous.&quot;, t1_diff_x))
+    Warn(sprintf(&quot;Found %d missing initial observations for exogenous.&quot;, t1_diff_x))
   endif
   if t2_diff_x &gt; 0
-    printWarning(sprintf(&quot;Found %d missing observations at sample end for exogenous.&quot;, t2_diff_x))
+    Warn(sprintf(&quot;Found %d missing observations at sample end for exogenous.&quot;, t2_diff_x))
   endif
 endif
 </code>

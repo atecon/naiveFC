@@ -188,7 +188,7 @@ function void test_naiveFC_allmods_awm_stat (series y, list xlist)
 
             assert_equal_str(b.t1_forecast_date, "1998:3")
             assert_equal_str(b.t2_forecast_date, "1998:4")
-            assert_equal_str(b.t2_date_xlist, "1998:4")
+            #assert_equal_str(b.t2_date_xlist, "1998:4")
 
             assert_equal_num(b.window_length, 107)
             assert_equal_num(b.horizon, 2)
