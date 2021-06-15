@@ -174,7 +174,7 @@ function list prepare_xlist (const bundle model_settings,
     if model_settings.add_ohe_periods
         xlist += add_ohe_periods_to_list()
     endif
-    if model_settings.add_intercept
+    if model_settings.add_intercept && !inlist(self.xlist, "const")
         xlist += add_intercept_to_list()
     endif
     if model_settings.add_linear_trend
