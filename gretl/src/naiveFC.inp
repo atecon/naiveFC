@@ -264,10 +264,10 @@ function matrix set_xlist_and_forecast (bundle *self)
   list xlist = xlist_new
 
   if model_is_ucm(self) == TRUE
-    forecast_results[1:,] = estimate_and_forecast_structism(command, y, train_obsnums, &self)
+    forecast_results[1:self.horizon_current,] = estimate_and_forecast_structism(command, y, train_obsnums, &self)
   else
     smpl full     # samples are set within function
-    forecast_results[1:,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &self)
+    forecast_results[1:self.horizon_current,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &self)
   endif
 
   return forecast_results
@@ -393,7 +393,7 @@ function bundle naiveFC (series y,
     xlist_is_valid(&self)
 
     # Replace of missing at the sample end
-    # must be done here before 't1_and_t2_of_y_and_xlist'
+    # must be done here before calling t1_and_t2_of_y_and_xlist()
     scalar n_sampleend_obs_replaced = NA
     series y = repl_sampleend_missings_of_y(y, self.verbose,\
                                             &n_sampleend_obs_replaced)
