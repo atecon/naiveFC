@@ -573,6 +573,82 @@ end function
 test_naiveFC_meanfc_awm_stat(y)
 
 
+function void test_strarr_sub (void)
+    print "Start testing function strarr_sub()"
+
+    # Given
+    strings given = defarray("ABC", "A", "B", "BDA")
+    string find = "A"
+    string subst = "Z"
+    strings expected = defarray("ZBC", "Z", "B", "BDZ")
+
+    # When
+    strings actual = strarr_sub(given, find, subst)
+
+    # Then
+    loop foreach i actual
+        assert(actual[i] == expected[i])
+    endloop
+end function
+test_strarr_sub()
+
+
+function void test_atofs (void)
+    print "Start testing function atofs()"
+
+    # Given
+    strings given = defarray("1", "1.1", "", "-2")
+    matrix expected = {1; 1.1; NA; -2}
+
+    # When
+    matrix actual = atofs(given)
+
+    # Then
+    loop foreach i actual
+        assert(actual[i] == expected[i])
+    endloop
+end function
+test_atofs()
+
+
+function void test_atofs (void)
+    print "Start testing function atofs()"
+
+    # Given
+    strings given = defarray("1", "1.1", "", "-2")
+    matrix expected = {1; 1.1; NA; -2}
+
+    # When
+    matrix actual = atofs(given)
+
+    # Then
+    loop foreach i actual
+        assert(actual[i] == expected[i])
+    endloop
+end function
+test_atofs()
+
+
+function void test_add_to_isodates (void)
+    print "Start testing function add_to_isodates()"
+
+    # Given
+    matrix given = {20200101; 20200101; 20200101}
+    matrix days_to_add = {1; 2; -1}
+    matrix expected = {20200102; 20200103; 20191231}
+
+    # When
+    matrix actual = add_to_isodates(given, days_to_add)
+
+    # Then
+    loop foreach i actual
+        assert(actual[i] == expected[i])
+    endloop
+end function
+test_add_to_isodates()
+
+
+
 #=====================
 function void test_add_lagged_y_to_xlist (void)
     print "Start add_lagged_y_to_xlist()"
@@ -597,6 +673,9 @@ function void test_model_is_ucm (void)
     print "pass"
 end function
 test_model_is_ucm()
+
+
+
 
 
 

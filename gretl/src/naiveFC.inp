@@ -702,6 +702,33 @@ end function
 # TODO: add convenient function "get_naive_forecast_errors()"
 
 
+function bundle get_naive_forecasts_stacked (const bundle self,
+    matrix horizons[null] "Select specific horizons, moving-window only")
+    /* Stack interval forecasts over horizons into a matrix with the following columns
+    - date_of_info
+    - date_forecasted
+    - horizon
+    - point: point forecast
+    - lower: lower bound of interval forecast
+    - upper: upper bound of interval forecast
+    */
+
+    if !exists(horizons)
+        matrix horizons = seq(1, self.horizon)
+    endif
+    matrix hors = vec(horizons)
+
+    scalar err = horizons_isok(self, hors)
+    if !err
+        return array(0)
+    endif
+
+    B = stacked_matrices_of_forecasts(self, hors)
+
+    return B
+end function
+
+
 # untested
 function void plot_naive_forecasts (const bundle self "Bundle returned from naiveFC()",
       const matrix horizons[null] "Select only specific horizons",

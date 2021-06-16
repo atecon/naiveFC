@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="naiveFC" needs-time-series-data="true" minver="2021b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.91</version>
-<date>2021-06-15</date>
+<version>0.95</version>
+<date>2021-06-16</date>
 <description>Simple forecasting methods</description>
 <tags>C53</tags>
 <label>naive forecast(s)</label>
@@ -34,7 +34,7 @@ if self.error
 endif
 xlist_is_valid(&amp;self)
 # Replace of missing at the sample end
-# must be done here before 't1_and_t2_of_y_and_xlist'
+# must be done here before calling t1_and_t2_of_y_and_xlist()
 scalar n_sampleend_obs_replaced = NA
 series y = repl_sampleend_missings_of_y(y, self.verbose, &amp;n_sampleend_obs_replaced)
 self.n_sampleend_obs_replaced = n_sampleend_obs_replaced
@@ -126,6 +126,33 @@ if !err
 endif
 smpl obsnum(self.t1_forecast_date) obsnum(self.t2_forecast_date)	# don't drop
 return list_of_forecasts(self, hors, suffix)
+</code>
+</gretl-function>
+<gretl-function name="get_naive_forecasts_stacked" type="bundle">
+ <params count="2">
+  <param name="self" type="bundle" const="true"/>
+  <param name="horizons" type="matrix" optional="true">
+<description>Select specific horizons, moving-window only</description>
+  </param>
+ </params>
+<code>/* Stack interval forecasts over horizons into a matrix with the following columns
+- date_of_info
+- date_forecasted
+- horizon
+- point: point forecast
+- lower: lower bound of interval forecast
+- upper: upper bound of interval forecast
+*/
+if !exists(horizons)
+  matrix horizons = seq(1, self.horizon)
+endif
+matrix hors = vec(horizons)
+scalar err = horizons_isok(self, hors)
+if !err
+  return array(0)
+endif
+B = stacked_matrices_of_forecasts(self, hors)
+return B
 </code>
 </gretl-function>
 <gretl-function name="GUI_naiveFC" type="matrix" menu-only="1" pkg-role="gui-main">
@@ -257,6 +284,51 @@ scalar ylo = mini - 0.05 * abs(mini)
 scalar yup = maxi + 0.05 * abs(maxi)
 </code>
 </gretl-function>
+<gretl-function name="stacked_matrices_of_forecasts" type="bundle" private="1">
+ <params count="2">
+  <param name="self" type="bundle" const="true"/>
+  <param name="horizons" type="matrix" const="true"/>
+ </params>
+<code>/* Wrapper actually calling specific functions. */
+strings models = getkeys(self.forecast_results)
+bundle StackedForecasts
+loop i=1..nelem(models)
+  string model = models[i]
+  if self.type_moving_window == &quot;static&quot;
+    funcerr &quot;Not supported for static windows, yet.&quot;
+    #list R += get_static_forecast_list(self, models[i], suffix)
+  else
+    StackedForecasts[model] = get_movwindow_forecast_matrix(horizons, self, models[i])
+  endif
+endloop
+return StackedForecasts
+</code>
+</gretl-function>
+<gretl-function name="get_movwindow_forecast_matrix" type="matrix" private="1">
+ <params count="3">
+  <param name="horizons" type="matrix" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+  <param name="model" type="string" const="true"/>
+ </params>
+<code>/* Return matrix of stacked h-step forecast_results. For 'rolling'
+and 'recursive' cases. */
+strings dois = cnameget(self.forecast_results[model].forecasts_lower_bound)
+strings dois = strarr_sub(dois, &quot;-&quot;, &quot;&quot;)
+matrix dois_values = atofs(strarr_sub(dois, &quot;-&quot;, &quot;&quot;))
+matrix fcvalues = {}    # TODO: pre-allocate
+strings cnames = defarray(&quot;date_of_info&quot;, &quot;date_forecasted&quot;, &quot;horizon&quot;, &quot;fcpoint&quot;, &quot;fclow&quot;, &quot;fcup&quot;)
+loop i=1..rows(horizons) -q
+  matrix horizon = ones(self.n_folds, 1) * horizons[i]
+  matrix forecast_date = add_to_isodates(dois_values, ones(self.n_folds, 1) * horizons[i])
+  matrix lower = self.forecast_results[model].forecasts_lower_bound[i,]'
+  matrix upper = self.forecast_results[model].forecasts_upper_bound[i,]'
+  matrix point = self.forecast_results[model].forecasts_point[i,]'
+  fcvalues |= ( dois_values ~ forecast_date ~ horizon ~ point ~ lower ~ upper )
+endloop
+cnameset(fcvalues, cnames)
+return fcvalues
+</code>
+</gretl-function>
 <gretl-function name="list_of_forecasts" type="list" private="1">
  <params count="3">
   <param name="self" type="bundle" const="true"/>
@@ -283,14 +355,14 @@ return R
   <param name="model" type="string" const="true"/>
   <param name="suffix" type="string" const="true"/>
  </params>
-<code>/* Return sascade of h-step forecast_results. For 'rolling'
+<code>/* Return cascade of h-step forecast_results. For 'rolling'
 and 'recursive' cases. */
 list R = null
 loop i=1..rows(horizons) -q
   scalar shift_periods = $i - 1
-  R += genseries(sprintf(&quot;low_h%d_%s%s&quot;, horizons[i], model, suffix), mlag(self.forecast_results[model].forecasts_lower_bound[i,]', shift_periods, NA) )
-  R += genseries(sprintf(&quot;point_h%d_%s%s&quot;, horizons[i], model, suffix), mlag(self.forecast_results[model].forecasts_point[i,]', shift_periods, NA) )
-  R += genseries(sprintf(&quot;up_h%d_%s%s&quot;, horizons[i], model, suffix), mlag(self.forecast_results[model].forecasts_upper_bound[i,]', shift_periods, NA) )
+  R += genseries(sprintf(&quot;low_h%d%s&quot;, horizons[i], suffix), mlag(self.forecast_results[model].forecasts_lower_bound[i,]', shift_periods, NA) )
+  R += genseries(sprintf(&quot;point_h%d%s&quot;, horizons[i], suffix), mlag(self.forecast_results[model].forecasts_point[i,]', shift_periods, NA) )
+  R += genseries(sprintf(&quot;up_h%d%s&quot;, horizons[i], suffix), mlag(self.forecast_results[model].forecasts_upper_bound[i,]', shift_periods, NA) )
 endloop
 return R
 </code>
@@ -304,9 +376,9 @@ return R
 <code>/* Return single multi-step forecast_results for 'static'
 case. */
 list R = null
-R += genseries(sprintf(&quot;low_h1to%d_%s%s&quot;, self.horizon, model, suffix), self.forecast_results[model].forecasts_lower_bound)
-R += genseries(sprintf(&quot;point_h1to%d_%s%s&quot;, self.horizon, model, suffix), self.forecast_results[model].forecasts_point)
-R += genseries(sprintf(&quot;up_h1to%d_%s%s&quot;, self.horizon, model, suffix), self.forecast_results[model].forecasts_upper_bound)
+R += genseries(sprintf(&quot;low_h1to%d%s&quot;, self.horizon, suffix), self.forecast_results[model].forecasts_lower_bound)
+R += genseries(sprintf(&quot;point_h1to%d%s&quot;, self.horizon, suffix), self.forecast_results[model].forecasts_point)
+R += genseries(sprintf(&quot;up_h1to%d%s&quot;, self.horizon, suffix), self.forecast_results[model].forecasts_upper_bound)
 return R
 </code>
 </gretl-function>
@@ -920,6 +992,52 @@ endif
 return TRUE
 </code>
 </gretl-function>
+<gretl-function name="strarr_sub" type="strings" private="1">
+ <params count="3">
+  <param name="S" type="strings"/>
+  <param name="find" type="string" const="true"/>
+  <param name="subst" type="string" const="true"/>
+ </params>
+<code>/* Apply strsub() to each item of the array. */
+loop foreach i S
+  S[i] = strsub(&quot;$i&quot;, find, subst)
+endloop
+return S
+</code>
+</gretl-function>
+<gretl-function name="atofs" type="matrix" private="1">
+ <params count="1">
+  <param name="S" type="strings"/>
+ </params>
+<code>/* Apply atof() to string array. */
+matrix m = mshape(NA, nelem(S), 1)
+loop foreach i S
+  m[i] = atof(&quot;$i&quot;)
+endloop
+return m
+</code>
+</gretl-function>
+<gretl-function name="add_to_isodates" type="matrix" private="1">
+ <params count="2">
+  <param name="input" type="matrix">
+<description>numerical ISO dates</description>
+  </param>
+  <param name="days_to_add" type="matrix">
+<description>May incl. positive/ negative values</description>
+  </param>
+ </params>
+<code>/* Both 'input' and 'days_to_add' are column vectors of the same length.
+return: matrix, Compute numerical ISO dates adding days. */
+input = vec(input)
+days_to_add = vec(days_to_add)
+errorif(rows(input) != rows(days_to_add), &quot;Vectors must be of the same length.&quot;)
+matrix r = mshape(NA, rows(input), 1)
+loop i=1..rows(input)
+  r[i] = isodate(epochday(input[i]) + days_to_add[i])
+endloop
+return r
+</code>
+</gretl-function>
 <gretl-function name="dict_models" type="bundle" private="1">
 <code>/* Dictionary including stuff for calling estimation
 command and fcast command. */
@@ -985,7 +1103,7 @@ list xlist = null
 if model_settings.add_ohe_periods
   xlist += add_ohe_periods_to_list()
 endif
-if model_settings.add_intercept
+if model_settings.add_intercept &amp;&amp; !inlist(self.xlist, &quot;const&quot;)
   xlist += add_intercept_to_list()
 endif
 if model_settings.add_linear_trend
@@ -1069,10 +1187,10 @@ list xlist_new = drop_zero_series_from_list(xlist)
 print_dropped_series(xlist, xlist_new, self)
 list xlist = xlist_new
 if model_is_ucm(self) == TRUE
-  forecast_results[1:,] = estimate_and_forecast_structism(command, y, train_obsnums, &amp;self)
+  forecast_results[1:self.horizon_current,] = estimate_and_forecast_structism(command, y, train_obsnums, &amp;self)
 else
   smpl full     # samples are set within function
-  forecast_results[1:,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &amp;self)
+  forecast_results[1:self.horizon_current,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &amp;self)
 endif
 return forecast_results
 </code>
@@ -1433,7 +1551,6 @@ end plot --output=&quot;@filename&quot;
 <sample-script>
 clear
 set verbose off
-#set debug 0
 
 include StrucTiSM.gfn
 #include naiveFC.gfn --force				# TODO:
@@ -1567,16 +1684,21 @@ opts.verbose = 1						# print details (optional)
 # TODO as we forecast only to the last valid obs of y in this case anyway!
 # FIXME: moving-window fc with &quot;avgfc&quot;
 
-strings methods = defarray(&quot;lltfc&quot;, &quot;bsmfc&quot;, &quot;airlinefc&quot;, &quot;ar1ma1fc&quot;, &quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;, \
-  &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, &quot;snaivedriftFC&quot;, &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgfc&quot;)
+strings methods = defarray(&quot;lltfc&quot;, &quot;bsmfc&quot;, &quot;airlinefc&quot;,\
+                           &quot;ar1ma1fc&quot;, &quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;,\
+                           &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, &quot;snaivedriftFC&quot;,\
+                           &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgfc&quot;)
 
 bundle b = null
-bundle b = naiveFC(y, methods[3], opts)
+bundle b = naiveFC(y, methods[9], opts)
 b
 bundle forecast_results = b.forecast_results
 
 #eval forecast_results.smeanfc
 #eval forecast_results.smeanfc.forecasts_point
+
+bundle FcStacked = get_naive_forecasts_stacked(b, {1,2})
+matrix fcvalues = FcStacked.smeanfc
 
 list FC = get_naive_forecasts(b, {1,2})
 

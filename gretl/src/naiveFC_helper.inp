@@ -85,6 +85,65 @@ function void yaxis_ranges (const list plotlist,
 end function
 
 
+function bundle stacked_matrices_of_forecasts (const bundle self,
+                                             const matrix horizons)
+    /* Wrapper actually calling specific functions. */
+
+    strings models = getkeys(self.forecast_results)
+
+    bundle StackedForecasts
+
+    loop i=1..nelem(models)
+        string model = models[i]
+        if self.type_moving_window == "static"
+            funcerr "Not supported for static windows, yet."
+            #list R += get_static_forecast_list(self, models[i], suffix)
+        else
+            StackedForecasts[model] = \
+                get_movwindow_forecast_matrix(horizons, self, models[i])
+        endif
+    endloop
+
+    return StackedForecasts
+end function
+
+
+function matrix get_movwindow_forecast_matrix (const matrix horizons,
+                                                const bundle self,
+                                                const string model)
+    /* Return matrix of stacked h-step forecast_results. For 'rolling'
+    and 'recursive' cases. */
+
+    strings dois = cnameget(self.forecast_results[model].forecasts_lower_bound)
+    strings dois = strarr_sub(dois, "-", "")
+
+    matrix dois_values = atofs(strarr_sub(dois, "-", ""))
+    matrix fcvalues = {}    # TODO: pre-allocate
+    strings cnames = defarray("date_of_info",\
+                              "date_forecasted",\
+                              "horizon",\
+                              "fcpoint",\
+                              "fclow",\
+                              "fcup")
+
+    loop i=1..rows(horizons) -q
+        matrix horizon = ones(self.n_folds, 1) * horizons[i]
+        matrix forecast_date = add_to_isodates(dois_values,\
+                                               ones(self.n_folds, 1) * horizons[i])
+
+        matrix lower = self.forecast_results[model].forecasts_lower_bound[i,]'
+        matrix upper = self.forecast_results[model].forecasts_upper_bound[i,]'
+        matrix point = self.forecast_results[model].forecasts_point[i,]'
+
+        fcvalues |= ( dois_values ~ forecast_date ~ horizon ~ point ~ lower ~ upper )
+    endloop
+
+    cnameset(fcvalues, cnames)
+
+    return fcvalues
+end function
+
+
 function list list_of_forecasts (const bundle self,
                                  const matrix horizons,
                                  const string suffix)
@@ -108,7 +167,7 @@ function list get_movwindow_forecast_list (const matrix horizons,
                                            const bundle self,
                                            const string model,
                                            const string suffix)
-    /* Return sascade of h-step forecast_results. For 'rolling'
+    /* Return cascade of h-step forecast_results. For 'rolling'
     and 'recursive' cases. */
 
     list R = null
@@ -821,6 +880,7 @@ function scalar window_length_is_ok (const bundle self)
     return TRUE
 end function
 
+
 function scalar sample_is_valid (const scalar start,
                                 const scalar ende)
     /* Check that sample is valid. If so return TRUE, else FALSE.*/
@@ -833,4 +893,57 @@ function scalar sample_is_valid (const scalar start,
 
     return TRUE
 end function
+
+
+# TODO: put to string_utils pkg
+function strings strarr_sub (strings S, const string find, const string subst)
+    /* Apply strsub() to each item of the array. */
+
+    loop foreach i S
+        S[i] = strsub("$i", find, subst)
+    endloop
+
+    return S
+end function
+
+# TODO: put to string_utils pkg
+function matrix atofs (strings S)
+    /* Apply atof() to string array. */
+
+    matrix m = mshape(NA, nelem(S), 1)
+
+    loop foreach i S
+        m[i] = atof("$i")
+    endloop
+
+    return m
+end function
+
+# TODO: put to calendar_utils pkg
+function matrix add_to_isodates (matrix input "numerical ISO dates",
+                                 matrix days_to_add "May incl. positive/ negative values")
+    /* Both 'input' and 'days_to_add' are column vectors of the same length.
+    return: matrix, Compute numerical ISO dates adding days. */
+
+    input = vec(input)
+    days_to_add = vec(days_to_add)
+
+    errorif(rows(input) != rows(days_to_add), "Vectors must be of the same length.")
+
+    matrix r = mshape(NA, rows(input), 1)
+
+    loop i=1..rows(input)
+        r[i] = isodate(epochday(input[i]) + days_to_add[i])
+    endloop
+
+    return r
+end function
+
+
+
+
+
+
+
+
 

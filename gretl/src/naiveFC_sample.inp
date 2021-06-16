@@ -1,6 +1,5 @@
 clear
 set verbose off
-#set debug 0
 
 include StrucTiSM.gfn
 #include naiveFC.gfn --force				# TODO:
@@ -134,16 +133,21 @@ opts.verbose = 1						# print details (optional)
 # TODO as we forecast only to the last valid obs of y in this case anyway!
 # FIXME: moving-window fc with "avgfc"
 
-strings methods = defarray("lltfc", "bsmfc", "airlinefc", "ar1ma1fc", "meanFC", "medianFC", "rwFC", "rwdriftFC", \
-  "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "ar1FC", "ar1trendFC", "avgfc")
+strings methods = defarray("lltfc", "bsmfc", "airlinefc",\
+                           "ar1ma1fc", "meanFC", "medianFC", "rwFC", "rwdriftFC",\
+                           "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC",\
+                           "ar1FC", "ar1trendFC", "avgfc")
 
 bundle b = null
-bundle b = naiveFC(y, methods[3], opts)
+bundle b = naiveFC(y, methods[9], opts)
 b
 bundle forecast_results = b.forecast_results
 
 #eval forecast_results.smeanfc
 #eval forecast_results.smeanfc.forecasts_point
+
+bundle FcStacked = get_naive_forecasts_stacked(b, {1,2})
+matrix fcvalues = FcStacked.smeanfc
 
 list FC = get_naive_forecasts(b, {1,2})
 
