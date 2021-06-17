@@ -148,6 +148,8 @@ bundle forecast_results = b.forecast_results
 
 bundle FcStacked = get_naive_forecasts_stacked(b, {1,2})
 matrix fcvalues = FcStacked.smeanfc
+printf "%16.0f\n", fcvalues
+
 
 list FC = get_naive_forecasts(b, {1,2})
 

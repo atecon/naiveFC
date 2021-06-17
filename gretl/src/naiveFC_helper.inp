@@ -114,31 +114,43 @@ function matrix get_movwindow_forecast_matrix (const matrix horizons,
     /* Return matrix of stacked h-step forecast_results. For 'rolling'
     and 'recursive' cases. */
 
+    series y = self.y
+    series obsdate = $obsdate
+
     strings dois = cnameget(self.forecast_results[model].forecasts_lower_bound)
     strings dois = strarr_sub(dois, "-", "")
-
     matrix dois_values = atofs(strarr_sub(dois, "-", ""))
+
     matrix fcvalues = {}    # TODO: pre-allocate
+
     strings cnames = defarray("date_of_info",\
                               "date_forecasted",\
                               "horizon",\
+                              "target",\
                               "fcpoint",\
                               "fclow",\
                               "fcup")
+
+    set skip_missing off
 
     loop i=1..rows(horizons) -q
         matrix horizon = ones(self.n_folds, 1) * horizons[i]
         matrix forecast_date = add_to_isodates(dois_values,\
                                                ones(self.n_folds, 1) * horizons[i])
 
+        smpl obsdate >= min(forecast_date) && \
+            obsdate <= max(forecast_date) --restrict --replace
+
         matrix lower = self.forecast_results[model].forecasts_lower_bound[i,]'
         matrix upper = self.forecast_results[model].forecasts_upper_bound[i,]'
         matrix point = self.forecast_results[model].forecasts_point[i,]'
 
-        fcvalues |= ( dois_values ~ forecast_date ~ horizon ~ point ~ lower ~ upper )
+        fcvalues |= ( dois_values ~ forecast_date ~ horizon ~ {y} ~ point ~ lower ~ upper )
     endloop
 
     cnameset(fcvalues, cnames)
+
+    set skip_missing on
 
     return fcvalues
 end function
