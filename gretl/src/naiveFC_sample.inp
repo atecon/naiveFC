@@ -127,6 +127,7 @@ scalar opts.endogenous_in_logs = TRUE
 opts.window_length = 700 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
 catch list opts.xlist = budget #D743 FDD		# optional additional regressors
+list opts.xlist += budget(-1 to -2)
 opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
@@ -136,10 +137,17 @@ opts.verbose = 1						# print details (optional)
 strings methods = defarray("lltfc", "bsmfc", "airlinefc",\
                            "ar1ma1fc", "meanFC", "medianFC", "rwFC", "rwdriftFC",\
                            "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC",\
-                           "ar1FC", "ar1trendFC", "avgfc")
+                           "ar1FC", "ar1trendFC", "avgfc", "ardl")
+
+string which = methods[16]
+
+if which == "ardl"
+    matrix opts.lags_endogenous = {1, 2, 4}
+endif
+
 
 bundle b = null
-bundle b = naiveFC(y, methods[9], opts)
+bundle b = naiveFC(y, which, opts)
 b
 bundle forecast_results = b.forecast_results
 
@@ -147,9 +155,8 @@ bundle forecast_results = b.forecast_results
 #eval forecast_results.smeanfc.forecasts_point
 
 bundle FcStacked = get_naive_forecasts_stacked(b, {1,2})
-matrix fcvalues = FcStacked.smeanfc
+matrix fcvalues = FcStacked["@which"]
 printf "%16.0f\n", fcvalues
-
 
 list FC = get_naive_forecasts(b, {1,2})
 

@@ -95,6 +95,17 @@ function bundle dict_models (void)
       "add_ohe_periods", 0 \
       )
 
+    dict_models.ardl = defbundle( \
+        "forecast_arg", "--dynamic", \
+        "command", "ols y xlist",
+        "add_linear_trend", 0, \
+        "add_first_lag", 0, \
+        "lags_endogenous", 1, \
+        "add_intercept", 1, \
+        "add_ohe_periods", 0 \
+      )
+
+
     # Harvey (1989, sect. 2.5.5) has shown that the autocorrelation structure
     # of the airline model is similar to that of an UCM composed by LLT and
     # stochastic seasonals.
@@ -145,6 +156,7 @@ function bundle default_values (const series y)
     scalar self.is_seas = data_has_seasonality()
     strings self.supported_estimators = get_estimator_names(self.is_seas)
     scalar self.verbose = 1
+    matrix self.lags_endogenous = {}        # for ARDL model only
 
     genr index
     series self.index = index
@@ -185,7 +197,7 @@ function list prepare_xlist (const bundle model_settings,
         xlist += self.xlist
     endif
 
-    xlist = add_lagged_y_to_xlist(self.y, xlist, model_settings)
+    xlist = add_lagged_y_to_xlist(self.y, xlist, model_settings, self)
 
     # TODO: check for duplicates in xlist
 
@@ -215,15 +227,62 @@ end function
 
 function list add_lagged_y_to_xlist (series y,
                                     list xlist,
-                                    const bundle model_settings)
+                                    const bundle model_settings,
+                                    const bundle self)
   /* Conditionally add 1st lag of endogenous to xlist. */
 
   if model_settings.add_first_lag == TRUE
     xlist += y(-1)
+  /*elif nelem(self.lags_endogenous)
+    list zlist = add_lags(y, self.lags_endogenous)
+    xlist = zlist xlist
+  */
   endif
 
   return xlist
 end function
+
+
+function list add_lags (const series y, matrix lags_values)
+    /* Compute specific lags of 'y'
+    return: List, lags of 'y' */
+
+    list R
+    matrix lags_values = vec(lags_values)
+    string yname = argname(y)
+
+    loop i=1..nelem(lags_values)
+        scalar lag = lags_values[i]
+        string vname = sprintf("%s_%d", yname, lag)
+
+        R += genseries(vname, y(-lag))
+    endloop
+
+    return R
+end function
+
+
+function string add_lags_to_command (const string command, matrix lags_values)
+    /* Compile string for estimating ARDL model with endogenous lags
+    return: string, ols command */
+
+    matrix lags_values = vec(lags_values)
+    strings cmd_items = strsplit(command, " ")
+    string yname = cmd_items[2]
+    string ret = flatten(cmd_items[1:2], TRUE)
+
+    loop i=1..nelem(lags_values)
+        scalar lag = lags_values[i]
+        ret ~= sprintf(" %s(-%d) ", yname, lag)
+    endloop
+
+    if nelem(cmd_items) > 2
+        ret ~= flatten(cmd_items[3:], TRUE)
+    endif
+
+    return ret
+end function
+
 
 # TODO: untested
 function matrix set_xlist_and_forecast (bundle *self)
@@ -233,6 +292,11 @@ function matrix set_xlist_and_forecast (bundle *self)
   series y = self.y         # length: window_length + horizon
   bundle model_settings = dict_models()[self.active_model]
   string command = add_quiet_str_to_command(self, model_settings)
+
+  if nelem(self.lags_endogenous)
+    command = add_lags_to_command(command, self.lags_endogenous)
+  endif
+
   string fcast_arg = add_quiet_str_to_fcast_arg(self, model_settings)
   list xlist = prepare_xlist(model_settings, self)
 
@@ -264,10 +328,12 @@ function matrix set_xlist_and_forecast (bundle *self)
   list xlist = xlist_new
 
   if model_is_ucm(self) == TRUE
-    forecast_results[1:self.horizon_current,] = estimate_and_forecast_structism(command, y, train_obsnums, &self)
+    forecast_results[1:self.horizon_current,] = \
+        estimate_and_forecast_structism(command, y, train_obsnums, &self)
   else
     smpl full     # samples are set within function
-    forecast_results[1:self.horizon_current,] = estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &self)
+    forecast_results[1:self.horizon_current,] = \
+        estimate_and_forecast_gretl(command, fcast_arg, y, xlist, train_obsnums, test_obsnums, &self)
   endif
 
   return forecast_results
@@ -833,8 +899,9 @@ end function
 # FIXME
 function matrix GUI_naiveFC (const series y "Dependent variable",
                              const list xlist[null] "Additional exogenous (future values must be known)",
-      int which[1:13:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
-      "ar1FC", "ar1trendFC", "ar1ma1fc", "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC", "avgFC", "airlinefc"},
+      int which[1:14:1] "Model type" {"meanFC", "medianFC", "rwFC", "rwdriftFC", \
+      "ar1FC", "ar1trendFC", "ar1ma1fc", "smeanFC", "smedianFC", "snaiveFC",\
+      "snaivedriftFC", "avgFC", "airlinefc", "ardl"},
       int h[1::10] "Forecast horizon",
       bool Plot[1] "Plot forecast")
     /* Helper function for GUI access. */
