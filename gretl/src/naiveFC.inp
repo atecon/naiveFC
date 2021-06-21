@@ -177,7 +177,7 @@ function list prepare_xlist (const bundle model_settings,
     if model_settings.add_intercept && !inlist(self.xlist, "const")
         xlist += add_intercept_to_list()
     endif
-    if model_settings.add_linear_trend
+    if model_settings.add_linear_trend && !inlist(self.xlist, "time")
         xlist += add_linear_trend_to_list()
     endif
 

@@ -34,7 +34,7 @@ function void print_dropped_series (const list old, const list new, const bundle
     /* */
     list dropped = old - new
     if nelem(dropped) && self.verbose
-       printf "Warning: The following regressors were droppped as they include only zeros:\n\
+       printf "\nWarning: The following regressors were droppped as they include only zeros:\n\
           %s", varname(dropped)
     endif
 end function
