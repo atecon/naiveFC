@@ -231,7 +231,7 @@ endif
 <code>/* */
 list dropped = old - new
 if nelem(dropped) &amp;&amp; self.verbose
-  printf &quot;Warning: The following regressors were droppped as they include only zeros:\n           %s&quot;, varname(dropped)
+  printf &quot;\nWarning: The following regressors were droppped as they include only zeros:\n           %s&quot;, varname(dropped)
 endif
 </code>
 </gretl-function>
@@ -253,7 +253,7 @@ return FALSE
  </params>
 <code>/* Check whether values on comprise zeros.
 return: 1 if y includes only zeros, otherweise 0. */
-return (sum(y) == 0) ? 1 : 0
+return (sum(y == 0) == nobs(y)) ? TRUE : FALSE
 </code>
 </gretl-function>
 <gretl-function name="drop_zero_series_from_list" type="list" private="1">
@@ -312,20 +312,30 @@ return StackedForecasts
  </params>
 <code>/* Return matrix of stacked h-step forecast_results. For 'rolling'
 and 'recursive' cases. */
+series y = self.y
+series obsdate = $obsdate
 strings dois = cnameget(self.forecast_results[model].forecasts_lower_bound)
 strings dois = strarr_sub(dois, &quot;-&quot;, &quot;&quot;)
 matrix dois_values = atofs(strarr_sub(dois, &quot;-&quot;, &quot;&quot;))
 matrix fcvalues = {}    # TODO: pre-allocate
-strings cnames = defarray(&quot;date_of_info&quot;, &quot;date_forecasted&quot;, &quot;horizon&quot;, &quot;fcpoint&quot;, &quot;fclow&quot;, &quot;fcup&quot;)
+strings cnames = defarray(&quot;date_of_info&quot;, &quot;date_forecasted&quot;, &quot;horizon&quot;, &quot;target&quot;, &quot;fcpoint&quot;, &quot;fclow&quot;, &quot;fcup&quot;)
+set skip_missing off
 loop i=1..rows(horizons) -q
   matrix horizon = ones(self.n_folds, 1) * horizons[i]
   matrix forecast_date = add_to_isodates(dois_values, ones(self.n_folds, 1) * horizons[i])
+  smpl obsdate &gt;= min(forecast_date) &amp;&amp; obsdate &lt;= max(forecast_date) --restrict --replace
+  # FIXME: NA values in &quot;my&quot; are replaced by sme arbitrary huge number
+  /*print y -o
+  matrix my = {y}
+  print my
+  */
   matrix lower = self.forecast_results[model].forecasts_lower_bound[i,]'
   matrix upper = self.forecast_results[model].forecasts_upper_bound[i,]'
   matrix point = self.forecast_results[model].forecasts_point[i,]'
-  fcvalues |= ( dois_values ~ forecast_date ~ horizon ~ point ~ lower ~ upper )
+  fcvalues |= ( dois_values ~ forecast_date ~ horizon ~ {self.y} ~ point ~ lower ~ upper )
 endloop
 cnameset(fcvalues, cnames)
+set skip_missing on
 return fcvalues
 </code>
 </gretl-function>
@@ -1106,7 +1116,7 @@ endif
 if model_settings.add_intercept &amp;&amp; !inlist(self.xlist, &quot;const&quot;)
   xlist += add_intercept_to_list()
 endif
-if model_settings.add_linear_trend
+if model_settings.add_linear_trend &amp;&amp; !inlist(self.xlist, &quot;time&quot;)
   xlist += add_linear_trend_to_list()
 endif
 if inbundle(self, &quot;xlist&quot;)
@@ -1699,6 +1709,8 @@ bundle forecast_results = b.forecast_results
 
 bundle FcStacked = get_naive_forecasts_stacked(b, {1,2})
 matrix fcvalues = FcStacked.smeanfc
+printf &quot;%16.0f\n&quot;, fcvalues
+
 
 list FC = get_naive_forecasts(b, {1,2})
 
