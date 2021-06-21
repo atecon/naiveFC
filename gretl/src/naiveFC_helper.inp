@@ -54,7 +54,7 @@ function scalar series_is_always_zero (const series y)
 /* Check whether values on comprise zeros.
     return: 1 if y includes only zeros, otherweise 0. */
 
-    return (sum(y) == 0) ? 1 : 0
+    return (sum(y == 0) == nobs(y)) ? TRUE : FALSE
 end function
 
 
@@ -141,11 +141,17 @@ function matrix get_movwindow_forecast_matrix (const matrix horizons,
         smpl obsdate >= min(forecast_date) && \
             obsdate <= max(forecast_date) --restrict --replace
 
+        # FIXME: NA values in "my" are replaced by sme arbitrary huge number
+        /*print y -o
+        matrix my = {y}
+        print my
+        */
+
         matrix lower = self.forecast_results[model].forecasts_lower_bound[i,]'
         matrix upper = self.forecast_results[model].forecasts_upper_bound[i,]'
         matrix point = self.forecast_results[model].forecasts_point[i,]'
 
-        fcvalues |= ( dois_values ~ forecast_date ~ horizon ~ {y} ~ point ~ lower ~ upper )
+        fcvalues |= ( dois_values ~ forecast_date ~ horizon ~ {self.y} ~ point ~ lower ~ upper )
     endloop
 
     cnameset(fcvalues, cnames)
