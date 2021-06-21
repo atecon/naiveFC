@@ -782,7 +782,7 @@ function strings get_supported_nonseas_methods (void)
     /* List all non-seasonal supported methods here. */
 
     return defarray("meanfc", "medianfc", "rwfc", "rwdriftfc", "ar1fc", \
-      "ar1trendfc", "avgfc", "ar1ma1fc", "ardl")
+      "ar1trendfc", "avgfc", "ar1ma1fc", "ardlfc")
 end function
 
 function scalar data_has_seasonality (void)

@@ -163,10 +163,10 @@ return B
   <param name="xlist" type="list" optional="true" const="true">
 <description>Additional exogenous (future values must be known)</description>
   </param>
-  <param name="which" type="int" min="1" max="13" default="1">
+  <param name="which" type="int" min="1" max="14" default="1">
 <description>Model type</description>
-<labels count="13">
-"meanFC" "medianFC" "rwFC" "rwdriftFC" "ar1FC" "ar1trendFC" "ar1ma1fc" "smeanFC" "smedianFC" "snaiveFC" "snaivedriftFC" "avgFC" "airlinefc" </labels>
+<labels count="14">
+"meanFC" "medianFC" "rwFC" "rwdriftFC" "ar1FC" "ar1trendFC" "ar1ma1fc" "smeanFC" "smedianFC" "snaiveFC" "snaivedriftFC" "avgFC" "airlinefc" "ardlfc" </labels>
   </param>
   <param name="h" type="int" min="1" default="10">
 <description>Forecast horizon</description>
@@ -890,7 +890,7 @@ return defarray(&quot;smeanfc&quot;, &quot;smedianfc&quot;, &quot;snaivefc&quot;
 </gretl-function>
 <gretl-function name="get_supported_nonseas_methods" type="strings" private="1">
 <code>/* List all non-seasonal supported methods here. */
-return defarray(&quot;meanfc&quot;, &quot;medianfc&quot;, &quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;ar1fc&quot;, &quot;ar1trendfc&quot;, &quot;avgfc&quot;, &quot;ar1ma1fc&quot;)
+return defarray(&quot;meanfc&quot;, &quot;medianfc&quot;, &quot;rwfc&quot;, &quot;rwdriftfc&quot;, &quot;ar1fc&quot;, &quot;ar1trendfc&quot;, &quot;avgfc&quot;, &quot;ar1ma1fc&quot;, &quot;ardlfc&quot;)
 </code>
 </gretl-function>
 <gretl-function name="data_has_seasonality" type="scalar" private="1">
@@ -1063,6 +1063,7 @@ dict_models.rwdriftfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quo
 dict_models.ar1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1trendfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 1, &quot;add_first_lag&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 dict_models.ar1ma1fc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;arima 1 0 1 ; y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
+dict_models.ardlfc = defbundle( &quot;forecast_arg&quot;, &quot;--dynamic&quot;, &quot;command&quot;, &quot;ols y xlist&quot;, &quot;add_linear_trend&quot;, 0, &quot;add_first_lag&quot;, 0, &quot;lags_endogenous&quot;, 1, &quot;add_intercept&quot;, 1, &quot;add_ohe_periods&quot;, 0 )
 # Harvey (1989, sect. 2.5.5) has shown that the autocorrelation structure
 # of the airline model is similar to that of an UCM composed by LLT and
 # stochastic seasonals.
@@ -1090,6 +1091,7 @@ scalar self.blength = 4					# Block length bootstrap  (not supported yet)
 scalar self.is_seas = data_has_seasonality()
 strings self.supported_estimators = get_estimator_names(self.is_seas)
 scalar self.verbose = 1
+matrix self.lags_endogenous = {}        # for ardlfc model only
 genr index
 series self.index = index
 string self.type_moving_window = &quot;static&quot; 			# &quot;static&quot;, &quot;rolling&quot; or &quot;recursive&quot;
@@ -1122,7 +1124,7 @@ endif
 if inbundle(self, &quot;xlist&quot;)
   xlist += self.xlist
 endif
-xlist = add_lagged_y_to_xlist(self.y, xlist, model_settings)
+xlist = add_lagged_y_to_xlist(self.y, xlist, model_settings, self)
 # TODO: check for duplicates in xlist
 return xlist
 </code>
@@ -1150,16 +1152,60 @@ return fcast_arg
 </code>
 </gretl-function>
 <gretl-function name="add_lagged_y_to_xlist" type="list" private="1">
- <params count="3">
+ <params count="4">
   <param name="y" type="series"/>
   <param name="xlist" type="list"/>
   <param name="model_settings" type="bundle" const="true"/>
+  <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Conditionally add 1st lag of endogenous to xlist. */
 if model_settings.add_first_lag == TRUE
   xlist += y(-1)
+  /*elif nelem(self.lags_endogenous)
+  list zlist = add_lags(y, self.lags_endogenous)
+  xlist = zlist xlist
+  */
 endif
 return xlist
+</code>
+</gretl-function>
+<gretl-function name="add_lags" type="list" private="1">
+ <params count="2">
+  <param name="y" type="series" const="true"/>
+  <param name="lags_values" type="matrix"/>
+ </params>
+<code>/* Compute specific lags of 'y'
+return: List, lags of 'y' */
+list R
+matrix lags_values = vec(lags_values)
+string yname = argname(y)
+loop i=1..nelem(lags_values)
+  scalar lag = lags_values[i]
+  string vname = sprintf(&quot;%s_%d&quot;, yname, lag)
+  R += genseries(vname, y(-lag))
+endloop
+return R
+</code>
+</gretl-function>
+<gretl-function name="add_lags_to_command" type="string" private="1">
+ <params count="2">
+  <param name="command" type="string" const="true"/>
+  <param name="lags_values" type="matrix"/>
+ </params>
+<code>/* Compile string for estimating ardlfc model with endogenous lags
+return: string, ols command */
+matrix lags_values = vec(lags_values)
+strings cmd_items = strsplit(command, &quot; &quot;)
+string yname = cmd_items[2]
+string ret = flatten(cmd_items[1:2], TRUE)
+loop i=1..nelem(lags_values)
+  scalar lag = lags_values[i]
+  ret ~= sprintf(&quot; %s(-%d) &quot;, yname, lag)
+endloop
+if nelem(cmd_items) &gt; 2
+  ret ~= flatten(cmd_items[3:], TRUE)
+endif
+return ret
 </code>
 </gretl-function>
 <gretl-function name="set_xlist_and_forecast" type="matrix" private="1">
@@ -1171,6 +1217,9 @@ matrix forecast_results = mshape(NA, self.horizon, 2)
 series y = self.y         # length: window_length + horizon
 bundle model_settings = dict_models()[self.active_model]
 string command = add_quiet_str_to_command(self, model_settings)
+if nelem(self.lags_endogenous)
+  command = add_lags_to_command(command, self.lags_endogenous)
+endif
 string fcast_arg = add_quiet_str_to_fcast_arg(self, model_settings)
 list xlist = prepare_xlist(model_settings, self)
 # &quot;(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)&quot;
@@ -1688,6 +1737,7 @@ scalar opts.endogenous_in_logs = TRUE
 opts.window_length = 700 #xmax($pd, 90) 	# moving window length (optional)
 # opts.window_length = $tmax
 catch list opts.xlist = budget #D743 FDD		# optional additional regressors
+list opts.xlist += budget(-1 to -2)
 opts.verbose = 1						# print details (optional)
 
 # TODO: in case of moving-window fc, xlist does not need to have additional oos valid data
@@ -1697,10 +1747,17 @@ opts.verbose = 1						# print details (optional)
 strings methods = defarray(&quot;lltfc&quot;, &quot;bsmfc&quot;, &quot;airlinefc&quot;,\
                            &quot;ar1ma1fc&quot;, &quot;meanFC&quot;, &quot;medianFC&quot;, &quot;rwFC&quot;, &quot;rwdriftFC&quot;,\
                            &quot;smeanFC&quot;, &quot;smedianFC&quot;, &quot;snaiveFC&quot;, &quot;snaivedriftFC&quot;,\
-                           &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgfc&quot;)
+                           &quot;ar1FC&quot;, &quot;ar1trendFC&quot;, &quot;avgfc&quot;, &quot;ardlfc&quot;)
+
+string which = methods[16]
+
+if which == &quot;ardlfc&quot;
+    matrix opts.lags_endogenous = {1, 2, 4}
+endif
+
 
 bundle b = null
-bundle b = naiveFC(y, methods[9], opts)
+bundle b = naiveFC(y, which, opts)
 b
 bundle forecast_results = b.forecast_results
 
@@ -1708,9 +1765,8 @@ bundle forecast_results = b.forecast_results
 #eval forecast_results.smeanfc.forecasts_point
 
 bundle FcStacked = get_naive_forecasts_stacked(b, {1,2})
-matrix fcvalues = FcStacked.smeanfc
+matrix fcvalues = FcStacked[&quot;@which&quot;]
 printf &quot;%16.0f\n&quot;, fcvalues
-
 
 list FC = get_naive_forecasts(b, {1,2})
 

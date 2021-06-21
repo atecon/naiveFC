@@ -137,11 +137,11 @@ opts.verbose = 1						# print details (optional)
 strings methods = defarray("lltfc", "bsmfc", "airlinefc",\
                            "ar1ma1fc", "meanFC", "medianFC", "rwFC", "rwdriftFC",\
                            "smeanFC", "smedianFC", "snaiveFC", "snaivedriftFC",\
-                           "ar1FC", "ar1trendFC", "avgfc", "ardl")
+                           "ar1FC", "ar1trendFC", "avgfc", "ardlfc")
 
 string which = methods[16]
 
-if which == "ardl"
+if which == "ardlfc"
     matrix opts.lags_endogenous = {1, 2, 4}
 endif
 
