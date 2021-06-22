@@ -191,6 +191,24 @@ endif
 return self.fc
 </code>
 </gretl-function>
+<gretl-function name="add_lags" type="list">
+ <params count="2">
+  <param name="y" type="series" const="true"/>
+  <param name="lags_values" type="matrix"/>
+ </params>
+<code>/* Compute specific lags of 'y'
+return: List, lags of 'y' */
+list R
+matrix lags_values = vec(lags_values)
+string yname = argname(y)
+loop i=1..nelem(lags_values)
+  scalar lag = lags_values[i]
+  string vname = sprintf(&quot;%s_%d&quot;, yname, lag)
+  R += genseries(vname, y(-lag))
+endloop
+return R
+</code>
+</gretl-function>
 <gretl-function name="y_has_zero_negative_vals" type="scalar" private="1">
  <params count="2">
   <param name="y" type="series" const="true"/>
@@ -1167,24 +1185,6 @@ if model_settings.add_first_lag == TRUE
   */
 endif
 return xlist
-</code>
-</gretl-function>
-<gretl-function name="add_lags" type="list" private="1">
- <params count="2">
-  <param name="y" type="series" const="true"/>
-  <param name="lags_values" type="matrix"/>
- </params>
-<code>/* Compute specific lags of 'y'
-return: List, lags of 'y' */
-list R
-matrix lags_values = vec(lags_values)
-string yname = argname(y)
-loop i=1..nelem(lags_values)
-  scalar lag = lags_values[i]
-  string vname = sprintf(&quot;%s_%d&quot;, yname, lag)
-  R += genseries(vname, y(-lag))
-endloop
-return R
 </code>
 </gretl-function>
 <gretl-function name="add_lags_to_command" type="string" private="1">
