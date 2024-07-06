@@ -308,8 +308,8 @@ function void t1_and_t2_of_y_and_xlist (const series y,
     scalar t2_diff_y = t2_curr - self.t2_obsnum_y
 
     if t1_diff_y > 0
-        printWarning(sprintf("Found %d missing initial observations for %s.", \
-          t1_diff_y, self.name_endo))
+        printWarning(sprintf("Found %d missing initial observations for series '%s'.",
+                             t1_diff_y, self.name_endo))
     endif
 
     if nelem(xlist)
@@ -361,8 +361,8 @@ function bundle naiveFC (series y,
         scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)
     endif
 
-    valid_dates_of_y_and_xlist(&self)
-    if self.error
+    if nelem(self.xlist)
+        valid_dates_of_y_and_xlist(&self)
         return self
     endif
 

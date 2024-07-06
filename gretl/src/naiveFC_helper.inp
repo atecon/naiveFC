@@ -209,11 +209,11 @@ function scalar get_sample_end (const bundle self)
     return sample_end
 end function
 
-function void do_initial_checks (bundle *self)
+function void do_initial_checks (const bundle self)
     /* Helper function perfoming some initial checks */
 
     check_min_version_extra()
-    check_requested_method(self.which)
+    check_requested_method(self.is_seas, self.which)
     errorif(self.nboot, "Bootstrap confidence intervals are not supported, yet")
 
     # TODO: We may add this for seasonal models
@@ -237,17 +237,18 @@ function void check_min_version_extra (void)
             "You need at least version 0.6 of the 'extra' package. Please update.")
 end function
 
-function void check_requested_method (const string which)
+function void check_requested_method (const bool is_seas,
+                                      const string model)
     /* code description
     return: type, description */
 
     strings methods = get_supported_nonseas_methods()
     strings seas_methods = get_supported_seas_methods()
 
-    errorif(!nelem(instrings(methods, self.which)) && !nelem(instrings(seas_methods, self.which)),
+    errorif(!nelem(instrings(methods, model)) && !nelem(instrings(seas_methods, model)),
             "The forecasting method you selected does not exist.")
 
-    errorif(!self.is_seas && nelem(instrings(seas_methods, self.which)),
+    errorif(!is_seas && nelem(instrings(seas_methods, model)),
             "The method you requested is not available for non-seasonal data.")
 end function
 
