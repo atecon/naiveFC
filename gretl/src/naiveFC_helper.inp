@@ -181,9 +181,10 @@ function scalar horizons_isok (const bundle self,
 end function
 
 
-function scalar sufficient_future_obs (bundle *self)
+function void sufficient_future_obs (bundle *self)
     /* */
 
+    self.error = 0
     scalar tdiff = $tmax + self.n_sampleend_obs_replaced - self.t2_obsnum_y
 
     if tdiff < self.horizon
@@ -192,10 +193,9 @@ function scalar sufficient_future_obs (bundle *self)
           or decrease the maximum forecast horizon to %d",
           self.horizon - (self.horizon - tdiff)))
         self.error = 1
-        return 1
     endif
 
-    return 0
+    return self.error
 end function
 
 
@@ -214,7 +214,7 @@ function scalar replace_nan_value_by (void)
 /* Set value for replacing future unknown values
 of series to be forecasted by a specific value. Number should be positive
 to avoid problems in case the endogenous is transformed to logarithms. */
-    return abs(98765432107)
+    return 98765432107
 end function
 
 
@@ -230,7 +230,7 @@ function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
         smpl full
     endif
 
-    if verbose
+    if verbose && n_sampleend_obs_replaced > 0
         printInfo(sprintf("Replaced %d missing values at the sample end of 'y'.", \
           n_sampleend_obs_replaced))
     endif
@@ -238,8 +238,10 @@ function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
     return n_sampleend_obs_replaced
 end function
 
-function scalar valid_dates_of_y_and_xlist (bundle *self)
+function void valid_dates_of_y_and_xlist (bundle *self)
     /* Check that sufficient future values of exogenous variables exist. */
+
+    self.error = FALSE
 
     if !nelem(self.xlist)
         return 0
@@ -260,7 +262,6 @@ function scalar valid_dates_of_y_and_xlist (bundle *self)
         printError("List of exogenous has insufficient future values.")
 
         self.error = 1
-        return 1
     endif
 
     if tdiff_y_xlist < 0 && (abs(tdiff_y_xlist) <  self.horizon)
@@ -273,10 +274,7 @@ function scalar valid_dates_of_y_and_xlist (bundle *self)
           self.horizon-abs(tdiff_y_xlist)))
 
         self.error = 1
-        return 1
     endif
-
-    return 0
 end function
 
 function void print_estimation_error_msg (const bundle self)

@@ -401,14 +401,13 @@ function bundle naiveFC (const series y,
         scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)
     endif
 
-    scalar check = valid_dates_of_y_and_xlist(&self)
-    if check
-        printError("Problem with dating for y and/ or xlist.")
+    valid_dates_of_y_and_xlist(&self)
+    if self.error
         return self
     endif
 
-    scalar check = sufficient_future_obs(&self)
-    if check
+    sufficient_future_obs(&self)
+    if self.error
         return self
     endif
 
