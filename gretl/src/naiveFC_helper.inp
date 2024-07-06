@@ -692,20 +692,33 @@ end function
 function strings get_supported_structism_methods (void)
   /* List all methods supported by the StrucTiSM package. */
 
-  return defarray("bsmfc", "lltfc")
+  return defarray("bsmfc",
+                  "lltfc")
 end function
 
 function strings get_supported_seas_methods (void)
     /* List all seasonal supported methods here. */
 
-    return defarray("smeanfc", "smedianfc", "snaivefc", "snaivedriftfc", "airlinefc") + get_supported_structism_methods()
+    return defarray("airlinefc",
+                    "smeanfc",
+                    "smedianfc",
+                    "snaivefc",
+                    "snaivedriftfc",
+                    ) + get_supported_structism_methods()
 end function
+
 
 function strings get_supported_nonseas_methods (void)
     /* List all non-seasonal supported methods here. */
 
-    return defarray("meanfc", "medianfc", "rwfc", "rwdriftfc", "ar1fc", \
-      "ar1trendfc", "avgfc", "ar1ma1fc")
+    return defarray("ar1fc",
+                    "ar1ma1fc"
+                    "ar1trendfc",
+                    "avgfc",
+                    "meanfc",
+                    "medianfc",
+                    "rwfc",
+                    "rwdriftfc")
 end function
 
 function scalar data_has_seasonality (void)
