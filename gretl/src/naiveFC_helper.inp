@@ -228,7 +228,7 @@ function strings methods_without_xlist (void)
     return S
 end function
 
-function void xlist_is_valid (bundle *self)
+function void xlist_is_supported (bundle *self)
     /* Flag whether the requested method supports exogenous variables. */
 
     matrix not_supported = instrings(methods_without_xlist(), self.which)
