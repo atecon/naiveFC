@@ -194,19 +194,42 @@ function void sufficient_future_obs (bundle *self)
           self.horizon - (self.horizon - tdiff)))
         self.error = 1
     endif
-
-    return self.error
 end function
 
 
 # TODO: untested
 function scalar get_sample_end (const bundle self)
+    /* */
+
     scalar sample_end = obsnum(self.t2_date_y)
     if self.type_moving_window == "static"
-        scalar sample_end += self.horizon
+        sample_end += self.horizon
     endif
 
     return sample_end
+end function
+
+function void check_min_version_extra (void)
+    /* code description
+    return: type, description */
+
+    pkg query extra --quiet
+    errorif($result.version < 0.6,
+            "You need at least version 0.6 of the 'extra' package. Please update.")
+end function
+
+function void check_requested_method (const string which)
+    /* code description
+    return: type, description */
+
+    strings methods = get_supported_nonseas_methods()
+    strings seas_methods = get_supported_seas_methods()
+
+    errorif(!nelem(instrings(methods, self.which)) && !nelem(instrings(seas_methods, self.which)),
+            "The forecasting method you selected does not exist.")
+
+    errorif(!self.is_seas && nelem(instrings(seas_methods, self.which)),
+            "The method you requested is not available for non-seasonal data.")
 end function
 
 
