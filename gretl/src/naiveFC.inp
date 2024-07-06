@@ -135,9 +135,9 @@ function bundle default_values (const series y)
     scalar self.y_is_constant = FALSE
     list self.xlist = null
     scalar self.endogenous_in_logs = FALSE
-    scalar self.horizon = 10				# maximum forecast horizon
+    scalar self.horizon = $pd				# maximum forecast horizon
     scalar self.level = 0.9					# probability level for forecast interval
-    scalar self.fan = FALSE						# plot fan chart  (not supported yet)
+    scalar self.fan = FALSE					# plot fan chart  (not supported yet)
     scalar self.nboot = 0					# no. of bootstrap replications  (not supported yet)
     scalar self.blength = 4					# Block length bootstrap  (not supported yet)
     scalar self.is_seas = data_has_seasonality()
@@ -272,18 +272,6 @@ function matrix set_xlist_and_forecast (bundle *self)
 end function
 
 
-function void get_t1_t2_dateinformation (const series y,
-                                         bundle *self)
-    /* Check valid start and end dates of dataset. */
-
-    bundle obsdetails
-
-    obslabels_and_nobs_to_bundle(y, &self)
-    scalar self.t1_obsnum = obsnum(self.t1_date)
-    scalar self.t2_obsnum = obsnum(self.t2_date)
-end function
-
-
 function bundle naiveFC (series y,
                          string which "Select forecasting method",
                          bundle opts[null] "Bundle incl. optional parameters")
@@ -296,23 +284,17 @@ function bundle naiveFC (series y,
     string self.name_endo = argname(y)
     do_initial_checks(self)	# TODO: return scalar capturing error instead of using pointer!
     xlist_is_supported(&self)
-    check_for_missings(deflist(y, self.xlist))
-    get_t1_t2_dateinformation(y, &self)
+    check_nonmissings_at_beginning(deflist(y, self.xlist))
+
+    get_t1_t2_y(y, &self)
+    if nelem(self.xlist)
+        get_t1_t2_xlist(xlist, &self)
+        assert(self.t1_obsnum_y == self.t1_obsnum_xlist)
+        check_for_sufficient_future_obs(&self)
+    endif
 
     if self.type_moving_window == "static"
-        scalar self.window_length = smplspan(self.t1_date, self.t2_date, $pd)
-    endif
-
-    if nelem(self.xlist)
-        valid_dates_of_y_and_xlist(&self)
-        if self.error
-            return self
-        endif
-    endif
-
-    sufficient_future_obs(&self)
-    if self.error
-        return self
+        scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)
     endif
 
     # get_sample_end(self) = in-sample end plus max(horizon)
@@ -359,21 +341,21 @@ function void cleanup_bundle (bundle *self)
     delete self.index
     delete self.active_model
     delete self.horizon_current
-    delete self.t1_date_y
-    delete self.t2_date_y
+    delete self.t1_date
+    delete self.t2_date
     delete self.xlist
 end function
 
 
-function bundle prepare_forecast_bundles (bundle *self)
-/* Prepare for each estimator a dictionary for point
+function bundle prepare_forecast_bundles (const bundle self)
+    /* Prepare for each estimator a dictionary for point and
     interval forecast results to be stored in matrices. */
 
     bundle forecast_results
 
     loop i=1..nelem(self.models) -q
         string model = self.models[i]
-        bundle forecast_results["@model"] = null
+        bundle forecast_results["@model"] = empty
     endloop
 
     return forecast_results
@@ -410,8 +392,8 @@ function void summarize_naive_fc_results (bundle *self)
             printf "Estimates based on logarithms of %s\n", self.name_endo
         endif
         printf "Number of additional regressors: \t%d\n", nelem(self.xlist)
-        printf "In-Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date_y, \
-          self.t2_date_y, nobs(self.y) - self.horizon
+        printf "In-Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date, \
+          self.t2_date, nobs(self.y) - self.horizon
         printf "Max. forecast horizon: \t\t\t%d\n", self.horizon
         if self.type_moving_window == "static"
             printf "Last in-sample observation: \t\t%s\n", self.t2_train_date
@@ -561,7 +543,7 @@ function matrices set_model_estimate_and_forecast (bundle *cv, bundle *self)
             string self.t1_forecast_date = obslabel($t2 - self.horizon_current + 1)	# Date of 1st h=1 ahead forecast
 
         elif lwin == (cv.n_folds - 1) && self.type_moving_window != "static"
-            self.t2_forecast_date = self.t2_date_y		# Date of last h-step ahead forecast
+            self.t2_forecast_date = self.t2_date		# Date of last h-step ahead forecast
         endif
         collected_point_fc_and_sderr[lwin] = set_xlist_and_forecast(&self)	# h by 2 matrix (point_fc ~ sderr)
     endloop
@@ -577,8 +559,8 @@ end function
 # TODO: untested
 # Public function
 function list get_naive_forecasts (const bundle self,
-                                   matrix horizons[null] "Select specific horizons (moving-window only)",
-      const string suffix[null] "Suffix for series' names")
+                                   matrix horizons[null],
+                                   const string suffix[null] "Suffix for series' names")
     /* Transform interval forecasts into a list of series and return this. */
 
     list R = null
@@ -615,8 +597,8 @@ function void plot_naive_forecasts (const bundle self "Bundle returned from naiv
     series y = self.y
     setinfo y --graph-name="Actuals"
     # re-set missing values back to NA
-    series y = (y == replace_nan_value_by() && self.type_moving_window == "static") \
-      ? NA : y
+    series y = (y == replace_nan_value_by() && \
+                self.type_moving_window == "static") ? NA : y
 
     if !exists(horizons)
         matrix horizons = seq(1, self.horizon)
@@ -626,8 +608,8 @@ function void plot_naive_forecasts (const bundle self "Bundle returned from naiv
     list plotlist = get_specific_model_for_avgfc(self, plotlist, model)
 
     # incl. some pre-forecast periods obs. for plotting
-    scalar start = xmax(obsnum(self.t1_forecast_date) - self.pre_fc_periods_to_plot, \
-      1)
+    scalar delta = obsnum(self.t1_forecast_date) - self.pre_fc_periods_to_plot
+    scalar start = xmax(delta, 1)
     smpl start obsnum(self.t2_forecast_date)
 
     call_plot(plotlist, self)
