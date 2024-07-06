@@ -181,22 +181,6 @@ function scalar horizons_isok (const bundle self,
 end function
 
 
-function void sufficient_future_obs (bundle *self)
-    /* */
-
-    self.error = 0
-    scalar tdiff = $tmax + self.n_sampleend_obs_replaced - self.t2_obsnum_y
-
-    if tdiff < self.horizon
-        printError(sprintf("Requested maximum forecast horizon exceeds\n\
-          the number of available future periods. Either add observations\n\
-          or decrease the maximum forecast horizon to %d",
-          self.horizon - (self.horizon - tdiff)))
-        self.error = 1
-    endif
-end function
-
-
 # TODO: untested
 function scalar get_sample_end (const bundle self)
     /* */
@@ -209,10 +193,14 @@ function scalar get_sample_end (const bundle self)
     return sample_end
 end function
 
+function void check_nonmissings_at_beginning (const list L)
+    /* code description
+    return: type, description */
 
-function void check_for_missings (const list L)
-    scalar T = sum(missing(L))
-    errorif(T > 0, "Some input series has missing values. Please get rid of those first.")
+    scalar tmin = $t1
+    smpl L --contiguous
+    errorif($t1 != tmin, "Found missing values at sample beginning for some series '%s'.\
+                    Correct first.")
 end function
 
 
@@ -293,39 +281,29 @@ to avoid problems in case the endogenous is transformed to logarithms. */
 end function
 
 
-function void valid_dates_of_y_and_xlist (bundle *self)
+function void check_for_sufficient_future_obs (bundle *self)
     /* Check that sufficient future values of exogenous variables exist. */
 
     self.error = FALSE
 
     scalar tdiff_y_xlist = self.t2_obsnum_y - self.t2_obsnum_xlist
 
-    if tdiff_y_xlist >= 0
-        if tdiff_y_xlist > 0
-            printError(sprintf("Sample ends earlier for exogenous regressors ('%s')\n\
-              than for the endogenous %s ('%s').", self.t2_date_xlist,
-              self.name_endo, self.t2_date))
-        else
-            printError(sprintf("Sample ends for both the exogenous regressors\n\
-              and for the endogenous %s at observation '%s'.",
-              self.name_endo, self.t2_date))
-        endif
-        printError("List of exogenous has insufficient future values.")
+    errorif(tdiff_y_xlist > 0,
+            sprintf("Sample ends earlier for exogenous regressors ('%s') than for the endogenous %s ('%s').",self.t2_date_xlist, self.name_endo, self.t2_date_y))
 
-        self.error = 1
-    endif
+    errorif(tdiff_y_xlist == 0,
+            sprintf("Sample ends for both the exogenous regressors and for the endogenous %s at observation '%s'. List of exogenous has insufficient future values.",
+                    self.name_endo, self.t2_date_y))
 
-    if tdiff_y_xlist < 0 && (abs(tdiff_y_xlist) <  self.horizon)
-        printError(sprintf("You set the maximum forecast horizon to %d periods but\n\
-          the sample of the exogenous regressors has only %d future\n\
-          values left after period %s.\n\
-          Either restrict the maximum forecast horizon to 'horizon = %d'\n\
-          or add %d additional future values to the exogenous variables.", \
-          self.horizon, abs(tdiff_y_xlist), self.t2_date_xlist, abs(tdiff_y_xlist),
-          self.horizon-abs(tdiff_y_xlist)))
 
-        self.error = 1
-    endif
+    errorif(tdiff_y_xlist < 0 && (abs(tdiff_y_xlist) < self.horizon),
+            sprintf("You set the maximum forecast horizon to %d periods but\n\
+                    the sample of the exogenous regressors has only %d future\n\
+                    values left after period %s.\n\
+                    Either restrict the maximum forecast horizon to 'horizon = %d'\n\
+                    or add %d additional future values to the exogenous variables.",
+                    self.horizon, abs(tdiff_y_xlist), self.t2_date_xlist,
+                    abs(tdiff_y_xlist), self.horizon-abs(tdiff_y_xlist)))
 end function
 
 function void print_estimation_error_msg (const bundle self)
@@ -676,14 +654,26 @@ function strings get_estimator_names (const bool is_seas "0=data has no seasonal
     return methods
 end function
 
+function void get_t1_t2_y (const series y, bundle *self)
+    /* Check valid start and end dates of targets series. */
 
-function void obslabels_and_nobs_to_bundle (const list y,
-                                            bundle *self)
-    /* Add obs. labels and number of observations to bundle. */
+    smpl y --no-missing
+    scalar self.t1_obsnum_y = $t1
+    scalar self.t2_obsnum_y = $t2
+    string self.t1_date_y = obslabel($t1)
+    string self.t2_date_y = obslabel($t2)
+    scalar self.Ty = $nobs
+end function
 
-    string self.t1_date = obslabel($t1)
-    string self.t2_date = obslabel($t2)
-    scalar self.T = $nobs
+function void get_t1_t2_xlist (const list xlist, bundle *self)
+    /* Check valid start and end dates of feature series. */
+
+    smpl xlist --no-missing
+    scalar self.t1_obsnum_xlist = $t1
+    scalar self.t2_obsnum_xlist = $t2
+    string self.t1_date_xlist = obslabel($t1)
+    string self.t2_date_xlist = obslabel($t2)
+    scalar self.Ty = $nobs
 end function
 
 
