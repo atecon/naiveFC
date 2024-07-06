@@ -272,28 +272,6 @@ function matrix set_xlist_and_forecast (bundle *self)
 end function
 
 
-# TODO: put checks into separate functions
-function void do_initial_checks (bundle *self)
-    /* Helper function perfoming some initial checks */
-
-    check_min_version_extra()
-    check_requested_method(self.which)
-
-    # TODO: Why is this necessary??
-    if self.window_length < $pd
-        printError(sprintf("Window size = %d", self.window_length))
-        printError(sprintf("Periodicity = %d\n", $pd))
-        printError("The size of the moving window cannot be smaller than the underlying periodicity.")
-        #        self.error = 1		# TODO: don't return error as long as it is not clear why/ when this case matters
-    endif
-
-    if self.nboot
-        print_no_bootstrap_support()
-        self.error = 1
-    endif
-end function
-
-
 function void xlist_is_valid (bundle *self)
     /* Flag whether the requested method supports exogenous variables. */
 

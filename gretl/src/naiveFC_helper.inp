@@ -209,6 +209,25 @@ function scalar get_sample_end (const bundle self)
     return sample_end
 end function
 
+function void do_initial_checks (bundle *self)
+    /* Helper function perfoming some initial checks */
+
+    check_min_version_extra()
+    check_requested_method(self.which)
+    errorif(self.nboot, "Bootstrap confidence intervals are not supported, yet")
+
+    # TODO: We may add this for seasonal models
+    /*
+    if self.window_length < $pd
+        printError(sprintf("Window size = %d", self.window_length))
+        printError(sprintf("Periodicity = %d\n", $pd))
+        printError("The size of the moving window cannot be smaller than the underlying periodicity.")
+        #        self.error = 1     # TODO: don't return error as long as it is not clear why/ when this case matters
+    endif
+    */
+end function
+
+
 function void check_min_version_extra (void)
     /* code description
     return: type, description */
