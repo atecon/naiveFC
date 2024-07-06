@@ -209,6 +209,32 @@ function scalar get_sample_end (const bundle self)
     return sample_end
 end function
 
+
+function strings methods_without_xlist (void)
+    /* Return name of methods for which no exogenous are accepted. */
+
+    strings S = defarray("rwfc",
+                         "rwdriftfc",
+                         "snaivefc",
+                         "snaivedriftfc",
+                         "bsmfc",
+                         "lltfc")
+    return S
+end function
+
+function void xlist_is_valid (const bundle self)
+    /* Flag whether the requested method supports exogenous variables. */
+
+    matrix not_supported = instrings(methods_without_xlist(), self.which)
+
+    if nelem(self.xlist) > 0 && nelem(not_supported) > 0
+        printWarning(sprintf("No exogenous variables can be included for the selected model '%s'.", self.which))
+        printInfo("List of exogenous will be ignored.")
+        self.xlist = null
+    endif
+end function
+
+
 function void do_initial_checks (const bundle self)
     /* Helper function perfoming some initial checks */
 
@@ -746,8 +772,7 @@ function strings get_supported_seas_methods (void)
                     "smeanfc",
                     "smedianfc",
                     "snaivefc",
-                    "snaivedriftfc",
-                    ) + get_supported_structism_methods()
+                    "snaivedriftfc") + get_supported_structism_methods()
 end function
 
 
@@ -755,7 +780,7 @@ function strings get_supported_nonseas_methods (void)
     /* List all non-seasonal supported methods here. */
 
     return defarray("ar1fc",
-                    "ar1ma1fc"
+                    "ar1ma1fc",
                     "ar1trendfc",
                     "avgfc",
                     "meanfc",
