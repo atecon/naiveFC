@@ -201,7 +201,7 @@ end function
 function scalar get_sample_end (const bundle self)
     /* */
 
-    scalar sample_end = obsnum(self.t2_date_y)
+    scalar sample_end = obsnum(self.t2_date)
     if self.type_moving_window == "static"
         sample_end += self.horizon
     endif
@@ -679,7 +679,7 @@ end function
 function scalar valid_window_length (bundle *self)
     /* Returns zero of window_length is valid. */
 
-    if smplspan(self.t1_date_y, self.t2_date_y, $pd) < self.window_length
+    if smplspan(self.t1_date, self.t2_date, $pd) < self.window_length
         printError(sprintf("The window size you selected (wsize=%d) exceeds the\n\
           number of valid observations in '%s'.", self.window_length, self.name_endo))
 
@@ -836,8 +836,8 @@ function bundle get_train_start_end_obsnums (const bundle self)
     bundle ret = null
     if self.type_moving_window == "static"
         # these are simply in-sample dates
-        ret.t1_obsnum = obsnum(self.t1_date_y)
-        ret.t2_obsnum = obsnum(self.t2_date_y)
+        ret.t1_obsnum = obsnum(self.t1_date)
+        ret.t2_obsnum = obsnum(self.t2_date)
     else
         scalar ret.t2_obsnum = $t2 - self.horizon_current
         scalar ret.t1_obsnum = 1 + ret.t2_obsnum - self.window_length

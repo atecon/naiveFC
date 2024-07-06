@@ -278,12 +278,9 @@ function void get_t1_t2_dateinformation (const series y,
 
     bundle obsdetails
 
-    obslabels_and_nobs_to_bundle(y, &obsdetails)
-    string self.t1_date_y = obsdetails.t1_date
-    string self.t2_date_y = \
-      obslabel(obsnum(obsdetails.t2_date) - self.n_sampleend_obs_replaced)
-    scalar self.t1_obsnum_y = obsnum(self.t1_date_y)
-    scalar self.t2_obsnum_y = obsnum(self.t2_date_y)
+    obslabels_and_nobs_to_bundle(y, &self)
+    scalar self.t1_obsnum = obsnum(self.t1_date)
+    scalar self.t2_obsnum = obsnum(self.t2_date)
 end function
 
 
