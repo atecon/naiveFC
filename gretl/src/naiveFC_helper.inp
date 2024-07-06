@@ -816,11 +816,6 @@ function strings gen_column_names (bundle *self)
 end function
 
 
-# TODO: Drop funcerr, instead return error but don't stop
-function void print_no_bootstrap_support (void)
-    printError("Bootstrap confidence intervals are not supported, yet")
-end function
-
 
 # TODO: untested
 function bundle get_test_start_end_obsnums (const bundle train_obsnums,
