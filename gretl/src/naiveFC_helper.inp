@@ -210,6 +210,12 @@ function scalar get_sample_end (const bundle self)
 end function
 
 
+function void check_for_missings (const list L)
+    scalar T = sum(missing(L))
+    errorif(T > 0, "Some input series has missing values. Please get rid of those first.")
+end function
+
+
 function strings methods_without_xlist (void)
     /* Return name of methods for which no exogenous are accepted. */
 
@@ -222,7 +228,7 @@ function strings methods_without_xlist (void)
     return S
 end function
 
-function void xlist_is_valid (const bundle self)
+function void xlist_is_valid (bundle *self)
     /* Flag whether the requested method supports exogenous variables. */
 
     matrix not_supported = instrings(methods_without_xlist(), self.which)
@@ -697,7 +703,8 @@ end function
 
 function void obslabels_and_nobs_to_bundle (const list y,
                                             bundle *self)
-    smpl y --contiguous
+    /* Add obs. labels and number of observations to bundle. */
+
     string self.t1_date = obslabel($t1)
     string self.t2_date = obslabel($t2)
     scalar self.T = $nobs
