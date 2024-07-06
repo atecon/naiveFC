@@ -293,34 +293,10 @@ to avoid problems in case the endogenous is transformed to logarithms. */
 end function
 
 
-# TODO: untested
-function scalar repl_sampleend_missings_of_y (series *y, const bool verbose)
-    /* Replace missing values of y at the sample end. */
-
-    smpl y --no-missing
-    scalar n_sampleend_obs_replaced = $tmax - $t2
-    if n_sampleend_obs_replaced > 0
-        smpl (1 + $t2) $tmax
-        series y = replace_nan_value_by()
-        smpl full
-    endif
-
-    if verbose && n_sampleend_obs_replaced > 0
-        printInfo(sprintf("Replaced %d missing values at the sample end of 'y'.", \
-          n_sampleend_obs_replaced))
-    endif
-
-    return n_sampleend_obs_replaced
-end function
-
 function void valid_dates_of_y_and_xlist (bundle *self)
     /* Check that sufficient future values of exogenous variables exist. */
 
     self.error = FALSE
-
-    if !nelem(self.xlist)
-        return 0
-    endif
 
     scalar tdiff_y_xlist = self.t2_obsnum_y - self.t2_obsnum_xlist
 
@@ -328,11 +304,11 @@ function void valid_dates_of_y_and_xlist (bundle *self)
         if tdiff_y_xlist > 0
             printError(sprintf("Sample ends earlier for exogenous regressors ('%s')\n\
               than for the endogenous %s ('%s').", self.t2_date_xlist,
-              self.name_endo, self.t2_date_y))
+              self.name_endo, self.t2_date))
         else
             printError(sprintf("Sample ends for both the exogenous regressors\n\
               and for the endogenous %s at observation '%s'.",
-              self.name_endo, self.t2_date_y))
+              self.name_endo, self.t2_date))
         endif
         printError("List of exogenous has insufficient future values.")
 

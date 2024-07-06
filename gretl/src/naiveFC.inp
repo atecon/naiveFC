@@ -294,27 +294,21 @@ function bundle naiveFC (series y,
     endif
     bundle self = set_bundle(y, which, opts)
     string self.name_endo = argname(y)
-    do_initial_checks(&self)	# TODO: return scalar capturing error instead of using pointer!
-    if self.error
-        return self
-    endif
-
+    do_initial_checks(self)	# TODO: return scalar capturing error instead of using pointer!
     xlist_is_valid(&self)
-
-    # Replace of missing at the sample end
-    # must be done here before 't1_and_t2_of_y_and_xlist'
-    self.n_sampleend_obs_replaced = repl_sampleend_missings_of_y(&y, self.verbose)
-
-    t1_and_t2_of_y_and_xlist(y, &self)
+    check_for_missings(deflist(y, self.xlist))
+    get_t1_t2_dateinformation(y, &self)
 
     if self.type_moving_window == "static"
-        # "self.t2_date_y" refers to in-sample end date of "y"
-        scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)
+        # "self.t2_date" refers to in-sample end date of "y"
+        scalar self.window_length = smplspan(self.t1_date, self.t2_date, $pd)
     endif
 
     if nelem(self.xlist)
         valid_dates_of_y_and_xlist(&self)
-        return self
+        if self.error
+            return self
+        endif
     endif
 
     sufficient_future_obs(&self)
@@ -322,7 +316,13 @@ function bundle naiveFC (series y,
         return self
     endif
 
-    smpl obsnum(self.t1_date_y) get_sample_end(self)		# get_sample_end(self) = in-sample end plus max(horizon)
+    # get_sample_end(self) = in-sample end plus max(horizon)
+    scalar sample_start = obsnum(self.t1_date)
+    scalar sample_end = get_sample_end(self)
+    assert(sample_end <= $tmax)
+    print sample_start sample_end
+    print $tmax
+    smpl sample_start sample_end
 
     series self.y = endogenous_series_in_logs(y, &self)
     if self.error == TRUE
