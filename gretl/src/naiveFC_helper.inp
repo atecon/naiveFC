@@ -667,9 +667,8 @@ function bundle set_bundle (const series y,
         strings self.models = self.supported_estimators
     endif
 
-    self.forecast_results = prepare_forecast_bundles(&self)
+    self.forecast_results = prepare_forecast_bundles(self)
     self.type_moving_window = tolower(self.type_moving_window)
-    self.name_endo = argname(y)
 
     return self
 end function
