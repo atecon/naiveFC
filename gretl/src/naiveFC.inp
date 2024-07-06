@@ -776,7 +776,8 @@ function void call_plot (const list plotlist,
         literal set linetype 3 lc rgb "red" lw 1.5 ps 0
         literal set linetype 2 lc rgb "grey" lw 1.5 ps 0
         literal set linetype 4 lc rgb "grey" lw 1.5 ps 0
-        literal set key left bottom below
+        #literal set key left bottom below
+        literal set nokey
         #literal set key inside left bottom
         #put the border more to the background by applying it
         # only on the left and bottom part and put it and the tics in gray
