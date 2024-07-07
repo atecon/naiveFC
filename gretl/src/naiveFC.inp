@@ -299,11 +299,9 @@ function bundle naiveFC (series y,
     endif
 
     # Activate the trainingset
-    print self
     smpl self.t1_obsnum_y_trainset self.t2_obsnum_y_trainset
-    stop
 
-    series self.y = endogenous_series_in_logs(y, &self)
+    series self.y = endogenous_series_in_logs(y, self)
     if self.error == TRUE
         return self
     endif
@@ -365,9 +363,8 @@ function void do_naive_forecasting (bundle *self)
 
     strings models = getkeys(self.forecast_results)
 
-    loop i=1..nelem(self.forecast_results) -q	# loop over models
-        self.active_model = models[i]
-
+    loop foreach i model
+        string self.active_model = "$i"
         bundle interval_forecasts = execute_forecasting(&self)
 
         attach_row_labels(&interval_forecasts, self)
@@ -420,8 +417,8 @@ end function
 
 
 function bundle execute_forecasting (bundle *self)
-/* This function estimates the point forecasts either in (i) a rolling or
-    (ii) a recursive manner and stores sequences of interval forecasts. */
+/* This function estimates the point forecasts either in (i) a static, (ii) rolling or
+    (iii) a recursive manner and stores sequences of interval forecasts. */
 
     bundle cv = prep_and_get_cv_folds(self)
     self.n_folds = cv.n_folds
