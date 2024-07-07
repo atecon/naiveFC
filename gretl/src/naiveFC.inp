@@ -234,17 +234,17 @@ function matrix set_xlist_and_forecast (bundle *self)
   string fcast_arg = add_quiet_str_to_fcast_arg(self, model_settings)
   list xlist = prepare_xlist(model_settings, self)
 
-  # "(train_obsnums.t2_obsnum - train_obsnums.t1_obsnum)"
+  # "(train_obsnums.t2_obsnum_xlist_trainset - train_obsnums.t1_obsnum_xlist_trainset)"
   # is not the effective sample length but (window_length-max(lags))
   bundle train_obsnums = get_train_start_end_obsnums(self)
   bundle test_obsnums = get_test_start_end_obsnums(train_obsnums, self)
 
   # Check training and test samples
-  if sample_is_valid(train_obsnums.t1_obsnum, train_obsnums.t2_obsnum) == FALSE
+  if sample_is_valid(train_obsnums.t1_obsnum_xlist_trainset, train_obsnums.t2_obsnum_xlist_trainset) == FALSE
     scalar self.error = TRUE
     return forecast_results
   endif
-  smpl train_obsnums.t1_obsnum train_obsnums.t2_obsnum
+  smpl train_obsnums.t1_obsnum_xlist_trainset train_obsnums.t2_obsnum_xlist_trainset
 
   # TODO: Can this happen, and if so why -- otherwise drop
   if window_length_is_ok(self) == FALSE
@@ -283,27 +283,25 @@ function bundle naiveFC (series y,
     bundle self = set_bundle(y, which, opts)
     string self.name_endo = argname(y)
     do_initial_checks(self)	# TODO: return scalar capturing error instead of using pointer!
-    xlist_is_supported(&self)
-    check_nonmissings_at_beginning(deflist(y, self.xlist))
+    xlist_supported_by_method(&self)
+    check_missings_at_sample_start(deflist(y, self.xlist))
 
     get_t1_t2_y(y, &self)
+    self.tmax = $tmax
     if nelem(self.xlist)
         get_t1_t2_xlist(xlist, &self)
-        assert(self.t1_obsnum_y == self.t1_obsnum_xlist)
-        check_for_sufficient_future_obs(&self)
+        assert(self.t1_obsnum_y_trainset == self.t1_obsnum_xlist)
+        check_for_sufficient_future_obs(self)
     endif
 
     if self.type_moving_window == "static"
-        scalar self.window_length = smplspan(self.t1_date_y, self.t2_date_y, $pd)
+        scalar self.window_length = smplspan(self.t1_date_y_trainset, self.t2_date_y_trainset, $pd)
     endif
 
-    # get_sample_end(self) = in-sample end plus max(horizon)
-    scalar sample_start = obsnum(self.t1_date_y)
-    scalar sample_end = get_sample_end(self)
-    assert(sample_end <= $tmax)
-    print sample_start sample_end
-    print $tmax
-    smpl sample_start sample_end
+    # Activate the trainingset
+    print self
+    smpl self.t1_obsnum_y_trainset self.t2_obsnum_y_trainset
+    stop
 
     series self.y = endogenous_series_in_logs(y, &self)
     if self.error == TRUE
@@ -341,7 +339,7 @@ function void cleanup_bundle (bundle *self)
     delete self.index
     delete self.active_model
     delete self.horizon_current
-    delete self.t1_date_y
+    delete self.t1_date_y_trainset
     delete self.t2_date
     delete self.xlist
 end function
@@ -392,7 +390,7 @@ function void summarize_naive_fc_results (bundle *self)
             printf "Estimates based on logarithms of %s\n", self.name_endo
         endif
         printf "Number of additional regressors: \t%d\n", nelem(self.xlist)
-        printf "In-Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date_y, \
+        printf "In-Sample: \t\t\t\t%s to %s (T = %d)\n", self.t1_date_y_trainset, \
           self.t2_date, nobs(self.y) - self.horizon
         printf "Max. forecast horizon: \t\t\t%d\n", self.horizon
         if self.type_moving_window == "static"
